@@ -1,39 +1,85 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Mail, Users, Send, CheckCircle, ShieldAlert, Info, ArrowUpDown, ChevronUp, ChevronDown, ExternalLink, PenTool } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, Mail, Users, Send, CheckCircle, ShieldAlert, Info, ArrowUpDown, ChevronUp, ChevronDown, ExternalLink, Loader2 } from 'lucide-react';
 import { Button, Card, Input, Modal, Badge } from '../../components/UIComponents';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 interface Client {
-    id: number;
+    id: string;
     name: string;
     email: string;
     lastVisit: string;
     totalVisits: number;
-    marketingOptIn: boolean; // Indicates if user agreed to marketing emails
+    marketingOptIn: boolean;
 }
 
 type SortKey = keyof Client;
 type SortDirection = 'asc' | 'desc';
 
 export const SalonClients: React.FC = () => {
-    // Mock Data for Clients
-    const [clients, setClients] = useState<Client[]>([
-        { id: 1, name: 'Sophie de Vries', email: 'sophie@example.com', lastVisit: '15-11-2023', totalVisits: 12, marketingOptIn: true },
-        { id: 2, name: 'Lisa Jansen', email: 'lisa@test.nl', lastVisit: '01-11-2023', totalVisits: 4, marketingOptIn: false },
-        { id: 3, name: 'Eva Bakker', email: 'eva@mail.com', lastVisit: '20-10-2023', totalVisits: 8, marketingOptIn: true },
-        { id: 4, name: 'Anouk Visser', email: 'anouk@demo.nl', lastVisit: '12-10-2023', totalVisits: 1, marketingOptIn: true },
-        { id: 5, name: 'Emma de Groot', email: 'emma@test.com', lastVisit: '05-09-2023', totalVisits: 15, marketingOptIn: false },
-        { id: 6, name: 'Julia Meijer', email: 'julia@test.nl', lastVisit: '02-12-2023', totalVisits: 3, marketingOptIn: true },
-    ]);
-
-    // State
+    const { user } = useAuth();
+    const [clients, setClients] = useState<Client[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [emailForm, setEmailForm] = useState({ subject: '' });
     const [isSent, setIsSent] = useState(false);
-    
-    // Sorting & Selection State
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
-    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+    // Fetch clients from Supabase (appointments by this salon's customers)
+    useEffect(() => {
+        const fetchClients = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                // Get all appointments for this salon
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select(`
+                        *,
+                        profiles:user_id (full_name, email)
+                    `)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                // Group by user and create client list
+                const clientMap = new Map<string, Client>();
+                
+                (data || []).forEach((apt: any) => {
+                    const userId = apt.user_id;
+                    if (!clientMap.has(userId)) {
+                        clientMap.set(userId, {
+                            id: userId,
+                            name: apt.profiles?.full_name || 'Unknown',
+                            email: apt.profiles?.email || '',
+                            lastVisit: apt.date,
+                            totalVisits: 1,
+                            marketingOptIn: true
+                        });
+                    } else {
+                        const existing = clientMap.get(userId)!;
+                        existing.totalVisits += 1;
+                        if (new Date(apt.date) > new Date(existing.lastVisit)) {
+                            existing.lastVisit = apt.date;
+                        }
+                    }
+                });
+
+                setClients(Array.from(clientMap.values()));
+            } catch (err) {
+                console.error('Error fetching clients:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchClients();
+    }, [user]);
 
     // 1. Filter Clients based on Search
     const filteredClients = useMemo(() => {
@@ -90,7 +136,7 @@ export const SalonClients: React.FC = () => {
         }
     };
 
-    const toggleSelectOne = (id: number) => {
+    const toggleSelect = (id: string) => {
         if (selectedIds.includes(id)) {
             setSelectedIds(selectedIds.filter(sid => sid !== id));
         } else {
@@ -133,7 +179,13 @@ export const SalonClients: React.FC = () => {
         }, 1000);
     };
 
-    // Helper for Sort Icon
+    if (loading) {
+        return (
+            <div className="flex justify-center py-12">
+                <Loader2 className="animate-spin text-brand-500" size={32} />
+            </div>
+        );
+    }
     const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
         if (sortConfig?.key !== columnKey) return <ArrowUpDown size={14} className="ml-1 text-stone-300 opacity-0 group-hover:opacity-50" />;
         return sortConfig.direction === 'asc' 
@@ -226,7 +278,7 @@ export const SalonClients: React.FC = () => {
                                             type="checkbox" 
                                             className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
                                             checked={selectedIds.includes(client.id)}
-                                            onChange={() => toggleSelectOne(client.id)}
+                                            onChange={() => toggleSelect(client.id)}
                                         />
                                     </td>
                                     <td className="px-6 py-4 font-medium text-stone-900 flex items-center gap-3">
@@ -321,7 +373,7 @@ export const SalonClients: React.FC = () => {
                     <div className="p-6 bg-stone-50 rounded-xl border border-stone-200 border-dashed text-center text-stone-600 my-4">
                          <div className="flex flex-col items-center gap-3">
                              <div className="h-12 w-12 bg-white rounded-full flex items-center justify-center text-brand-500 shadow-sm border border-stone-100">
-                                 <PenTool size={20} />
+                                 <Mail size={20} />
                              </div>
                              <div>
                                 <p className="font-semibold text-stone-800">Mail wordt opgesteld in jouw mail app</p>

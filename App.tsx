@@ -52,9 +52,6 @@ const getSubdomain = () => {
 
 const App: React.FC = () => {
   const subdomain = getSubdomain();
-  
-  // Debug: log what subdomain was detected
-  console.log('DEBUG: Detected subdomain:', subdomain, 'Hostname:', window.location.hostname);
 
   // If a valid subdomain is detected, we hijack the router to only show that Salon's "Website"
   if (subdomain) {
