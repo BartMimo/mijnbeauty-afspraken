@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Add any project-specific global styles here */
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
