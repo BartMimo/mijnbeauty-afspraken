@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, User, Calendar, Settings, LogOut, Scissors, PieChart, Home, ChevronDown, Bell, Tag, Clock, Heart, Users, Mail } from 'lucide-react';
 import { Button } from './UIComponents';
+import { useAuth } from '../context/AuthContext';
 
 // --- Shared Header Component ---
 const HeaderLogo = () => (
@@ -16,25 +17,11 @@ const HeaderLogo = () => (
 const UserDropdown: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
-    const [user, setUser] = useState<any>(null);
+    const { user, profile, signOut } = useAuth();
 
-    const loadUser = () => {
-        const userStr = localStorage.getItem('currentUser');
-        setUser(userStr ? JSON.parse(userStr) : null);
-    };
-
-    useEffect(() => {
-        loadUser();
-        // Listen for auth changes anywhere in the app
-        window.addEventListener('auth-change', loadUser);
-        return () => window.removeEventListener('auth-change', loadUser);
-    }, []);
-
-    const handleLogout = () => {
-        localStorage.removeItem('currentUser');
+    const handleLogout = async () => {
+        await signOut();
         setIsOpen(false);
-        // Dispatch event to update Header UI immediately
-        window.dispatchEvent(new Event('auth-change'));
         navigate('/');
     };
 
@@ -47,32 +34,32 @@ const UserDropdown: React.FC = () => {
                 <div className="h-8 w-8 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center shrink-0">
                     <User size={18} />
                 </div>
-                {user && <span className="hidden md:inline text-sm font-medium text-stone-700 max-w-[100px] truncate">{user.name.split(' ')[0]}</span>}
+                {profile && <span className="hidden md:inline text-sm font-medium text-stone-700 max-w-[100px] truncate">{profile.full_name?.split(' ')[0] || 'User'}</span>}
                 <ChevronDown size={16} className="text-stone-400 hidden md:block" />
             </button>
 
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-stone-100 py-1 z-50 animate-fadeIn origin-top-right">
                     <div className="px-4 py-2 border-b border-stone-50">
-                        <p className="text-sm font-medium text-stone-900 truncate">{user?.name || 'Gast'}</p>
-                        <p className="text-xs text-stone-500 capitalize">{user?.role === 'staff' ? 'Medewerker' : user?.role}</p>
+                        <p className="text-sm font-medium text-stone-900 truncate">{profile?.full_name || user?.email || 'Gast'}</p>
+                        <p className="text-xs text-stone-500 capitalize">{profile?.role === 'staff' ? 'Medewerker' : profile?.role}</p>
                     </div>
-                    {user?.role === 'consumer' && (
+                    {profile?.role === 'consumer' && (
                         <Link to="/dashboard/user" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
                             Mijn Dashboard
                         </Link>
                     )}
-                    {user?.role === 'salon' && (
+                    {profile?.role === 'salon' && (
                          <Link to="/dashboard/salon" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
                             Salon Dashboard
                         </Link>
                     )}
-                    {user?.role === 'staff' && (
+                    {profile?.role === 'staff' && (
                          <Link to="/dashboard/staff" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
                             Mijn Agenda
                         </Link>
                     )}
-                    <Link to={user?.role === 'staff' ? "/dashboard/staff/profile" : "/dashboard/user/profile"} className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
+                    <Link to={profile?.role === 'staff' ? "/dashboard/staff/profile" : "/dashboard/user/profile"} className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
                         Profiel
                     </Link>
                     <button 
@@ -89,18 +76,8 @@ const UserDropdown: React.FC = () => {
 
 export const PublicLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  const checkAuth = () => {
-    const user = localStorage.getItem('currentUser');
-    setIsAuthenticated(!!user);
-  };
-
-  useEffect(() => {
-    checkAuth();
-    window.addEventListener('auth-change', checkAuth);
-    return () => window.removeEventListener('auth-change', checkAuth);
-  }, []);
+  const { user, session } = useAuth();
+  const isAuthenticated = !!user && !!session;
 
   return (
     <div className="flex min-h-screen flex-col bg-stone-50">

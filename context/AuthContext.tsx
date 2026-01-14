@@ -102,7 +102,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    // Clear all localStorage that might contain old demo/test data
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('userAppointments');
+    localStorage.removeItem('user_favorites');
+    localStorage.removeItem('salon_deals');
   };
 
   if (isLoading) {
