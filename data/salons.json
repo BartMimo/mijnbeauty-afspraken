@@ -1,0 +1,17 @@
+[
+  {
+    "id": "1",
+    "subdomain": "glow",
+    "name": "Glow & Shine Studio",
+    "description": "Specialist in biab nagels en wimperextensions.",
+    "address": "Kerkstraat 12",
+    "city": "Amsterdam",
+    "zipCode": "1012 AB",
+    "image": "https://picsum.photos/800/600?random=1",
+    "rating": 4.8,
+    "reviewCount": 124,
+    "ownerId": "owner1",
+    "email": "info@glowshine.nl",
+    "phone": "0612345678"
+  }
+]

@@ -1,0 +1,2 @@
+id,subdomain,name,description,address,city,zipCode,image,rating,reviewCount,ownerId,email,phone
+1,glow,"Glow & Shine Studio","Specialist in biab nagels en wimperextensions.","Kerkstraat 12",Amsterdam,"1012 AB","https://picsum.photos/800/600?random=1",4.8,124,owner1,info@glowshine.nl,0612345678
