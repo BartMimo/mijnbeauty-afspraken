@@ -151,7 +151,7 @@ export const MOCK_DEALS: Deal[] = [
   },
   {
     id: 'd4',
-    salonId: '2',
+    salonId: 'barber',
     salonName: 'Barber Bros',
     salonCity: 'Utrecht',
     serviceName: 'Baard Trimmen Deluxe',
