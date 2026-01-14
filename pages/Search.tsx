@@ -49,7 +49,10 @@ export const SearchPage: React.FC = () => {
             id: s.id,
             name: s.name,
             price: s.price,
-                        category: ServiceCategory.NAILS // Default for now
+            category: ServiceCategory.NAILS // Default for now
+          }))
+        }));
+
         setSalons(transformed);
       } catch (err) {
         console.error('Error fetching salons:', err);
