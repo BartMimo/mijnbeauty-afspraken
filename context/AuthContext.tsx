@@ -87,10 +87,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (data) setProfile(data);
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (error) {
+        console.warn("Profile fetch error:", error);
+      } else if (data) {
+        setProfile(data);
+      }
     } catch (e) {
-      console.warn("Profile fetch failed, using fallback");
+      console.warn("Profile fetch failed:", e);
     } finally {
       setIsLoading(false);
     }

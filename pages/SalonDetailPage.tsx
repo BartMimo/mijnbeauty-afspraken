@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Tag, Zap, Phone, Mail, MessageCircle, Loader2 } from 'lucide-react';
 import { Button, Card, Badge } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { Service, Deal } from '../types';
 
 interface SalonDetailPageProps {
@@ -11,10 +12,13 @@ interface SalonDetailPageProps {
 
 export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) => {
     const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const { user } = useAuth();
     const salonId = subdomain || id;
     
     const [salon, setSalon] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [bookingLoading, setBookingLoading] = useState(false);
     const [activeDeals, setActiveDeals] = useState<Deal[]>([]);
     const [selectedService, setSelectedService] = useState<string | null>(null);
     const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
@@ -44,6 +48,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
 
                 setSalon({
                     id: data.slug || data.id,
+                    supabaseId: data.id,
                     name: data.name,
                     city: data.city || '',
                     address: data.address || '',
@@ -449,7 +454,42 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                 </div>
                                             </div>
                                             
-                                            <Button className="w-full" onClick={() => alert('Boeking succesvol! (Demo)')}>
+                                            <Button 
+                                                className="w-full" 
+                                                onClick={async () => {
+                                                    if (!user) {
+                                                        alert('Log eerst in om te boeken');
+                                                        navigate('/login');
+                                                        return;
+                                                    }
+                                                    
+                                                    setBookingLoading(true);
+                                                    try {
+                                                        const { error } = await supabase
+                                                            .from('appointments')
+                                                            .insert([{
+                                                                user_id: user.id,
+                                                                salon_id: salon.supabaseId,
+                                                                service_id: selectedService,
+                                                                date: selectedDate?.toISOString().split('T')[0],
+                                                                time: selectedDeal ? selectedDeal.time : selectedTime,
+                                                                price: selectedDeal ? selectedDeal.discountPrice : currentService?.price,
+                                                                status: 'confirmed'
+                                                            }]);
+                                                        
+                                                        if (error) throw error;
+                                                        
+                                                        alert('Boeking succesvol!');
+                                                        navigate('/dashboard/user');
+                                                    } catch (err: any) {
+                                                        console.error('Booking error:', err);
+                                                        alert('Boeking mislukt: ' + (err.message || 'Onbekende fout'));
+                                                    } finally {
+                                                        setBookingLoading(false);
+                                                    }
+                                                }}
+                                                isLoading={bookingLoading}
+                                            >
                                                 {selectedDeal ? 'Deal Claimen & Boeken' : 'Bevestig Boeking'}
                                             </Button>
                                             
