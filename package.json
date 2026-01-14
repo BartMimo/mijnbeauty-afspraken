@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "node scripts/vercel-debug.js && tsc && vite build",
     "preview": "vite preview",
     "import-data": "ts-node scripts/import-data.ts",
     "import-all": "ts-node scripts/import-all.ts",
