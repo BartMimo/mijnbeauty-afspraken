@@ -301,7 +301,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                      <Card className="p-8">
                         <h2 className="text-xl font-bold mb-6">Reviews</h2>
                         <div className="space-y-6">
-                            {MOCK_REVIEWS.map(review => (
+                            {[].map((review: any) => (
                                 <div key={review.id} className="border-b border-stone-100 last:border-0 pb-6 last:pb-0">
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="font-semibold">{review.user}</span>
