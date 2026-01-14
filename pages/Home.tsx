@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Star, Scissors, CheckCircle, ArrowRight, Tag, Clock, Euro } from 'lucide-react';
+import { Search, MapPin, Star, Scissors, CheckCircle, ArrowRight, Tag, Clock, Euro, Calendar } from 'lucide-react';
 import { Button, Input, Card, Badge } from '../components/UIComponents';
 import { MOCK_SALONS, MOCK_DEALS } from '../services/mockData';
 
@@ -185,6 +185,3 @@ export const Home: React.FC = () => {
     </div>
   );
 };
-
-// Helper for icon component mapping if needed later.
-function Calendar(props: any) { return <div {...props}>Calendar</div> }
