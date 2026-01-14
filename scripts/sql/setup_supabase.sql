@@ -15,6 +15,11 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+-- Ensure timestamp columns exist for pre-existing installations
+alter table public.profiles
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
 -- Non-unique index on email to support lookups without causing sign-up conflicts
 create index if not exists profiles_email_idx on public.profiles (email);
 
