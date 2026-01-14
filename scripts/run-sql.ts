@@ -28,7 +28,7 @@ async function main() {
     }
     console.log('RPC executed ok:', data);
   } catch (e) {
-    console.error('RPC execution failed, trying via query on DB (may not be supported).', e.message || e);
+    console.error('RPC execution failed, trying via query on DB (may not be supported).', (e as any).message || e);
     // If rpc not available, try calling the SQL via the Postgres query endpoint (not always possible)
     try {
       const res = await (supabase as any).postgrest.rpc('sql', { q: sql });

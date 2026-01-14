@@ -76,7 +76,7 @@ async function main() {
     console.log(`Loading mapping: ${mapPath}`);
     const mapRaw = await fs.readFile(mapPath, 'utf-8');
     const mapping = JSON.parse(mapRaw) as Record<string, string>;
-    rows = rows.map((row) => {
+    rows = rows.map((row: any) => {
       const out: Record<string, any> = { ...row };
       for (const [source, target] of Object.entries(mapping)) {
         if (source in row) {
@@ -94,7 +94,7 @@ async function main() {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   let removedId = false;
   let removedOwnerId = false;
-  rows = rows.map((row) => {
+  rows = rows.map((row: any) => {
     const out = { ...row } as Record<string, any>;
     if ('id' in out) {
       delete out.id;
@@ -125,7 +125,7 @@ async function main() {
   // WARNING: service role key is highly privileged; keep it secret and do NOT commit it to source control.
   const supabase = supabaseServiceKey
     ? createClient(supabaseUrl, supabaseServiceKey)
-    : createClient(supabaseUrl, supabaseKey);
+    : createClient(supabaseUrl || '', supabaseKey || '');
   if (supabaseServiceKey) console.warn('Using SUPABASE_SERVICE_ROLE_KEY to perform imports (bypasses RLS). Ensure this key is kept secret.');
 
   // --- Auto-generate `slug` if missing, and ensure uniqueness in the DB ---

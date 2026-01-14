@@ -48,7 +48,7 @@ async function main() {
         console.error('Failed to create user for', email, insertErr);
         continue;
       }
-      userId = newUser.id;
+      userId = newUser?.id || '';
       console.log(`Created user ${userId} for ${email}`);
     }
 
