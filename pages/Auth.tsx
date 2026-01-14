@@ -116,6 +116,15 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
             });
 
             if (error) throw error;
+            // Ensure a profile row exists regardless of DB hooks
+            if (data.user) {
+                await supabase
+                    .from('profiles')
+                    .upsert(
+                        { id: data.user.id, email: regEmail, full_name: regName, role: 'consumer' },
+                        { onConflict: 'id' }
+                    );
+            }
             
             alert('Account aangemaakt! Controleer je e-mail voor bevestiging (of log in als dit een testomgeving is).');
             if (data.session) {
@@ -167,6 +176,13 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
 
             // 2. Create Salon Entry (If User creation successful)
             if (data.user) {
+                // Ensure a profile row exists regardless of DB hooks
+                await supabase
+                    .from('profiles')
+                    .upsert(
+                        { id: data.user.id, email: regEmail, full_name: regName, role: 'salon' },
+                        { onConflict: 'id' }
+                    );
                 const { error: salonError } = await supabase
                     .from('salons')
                     .insert([
