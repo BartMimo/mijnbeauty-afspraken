@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/vercel-debug.js && tsc && vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
     "import-data": "ts-node scripts/import-data.ts",
     "import-all": "ts-node scripts/import-all.ts",
@@ -27,8 +27,9 @@
     "react-router-dom": "^6.22.0",
     "recharts": "^2.12.0",
     "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.0"
-  },
+    "tailwind-merge": "^2.2.0",
+    "typescript": "^5.2.0"
+  }
   "devDependencies": {
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
