@@ -31,17 +31,17 @@ const getSubdomain = () => {
     const host = window.location.hostname;
     const parts = host.split('.');
     
-    // Check if we are on a subdomain (length > 2 usually means subdomain.domain.com)
-    // Or for localhost: length > 1 (subdomain.localhost)
-    // Excluding 'www'
-    
     let subdomain = '';
     
-    // Simple detection for demo purposes
-    if (parts.length > 2 && parts[0] !== 'www') {
-        subdomain = parts[0];
-    } else if (parts.length === 2 && host.includes('localhost') && parts[0] !== 'www') {
+    // For localhost: subdomain.localhost (2 parts) - subdomain is parts[0]
+    if (parts.length === 2 && host.includes('localhost') && parts[0] !== 'www') {
          subdomain = parts[0];
+    } 
+    // For Vercel domains (*.vercel.app): only detect real subdomains (salons)
+    // mijnbeauty-afspraken.vercel.app has 3 parts, so we don't detect a subdomain
+    // glow.mijnbeauty-afspraken.vercel.app would have 4 parts, where parts[0] = 'glow' is the subdomain
+    else if (parts.length > 3 && parts[0] !== 'www') {
+        subdomain = parts[0];
     }
 
     // Uncomment this line to TEST specific subdomain behavior without configuring DNS
