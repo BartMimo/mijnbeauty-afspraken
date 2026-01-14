@@ -5,9 +5,15 @@ import { Button, Card, Badge } from '../components/UIComponents';
 import { MOCK_SALONS, MOCK_REVIEWS, MOCK_DEALS } from '../services/mockData';
 import { Service, Deal } from '../types';
 
-export const SalonDetailPage: React.FC = () => {
+interface SalonDetailPageProps {
+    subdomain?: string;
+}
+
+export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) => {
     const { id } = useParams<{ id: string }>();
-    const salon = MOCK_SALONS.find(s => s.id === id);
+    // If subdomain is provided, use it; otherwise use URL parameter
+    const salonId = subdomain || id;
+    const salon = MOCK_SALONS.find(s => s.id === salonId);
     
     // State
     const [activeDeals, setActiveDeals] = useState<Deal[]>([]);
