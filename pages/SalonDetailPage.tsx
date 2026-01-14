@@ -28,16 +28,16 @@ export const SalonDetailPage: React.FC = () => {
         const staticDeals = MOCK_DEALS.filter(d => d.salonId === salon.id);
 
         // 2. Get dynamic deals created in Dashboard (localStorage)
-        // Note: Since dashboard assumes single-user context, we assume all LS deals belong to Salon ID '1' (Glow & Shine) for this demo.
+        // Note: Since dashboard assumes single-user context, we assume all LS deals belong to Salon ID 'glow' (Glow & Shine) for this demo.
         let dynamicDeals: Deal[] = [];
-        if (salon.id === '1') {
+        if (salon.id === 'glow') {
             const saved = localStorage.getItem('salon_deals');
             if (saved) {
                 const parsed = JSON.parse(saved);
                 // Map dashboard format to public Deal format if needed
                 dynamicDeals = parsed.filter((d: any) => d.status === 'active').map((d: any) => ({
                     id: `local-${d.id}`,
-                    salonId: '1',
+                    salonId: 'glow',
                     salonName: salon.name,
                     salonCity: salon.city,
                     serviceName: d.service,

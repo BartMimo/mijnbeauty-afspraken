@@ -1,4 +1,4 @@
-Cimport dotenv from 'dotenv';
+import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
 dotenv.config({ path: '.env.local' });
@@ -19,8 +19,7 @@ async function main() {
       continue;
     }
     const email = s.email;
-    // Check if auth user exists
-    const { data: existingAuthUser } = await supabase.auth.admin.listUsers?.({ limit: 100 }).catch(() => ({ data: null }));
+    // Check if auth user exists (we'll look up by profile/email instead)
     // Better approach: try to fetch profile by email in profiles table
     const { data: profile } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
     if (profile && profile.id) {

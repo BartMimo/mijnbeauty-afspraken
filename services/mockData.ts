@@ -3,7 +3,7 @@ import { Salon, ServiceCategory, Appointment, UserRole, Deal } from '../types';
 
 export const MOCK_SALONS: Salon[] = [
   {
-    id: '1',
+    id: 'glow',
     subdomain: 'glow',
     name: 'Glow & Shine Studio',
     description: 'Specialist in biab nagels en wimperextensions. Een rustige plek voor jezelf.',
@@ -22,7 +22,7 @@ export const MOCK_SALONS: Salon[] = [
     ]
   },
   {
-    id: '2',
+    id: 'barber',
     subdomain: 'barber',
     name: 'Barber Bros',
     description: 'Klassieke herenkapper. Strakke fades en baardtrimmen.',
@@ -41,7 +41,7 @@ export const MOCK_SALONS: Salon[] = [
     ]
   },
   {
-    id: '3',
+    id: 'zen',
     subdomain: 'zen',
     name: 'Zen Massage Praktijk',
     description: 'Kom volledig tot rust met onze ontspanningsmassages.',
@@ -60,7 +60,7 @@ export const MOCK_SALONS: Salon[] = [
     ]
   },
     {
-    id: '4',
+    id: 'bella',
     subdomain: 'bella',
     name: 'Bella Hair',
     description: 'Dé specialist in kleuringen en balayage.',
@@ -83,7 +83,7 @@ export const MOCK_SALONS: Salon[] = [
 export const MOCK_APPOINTMENTS: Appointment[] = [
   {
     id: 'a1',
-    salonId: '1',
+    salonId: 'glow',
     salonName: 'Glow & Shine Studio',
     serviceId: 's1',
     serviceName: 'Biab Nagels',
@@ -95,7 +95,7 @@ export const MOCK_APPOINTMENTS: Appointment[] = [
   },
   {
     id: 'a2',
-    salonId: '2',
+    salonId: 'barber',
     salonName: 'Barber Bros',
     serviceId: 's3',
     serviceName: 'Heren Knippen',
@@ -115,7 +115,7 @@ export const MOCK_REVIEWS = [
 export const MOCK_DEALS: Deal[] = [
   {
     id: 'd1',
-    salonId: '1',
+    salonId: 'glow',
     salonName: 'Glow & Shine Studio',
     salonCity: 'Amsterdam',
     serviceName: 'Biab Nagels (Last-minute)',
@@ -127,7 +127,7 @@ export const MOCK_DEALS: Deal[] = [
   },
   {
     id: 'd2',
-    salonId: '3',
+    salonId: 'zen',
     salonName: 'Zen Massage',
     salonCity: 'Rotterdam',
     serviceName: 'Ontspanningsmassage 60min',
@@ -139,7 +139,7 @@ export const MOCK_DEALS: Deal[] = [
   },
    {
     id: 'd3',
-    salonId: '4',
+    salonId: 'bella',
     salonName: 'Bella Hair',
     salonCity: 'Amstelveen',
     serviceName: 'Wassen & Stylen',
