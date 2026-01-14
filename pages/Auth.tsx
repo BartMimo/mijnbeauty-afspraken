@@ -117,7 +117,8 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
 
             if (error) throw error;
             // Ensure a profile row exists regardless of DB hooks
-            if (data.user) {
+            // Upsert profile only if we have a session (auth.uid available under RLS)
+            if (data.user && data.session) {
                 await supabase
                     .from('profiles')
                     .upsert(
@@ -175,8 +176,8 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
             if (error) throw error;
 
             // 2. Create Salon Entry (If User creation successful)
-            if (data.user) {
-                // Ensure a profile row exists regardless of DB hooks
+            if (data.user && data.session) {
+                // Upsert profile only if we have a session (auth.uid available under RLS)
                 await supabase
                     .from('profiles')
                     .upsert(

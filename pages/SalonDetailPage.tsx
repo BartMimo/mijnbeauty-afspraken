@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Tag, Zap, Phone, Mail, MessageCircle } from 'lucide-react';
+import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Tag, Zap, Phone, Mail, MessageCircle, Loader2 } from 'lucide-react';
 import { Button, Card, Badge } from '../components/UIComponents';
-import { MOCK_SALONS, MOCK_REVIEWS, MOCK_DEALS } from '../services/mockData';
+import { supabase } from '../lib/supabase';
 import { Service, Deal } from '../types';
 
 interface SalonDetailPageProps {
@@ -11,11 +11,10 @@ interface SalonDetailPageProps {
 
 export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) => {
     const { id } = useParams<{ id: string }>();
-    // If subdomain is provided, use it; otherwise use URL parameter
     const salonId = subdomain || id;
-    const salon = MOCK_SALONS.find(s => s.id === salonId);
     
-    // State
+    const [salon, setSalon] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
     const [activeDeals, setActiveDeals] = useState<Deal[]>([]);
     const [selectedService, setSelectedService] = useState<string | null>(null);
     const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
@@ -26,38 +25,80 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
-    // Load deals (Combine MOCK_DEALS with LocalStorage deals from Dashboard)
+    // Fetch salon data from Supabase
     useEffect(() => {
-        if (!salon) return;
+        const fetchSalon = async () => {
+            if (!salonId) return;
 
-        // 1. Get static mock deals for this salon
-        const staticDeals = MOCK_DEALS.filter(d => d.salonId === salon.id);
+            try {
+                const { data, error } = await supabase
+                    .from('salons')
+                    .select(`
+                        *,
+                        services(id, name, description, price, duration_minutes)
+                    `)
+                    .or(`slug.eq.${salonId},id.eq.${salonId}`)
+                    .single();
 
-        // 2. Get dynamic deals created in Dashboard (localStorage)
-        // Note: Since dashboard assumes single-user context, we assume all LS deals belong to Salon ID 'glow' (Glow & Shine) for this demo.
-        let dynamicDeals: Deal[] = [];
-        if (salon.id === 'glow') {
-            const saved = localStorage.getItem('salon_deals');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                // Map dashboard format to public Deal format if needed
-                dynamicDeals = parsed.filter((d: any) => d.status === 'active').map((d: any) => ({
-                    id: `local-${d.id}`,
-                    salonId: 'glow',
-                    salonName: salon.name,
-                    salonCity: salon.city,
-                    serviceName: d.service,
-                    originalPrice: parseFloat(d.original || '0'),
-                    discountPrice: parseFloat(d.price),
-                    date: 'Binnenkort', // Dashboard deals usually imply "today/tomorrow" or specified text
-                    time: d.time,
-                    description: 'Exclusieve online deal'
-                }));
+                if (error) throw error;
+
+                setSalon({
+                    id: data.slug || data.id,
+                    name: data.name,
+                    city: data.city || '',
+                    address: data.address || '',
+                    description: 'Welkom bij onze salon!',
+                    rating: 4.5,
+                    reviewCount: 0,
+                    services: (data.services || []).map((s: any) => ({
+                        id: s.id,
+                        name: s.name,
+                        description: s.description || '',
+                        price: s.price,
+                        duration: s.duration_minutes,
+                        category: 'Nails'
+                    })),
+                    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'
+                });
+
+                // Fetch deals
+                const { data: dealsData } = await supabase
+                    .from('deals')
+                    .select('*')
+                    .eq('salon_id', data.id)
+                    .eq('active', true);
+
+                if (dealsData) {
+                    setActiveDeals(dealsData.map((d: any) => ({
+                        id: d.id,
+                        salonId: data.slug || data.id,
+                        salonName: data.name,
+                        salonCity: data.city,
+                        serviceName: d.service_name,
+                        originalPrice: d.original_price,
+                        discountPrice: d.discount_price,
+                        date: d.date,
+                        time: d.time,
+                        description: d.description || ''
+                    })));
+                }
+            } catch (err) {
+                console.error('Error fetching salon:', err);
+            } finally {
+                setLoading(false);
             }
-        }
+        };
 
-        setActiveDeals([...staticDeals, ...dynamicDeals]);
-    }, [salon]);
+        fetchSalon();
+    }, [salonId]);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <Loader2 className="animate-spin text-brand-500" size={32} />
+            </div>
+        );
+    }
 
     if (!salon) return <div className="p-8 text-center">Salon niet gevonden</div>;
 

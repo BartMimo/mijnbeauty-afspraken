@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Star, Filter, SlidersHorizontal, Heart, X } from 'lucide-react';
+import { MapPin, Star, Filter, SlidersHorizontal, Heart, X, Loader2 } from 'lucide-react';
 import { Button, Card, Input, Badge } from '../components/UIComponents';
-import { MOCK_SALONS } from '../services/mockData';
+import { supabase } from '../lib/supabase';
 import { ServiceCategory } from '../types';
 
 export const SearchPage: React.FC = () => {
@@ -19,8 +19,50 @@ export const SearchPage: React.FC = () => {
       distance: initialDist,
   });
 
+  const [salons, setSalons] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  // Fetch salons from Supabase
+  useEffect(() => {
+    const fetchSalons = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('salons')
+          .select(`
+            *,
+            services(id, name, price)
+          `);
+
+        if (error) throw error;
+
+        const transformed = (data || []).map((salon: any) => ({
+          id: salon.slug || salon.id,
+          name: salon.name,
+          city: salon.city || '',
+          address: salon.address || '',
+          zipCode: '',
+          rating: 4.5, // TODO: Calculate from reviews
+          reviewCount: 0,
+          services: (salon.services || []).map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            price: s.price,
+            category: ServiceCategory.Nails // Default for now
+          }))
+        }));
+
+        setSalons(transformed);
+      } catch (err) {
+        console.error('Error fetching salons:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSalons();
+  }, []);
 
   useEffect(() => {
       const savedFavs = JSON.parse(localStorage.getItem('user_favorites') || '[]');
@@ -42,12 +84,12 @@ export const SearchPage: React.FC = () => {
   };
 
   // Filter Logic
-  const filteredSalons = MOCK_SALONS.filter(salon => {
+  const filteredSalons = salons.filter(salon => {
       const matchesQuery = salon.name.toLowerCase().includes(filters.query.toLowerCase()) || 
-                           salon.services.some(s => s.name.toLowerCase().includes(filters.query.toLowerCase()));
+                           salon.services.some((s: any) => s.name.toLowerCase().includes(filters.query.toLowerCase()));
       const matchesLoc = salon.city.toLowerCase().includes(filters.location.toLowerCase()) ||
                          salon.zipCode.toLowerCase().includes(filters.location.toLowerCase());
-      const matchesCat = filters.category === 'all' || salon.services.some(s => s.category === filters.category);
+      const matchesCat = filters.category === 'all' || salon.services.some((s: any) => s.category === filters.category);
       
       return matchesQuery && matchesLoc && matchesCat;
   });
@@ -150,7 +192,7 @@ export const SearchPage: React.FC = () => {
         <div className="flex-1">
             <div className="mb-4 md:mb-6 flex justify-between items-center">
                 <h1 className="text-xl md:text-2xl font-bold text-stone-900">
-                    {filteredSalons.length} resultaten gevonden
+                    {loading ? 'Zoeken...' : `${filteredSalons.length} resultaten gevonden`}
                 </h1>
                 <div className="hidden md:flex items-center gap-2 text-sm text-stone-500">
                     <span>Sorteer op:</span>
@@ -162,6 +204,18 @@ export const SearchPage: React.FC = () => {
                 </div>
             </div>
 
+            {loading ? (
+                <div className="flex justify-center py-12">
+                    <Loader2 className="animate-spin text-brand-500" size={32} />
+                </div>
+            ) : filteredSalons.length === 0 ? (
+                <Card className="p-12 text-center">
+                    <p className="text-stone-500 mb-4">Geen salons gevonden met de opgegeven filters.</p>
+                    <Button onClick={() => setFilters({query: '', location: '', category: 'all', distance: null})}>
+                        Reset filters
+                    </Button>
+                </Card>
+            ) : (
             <div className="grid gap-6">
                 {filteredSalons.map(salon => (
                     <Card key={salon.id} className="flex flex-col md:flex-row overflow-hidden hover:shadow-md transition-shadow">
@@ -208,22 +262,8 @@ export const SearchPage: React.FC = () => {
                         </div>
                     </Card>
                 ))}
-                
-                {filteredSalons.length === 0 && (
-                    <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-stone-200">
-                        <Filter size={48} className="mx-auto text-stone-300 mb-4" />
-                        <h3 className="text-lg font-medium text-stone-900">Geen salons gevonden</h3>
-                        <p className="text-stone-500">Probeer je zoekfilters aan te passen.</p>
-                        <Button 
-                            variant="outline" 
-                            className="mt-4"
-                            onClick={() => setFilters({query: '', location: '', category: 'all', distance: null})}
-                        >
-                            Filters wissen
-                        </Button>
-                    </div>
-                )}
             </div>
+            )}
         </div>
       </div>
     </div>

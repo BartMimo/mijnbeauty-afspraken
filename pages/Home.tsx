@@ -1,13 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Star, Scissors, CheckCircle, ArrowRight, Tag, Clock, Euro, Calendar } from 'lucide-react';
+import { Search, MapPin, Star, Scissors, CheckCircle, ArrowRight, Tag, Clock, Euro, Calendar, Loader2 } from 'lucide-react';
 import { Button, Input, Card, Badge } from '../components/UIComponents';
-import { MOCK_SALONS, MOCK_DEALS } from '../services/mockData';
+import { supabase } from '../lib/supabase';
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [location, setLocation] = useState('');
+  const [deals, setDeals] = useState<any[]>([]);
+  const [loadingDeals, setLoadingDeals] = useState(true);
+
+  // Fetch deals from Supabase
+  useEffect(() => {
+    const fetchDeals = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('deals')
+          .select(`
+            *,
+            salon:salons(id, name, slug)
+          `)
+          .eq('active', true)
+          .limit(4);
+
+        if (error) throw error;
+
+        const transformed = (data || []).map((deal: any) => ({
+          id: deal.id,
+          serviceName: deal.service_name,
+          originalPrice: deal.original_price,
+          discountPrice: deal.discount_price,
+          date: deal.date,
+          time: deal.time,
+          salonName: deal.salon?.name || 'Salon',
+          salonId: deal.salon?.slug || deal.salon?.id
+        }));
+
+        setDeals(transformed);
+      } catch (err) {
+        console.error('Error fetching deals:', err);
+      } finally {
+        setLoadingDeals(false);
+      }
+    };
+
+    fetchDeals();
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,8 +116,17 @@ export const Home: React.FC = () => {
                 Bekijk alle deals <ArrowRight size={16} className="ml-1" />
             </a>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {MOCK_DEALS.map((deal) => {
+        {loadingDeals ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="animate-spin text-brand-500" size={32} />
+          </div>
+        ) : deals.length === 0 ? (
+          <Card className="p-8 text-center bg-stone-50">
+            <p className="text-stone-500">Momenteel zijn er geen actieve deals beschikbaar.</p>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {deals.map((deal) => {
                 const discount = Math.round(((deal.originalPrice - deal.discountPrice) / deal.originalPrice) * 100);
                 return (
                     <Card key={deal.id} className="overflow-hidden group hover:shadow-lg transition-all border-brand-100 flex flex-col h-full">
@@ -114,7 +162,8 @@ export const Home: React.FC = () => {
                     </Card>
                 );
             })}
-        </div>
+          </div>
+        )}
       </section>
 
       {/* How it works */}

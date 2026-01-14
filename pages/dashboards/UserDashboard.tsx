@@ -1,37 +1,71 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Download, Edit2, Trash2, RotateCcw, Bell } from 'lucide-react';
+import { Calendar, Clock, MapPin, Download, Edit2, Trash2, RotateCcw, Bell, Loader2 } from 'lucide-react';
 import { Card, Badge, Button, Modal, Input } from '../../components/UIComponents';
-import { MOCK_APPOINTMENTS } from '../../services/mockData';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 export const UserDashboard: React.FC = () => {
     const navigate = useNavigate();
+    const { user } = useAuth();
     
-    // Initialize appointments from localStorage if available, else mock
-    const [appointments, setAppointments] = useState(() => {
-        const saved = localStorage.getItem('userAppointments');
-        return saved ? JSON.parse(saved) : MOCK_APPOINTMENTS;
-    });
-
-    // Notification State
+    const [appointments, setAppointments] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [notification, setNotification] = useState<string | null>(null);
 
-    // Persist changes to localStorage
+    // Fetch appointments from Supabase
     useEffect(() => {
-        localStorage.setItem('userAppointments', JSON.stringify(appointments));
-        
-        // Check for notifications (Simulation: If there's a confirmed appointment tomorrow or today)
-        // In real app this comes from backend push
-        const now = new Date();
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-        
-        const hasUpcoming = appointments.find((a: any) => a.date === tomorrowStr && a.status === 'confirmed');
-        if (hasUpcoming) {
-            setNotification(`Herinnering: Je hebt morgen om ${hasUpcoming.time} een afspraak bij ${hasUpcoming.salonName}!`);
-        }
-    }, [appointments]);
+        const fetchAppointments = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select(`
+                        *,
+                        service:services(name),
+                        salon:salons(id, name, slug)
+                    `)
+                    .eq('user_id', user.id)
+                    .order('date', { ascending: true });
+
+                if (error) throw error;
+
+                // Transform data to match component structure
+                const transformed = (data || []).map((apt: any) => ({
+                    id: apt.id,
+                    date: apt.date,
+                    time: apt.time,
+                    status: apt.status,
+                    price: apt.price,
+                    serviceName: apt.service?.name || 'Service',
+                    salonName: apt.salon?.name || 'Salon',
+                    salonId: apt.salon?.slug || apt.salon?.id
+                }));
+
+                setAppointments(transformed);
+
+                // Check for upcoming notifications
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                
+                const hasUpcoming = transformed.find((a: any) => a.date === tomorrowStr && a.status === 'confirmed');
+                if (hasUpcoming) {
+                    setNotification(`Herinnering: Je hebt morgen om ${hasUpcoming.time} een afspraak bij ${hasUpcoming.salonName}!`);
+                }
+            } catch (err) {
+                console.error('Error fetching appointments:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAppointments();
+    }, [user]);
     
     // Modal State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -68,11 +102,23 @@ export const UserDashboard: React.FC = () => {
         document.body.removeChild(link);
     };
 
-    const handleCancel = (id: string) => {
+    const handleCancel = async (id: string) => {
         if (window.confirm('Weet je zeker dat je deze afspraak wilt annuleren? Dit kan niet ongedaan gemaakt worden.')) {
-            // Remove the appointment from the list
-            setAppointments((prev: any[]) => prev.filter((a: any) => a.id !== id));
-            setNotification(null); // Clear notification if cancelled
+            try {
+                const { error } = await supabase
+                    .from('appointments')
+                    .update({ status: 'cancelled' })
+                    .eq('id', id);
+
+                if (error) throw error;
+
+                // Update local state
+                setAppointments((prev: any[]) => prev.filter((a: any) => a.id !== id));
+                setNotification(null);
+            } catch (err) {
+                console.error('Error cancelling appointment:', err);
+                alert('Kon afspraak niet annuleren. Probeer opnieuw.');
+            }
         }
     };
 
@@ -86,21 +132,42 @@ export const UserDashboard: React.FC = () => {
         setIsEditModalOpen(true);
     };
 
-    const saveEdit = () => {
+    const saveEdit = async () => {
         if (editingApt) {
-            setAppointments((prev: any[]) => prev.map((a: any) => a.id === editingApt.id ? {
-                ...a,
-                date: editForm.date,
-                time: editForm.time
-            } : a));
-            setIsEditModalOpen(false);
-            setEditingApt(null);
+            try {
+                const { error } = await supabase
+                    .from('appointments')
+                    .update({ date: editForm.date, time: editForm.time })
+                    .eq('id', editingApt.id);
+
+                if (error) throw error;
+
+                // Update local state
+                setAppointments((prev: any[]) => prev.map((a: any) => a.id === editingApt.id ? {
+                    ...a,
+                    date: editForm.date,
+                    time: editForm.time
+                } : a));
+                setIsEditModalOpen(false);
+                setEditingApt(null);
+            } catch (err) {
+                console.error('Error updating appointment:', err);
+                alert('Kon afspraak niet wijzigen. Probeer opnieuw.');
+            }
         }
     };
 
     // Filter derived lists from state
     const upcoming = appointments.filter((a: any) => a.status === 'confirmed');
     const history = appointments.filter((a: any) => a.status === 'completed');
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <Loader2 className="animate-spin text-brand-500" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8">
