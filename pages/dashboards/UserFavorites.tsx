@@ -1,27 +1,105 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Star, Heart, ArrowRight } from 'lucide-react';
+import { MapPin, Star, Heart, ArrowRight, Loader2 } from 'lucide-react';
 import { Card, Button, Badge } from '../../components/UIComponents';
-import { MOCK_SALONS } from '../../services/mockData';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 export const UserFavorites: React.FC = () => {
     const navigate = useNavigate();
-    const [favorites, setFavorites] = useState<string[]>([]);
+    const { user } = useAuth();
+    const [favorites, setFavorites] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const savedFavs = JSON.parse(localStorage.getItem('user_favorites') || '[]');
-        setFavorites(savedFavs);
-    }, []);
+        const fetchFavorites = async () => {
+            if (!user) {
+                setFavorites([]);
+                setLoading(false);
+                return;
+            }
 
-    const removeFavorite = (e: React.MouseEvent, id: string) => {
+            try {
+                const { data, error } = await supabase
+                    .from('favorites')
+                    .select(`
+                        salon_id,
+                        salons (
+                            id,
+                            slug,
+                            name,
+                            city,
+                            address,
+                            image_url,
+                            description,
+                            services (id, name)
+                        )
+                    `)
+                    .eq('user_id', user.id);
+
+                if (error) throw error;
+
+                const transformed = (data || []).map((f: any) => ({
+                    id: f.salons.slug || f.salons.id,
+                    name: f.salons.name,
+                    city: f.salons.city,
+                    address: f.salons.address,
+                    image: f.salons.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035',
+                    description: f.salons.description,
+                    rating: 4.5,
+                    reviewCount: 0,
+                    services: (f.salons.services || []).slice(0, 3).map((s: any) => ({
+                        id: s.id,
+                        name: s.name
+                    }))
+                }));
+
+                setFavorites(transformed);
+            } catch (err) {
+                console.error('Error fetching favorites:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchFavorites();
+    }, [user]);
+
+    const removeFavorite = async (e: React.MouseEvent, salonSlug: string) => {
         e.preventDefault();
         e.stopPropagation();
-        const newFavs = favorites.filter(favId => favId !== id);
-        setFavorites(newFavs);
-        localStorage.setItem('user_favorites', JSON.stringify(newFavs));
+
+        if (!user) return;
+
+        try {
+            // Get salon UUID from slug
+            const { data: salonData } = await supabase
+                .from('salons')
+                .select('id')
+                .eq('slug', salonSlug)
+                .single();
+
+            if (!salonData) return;
+
+            await supabase
+                .from('favorites')
+                .delete()
+                .eq('user_id', user.id)
+                .eq('salon_id', salonData.id);
+
+            setFavorites(favorites.filter(f => f.id !== salonSlug));
+        } catch (err) {
+            console.error('Error removing favorite:', err);
+        }
     };
 
-    const favoriteSalons = MOCK_SALONS.filter(salon => favorites.includes(salon.id));
+    if (loading) {
+        return (
+            <div className="flex justify-center py-12">
+                <Loader2 className="animate-spin text-brand-500" size={32} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -30,9 +108,9 @@ export const UserFavorites: React.FC = () => {
                 <p className="text-stone-500">Salons die je hebt bewaard.</p>
             </div>
 
-            {favoriteSalons.length > 0 ? (
+            {favorites.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {favoriteSalons.map(salon => (
+                    {favorites.map(salon => (
                         <Card key={salon.id} className="flex flex-col overflow-hidden hover:shadow-md transition-shadow group">
                             <div className="h-48 bg-stone-200 relative">
                                 <img src={salon.image} alt={salon.name} className="w-full h-full object-cover" />
@@ -51,7 +129,7 @@ export const UserFavorites: React.FC = () => {
                                         <MapPin size={14} className="mr-1" /> {salon.city}
                                     </p>
                                     <div className="flex gap-2 flex-wrap mb-4">
-                                         {salon.services.slice(0, 2).map(s => (
+                                         {salon.services.slice(0, 2).map((s: any) => (
                                              <Badge key={s.id}>{s.name}</Badge>
                                          ))}
                                     </div>

@@ -107,6 +107,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('userAppointments');
     localStorage.removeItem('user_favorites');
     localStorage.removeItem('salon_deals');
+    localStorage.removeItem('salon_appointments');
+    localStorage.removeItem('salon_services');
+    localStorage.removeItem('salon_settings');
+    localStorage.removeItem('salon_staff_v2');
   };
 
   if (isLoading) {

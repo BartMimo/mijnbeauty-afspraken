@@ -4,8 +4,10 @@ import { MapPin, Star, Filter, SlidersHorizontal, Heart, X, Loader2 } from 'luci
 import { Button, Card, Input, Badge } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 import { ServiceCategory } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 export const SearchPage: React.FC = () => {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const initialQuery = searchParams.get('q') || '';
@@ -64,23 +66,88 @@ export const SearchPage: React.FC = () => {
     fetchSalons();
   }, []);
 
+  // Fetch favorites from Supabase
   useEffect(() => {
-      const savedFavs = JSON.parse(localStorage.getItem('user_favorites') || '[]');
-      setFavorites(savedFavs);
-  }, []);
+    const fetchFavorites = async () => {
+      if (!user) {
+        setFavorites([]);
+        return;
+      }
 
-  const toggleFavorite = (e: React.MouseEvent, id: string) => {
+      try {
+        const { data, error } = await supabase
+          .from('favorites')
+          .select('salon_id')
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+        
+        // Map salon UUIDs to slugs for favorites array
+        const salonIds = (data || []).map(f => f.salon_id);
+        
+        // Get corresponding salon slugs
+        if (salonIds.length > 0) {
+          const { data: salonData } = await supabase
+            .from('salons')
+            .select('id, slug')
+            .in('id', salonIds);
+          
+          const slugs = (salonData || []).map(s => s.slug || s.id);
+          setFavorites(slugs);
+        } else {
+          setFavorites([]);
+        }
+      } catch (err) {
+        console.error('Error fetching favorites:', err);
+        setFavorites([]);
+      }
+    };
+
+    fetchFavorites();
+  }, [user]);
+
+  const toggleFavorite = async (e: React.MouseEvent, salonSlug: string) => {
       e.preventDefault();
       e.stopPropagation();
       
-      let newFavs;
-      if (favorites.includes(id)) {
-          newFavs = favorites.filter(favId => favId !== id);
-      } else {
-          newFavs = [...favorites, id];
+      if (!user) {
+        // Redirect to login if not authenticated
+        navigate('/auth?redirect=/search');
+        return;
       }
-      setFavorites(newFavs);
-      localStorage.setItem('user_favorites', JSON.stringify(newFavs));
+
+      try {
+        // Get salon UUID from slug
+        const { data: salonData } = await supabase
+          .from('salons')
+          .select('id')
+          .eq('slug', salonSlug)
+          .single();
+
+        if (!salonData) return;
+
+        const isFavorited = favorites.includes(salonSlug);
+
+        if (isFavorited) {
+          // Remove from favorites
+          await supabase
+            .from('favorites')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('salon_id', salonData.id);
+          
+          setFavorites(favorites.filter(id => id !== salonSlug));
+        } else {
+          // Add to favorites
+          await supabase
+            .from('favorites')
+            .insert({ user_id: user.id, salon_id: salonData.id });
+          
+          setFavorites([...favorites, salonSlug]);
+        }
+      } catch (err) {
+        console.error('Error toggling favorite:', err);
+      }
   };
 
   // Filter Logic

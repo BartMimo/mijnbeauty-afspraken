@@ -1,19 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, CheckCircle } from 'lucide-react';
 import { Button, Card, Badge } from '../../components/UIComponents';
+import { useAuth } from '../../context/AuthContext';
 
 export const StaffDashboard: React.FC = () => {
-    // Current Staff User
-    const [currentUser, setCurrentUser] = useState<any>(null);
+    // Get current user from AuthContext
+    const { user, profile } = useAuth();
     const [currentDate, setCurrentDate] = useState(new Date());
-
-    useEffect(() => {
-        const userStr = localStorage.getItem('currentUser');
-        if (userStr) {
-            const user = JSON.parse(userStr);
-            setCurrentUser(user);
-        }
-    }, []);
 
     // Helper to format date as YYYY-MM-DD
     const toDateString = (date: Date) => date.toISOString().split('T')[0];
@@ -53,7 +46,7 @@ export const StaffDashboard: React.FC = () => {
     };
 
     // Filter appointments: Date matches AND Staff name matches first name
-    const firstName = currentUser?.name?.split(' ')[0] || 'Mike'; // Default to Mike if loading
+    const firstName = profile?.full_name?.split(' ')[0] || 'Staff'; // Get name from profile
     
     const dailyAppointments = appointments.filter(a => {
         const matchesDate = a.date === toDateString(currentDate);
@@ -83,7 +76,7 @@ export const StaffDashboard: React.FC = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-stone-900">Mijn Agenda</h1>
-                    <p className="text-stone-500">Welkom, {currentUser?.name || 'Medewerker'}</p>
+                    <p className="text-stone-500">Welkom, {profile?.full_name || 'Medewerker'}</p>
                 </div>
 
                 <div className="flex items-center gap-3">

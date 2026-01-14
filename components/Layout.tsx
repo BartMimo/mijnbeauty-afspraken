@@ -187,6 +187,7 @@ export const PublicLayout: React.FC<{ children: React.ReactNode }> = ({ children
 export const DashboardLayout: React.FC<{ children: React.ReactNode; role: 'user' | 'salon' | 'admin' | 'staff' }> = ({ children, role }) => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { signOut } = useAuth();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     
     // Close mobile menu when route changes
@@ -296,8 +297,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode; role: 'user'
                             <div className="pt-4 border-t border-stone-100">
                                 <button 
                                     onClick={() => { 
-                                        localStorage.removeItem('currentUser'); 
-                                        window.dispatchEvent(new Event('auth-change'));
+                                        signOut();
                                         navigate('/'); 
                                     }} 
                                     className="flex w-full items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl font-medium"

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Save, Clock } from 'lucide-react';
 import { Button, Input, Card } from '../../components/UIComponents';
+import { useAuth } from '../../context/AuthContext';
 
 export const StaffProfile: React.FC = () => {
-    // In a real app, we'd use an ID. Here we sync by email match.
-    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    const userEmail = currentUser.email || 'mike@salon.nl'; // Fallback for demo safety
+    // Get current user from AuthContext
+    const { user, profile } = useAuth();
+    const userEmail = user?.email || profile?.email || 'staff@salon.nl';
 
     // Load full staff list to find and update "me"
     const [allStaff, setAllStaff] = useState<any[]>([]);
@@ -64,11 +65,8 @@ export const StaffProfile: React.FC = () => {
         const updatedStaffList = allStaff.map(s => s.id === myProfile.id ? myProfile : s);
         
         // Save to storage (Syncs with Owner view)
+        // NOTE: In production, this should save to Supabase staff table
         localStorage.setItem('salon_staff_v2', JSON.stringify(updatedStaffList));
-        
-        // Update current session name if changed
-        const sessionUser = { ...currentUser, name: myProfile.name };
-        localStorage.setItem('currentUser', JSON.stringify(sessionUser));
 
         alert('Wijzigingen opgeslagen!');
     };
