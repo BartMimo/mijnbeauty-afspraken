@@ -65,18 +65,18 @@ export const SalonDeals: React.FC = () => {
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDeal, setEditingDeal] = useState<any>(null);
-    const [form, setForm] = useState({ service: '', price: '', original: '', time: '', status: 'active' });
+    const [form, setForm] = useState({ service: '', price: '', original: '', time: '', date: '', status: 'active' });
 
     // Actions
     const handleEdit = (deal: any) => {
         setEditingDeal(deal);
-        setForm({ ...deal });
+        setForm({ ...deal, date: deal.date || new Date().toISOString().split('T')[0] });
         setIsModalOpen(true);
     };
 
     const handleCreate = () => {
         setEditingDeal(null);
-        setForm({ service: '', price: '', original: '', time: '', status: 'active' });
+        setForm({ service: '', price: '', original: '', time: '', date: new Date().toISOString().split('T')[0], status: 'active' });
         setIsModalOpen(true);
     };
 
@@ -96,8 +96,8 @@ export const SalonDeals: React.FC = () => {
         if (!salonId) return;
 
         try {
-            // Parse date from time string or use today
-            const dealDate = new Date().toISOString().split('T')[0];
+            // Use form date or today
+            const dealDate = form.date || new Date().toISOString().split('T')[0];
             
             if (editingDeal) {
                 // Update existing deal
@@ -107,13 +107,18 @@ export const SalonDeals: React.FC = () => {
                         service_name: form.service,
                         original_price: parseFloat(form.original),
                         discount_price: parseFloat(form.price),
+                        date: dealDate,
                         time: form.time,
                         status: form.status
                     })
                     .eq('id', editingDeal.id);
 
                 if (error) throw error;
-                setDeals(prev => prev.map(d => d.id === editingDeal.id ? { ...d, ...form } : d));
+                setDeals(prev => prev.map(d => d.id === editingDeal.id ? { 
+                    ...d, 
+                    ...form,
+                    time: `${new Date(dealDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${form.time}`
+                } : d));
             } else {
                 // Create new deal
                 const { data, error } = await supabase
@@ -136,7 +141,8 @@ export const SalonDeals: React.FC = () => {
                     service: data.service_name,
                     price: data.discount_price,
                     original: data.original_price,
-                    time: form.time,
+                    time: `${new Date(dealDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${form.time}`,
+                    date: dealDate,
                     status: data.status
                 }]);
             }
@@ -264,7 +270,6 @@ export const SalonDeals: React.FC = () => {
                         value={form.service}
                         onChange={e => setForm({...form, service: e.target.value})}
                         placeholder="bv. Last-minute Knippen"
-                        required
                     />
                     <div className="grid grid-cols-2 gap-4">
                          <Input 
@@ -272,23 +277,47 @@ export const SalonDeals: React.FC = () => {
                             type="number"
                             value={form.original}
                             onChange={e => setForm({...form, original: e.target.value})}
-                            required
                         />
                          <Input 
                             label="Deal Prijs (€)" 
                             type="number"
                             value={form.price}
                             onChange={e => setForm({...form, price: e.target.value})}
-                            required
                         />
                     </div>
+                    
+                    {/* Date picker */}
                     <Input 
-                        label="Tijdstip / Omschrijving" 
-                        value={form.time}
-                        onChange={e => setForm({...form, time: e.target.value})}
-                        placeholder="bv. Vandaag, 14:00"
-                        required
+                        label="Datum" 
+                        type="date"
+                        value={form.date || new Date().toISOString().split('T')[0]}
+                        onChange={e => setForm({...form, date: e.target.value})}
                     />
+                    
+                    {/* Time picker with clickable buttons */}
+                    <div>
+                        <label className="block text-sm font-medium text-stone-700 mb-2">Tijdstip</label>
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                            {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
+                              '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+                              '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
+                              '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'].map(time => (
+                                <button
+                                    key={time}
+                                    type="button"
+                                    onClick={() => setForm({...form, time})}
+                                    className={`px-2 py-2 text-sm rounded-lg border transition-colors ${
+                                        form.time === time 
+                                            ? 'bg-brand-500 text-white border-brand-500' 
+                                            : 'bg-white text-stone-700 border-stone-200 hover:border-brand-300 hover:bg-brand-50'
+                                    }`}
+                                >
+                                    {time}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                      <div className="flex items-center pt-2">
                         <input 
                             type="checkbox" 
@@ -301,7 +330,12 @@ export const SalonDeals: React.FC = () => {
                     </div>
                     <div className="flex justify-end pt-4 gap-2">
                         <Button variant="outline" onClick={() => setIsModalOpen(false)}>Annuleren</Button>
-                        <Button onClick={handleSave}>Opslaan</Button>
+                        <Button 
+                            onClick={handleSave}
+                            disabled={!form.service || !form.price || !form.original || !form.time}
+                        >
+                            Opslaan
+                        </Button>
                     </div>
                 </div>
             </Modal>

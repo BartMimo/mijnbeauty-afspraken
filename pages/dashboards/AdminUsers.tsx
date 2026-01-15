@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, MoreHorizontal, Mail, Shield } from 'lucide-react';
-import { Button, Card, Badge } from '../../components/UIComponents';
+import { Search, Mail, Shield, Edit2, Trash2 } from 'lucide-react';
+import { Button, Card, Badge, Modal, Input } from '../../components/UIComponents';
 import { supabase } from '../../lib/supabase';
 
 export const AdminUsers: React.FC = () => {
     const [users, setUsers] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
+
+    // Modal state
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<any>(null);
+    const [editForm, setEditForm] = useState({ full_name: '', email: '', role: '' });
 
     useEffect(() => {
         const fetchUsers = async () => {
@@ -22,7 +27,7 @@ export const AdminUsers: React.FC = () => {
                     id: u.id,
                     name: u.full_name || 'Onbekend',
                     email: u.email,
-                    role: u.role || 'user',
+                    role: u.role || 'consumer',
                     status: 'Actief',
                     date: u.created_at ? new Date(u.created_at).toLocaleDateString('nl-NL') : '-'
                 }));
@@ -44,6 +49,64 @@ export const AdminUsers: React.FC = () => {
             u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
         );
     }, [users, searchQuery]);
+
+    // Actions
+    const handleEdit = (user: any) => {
+        setEditingUser(user);
+        setEditForm({ 
+            full_name: user.name, 
+            email: user.email, 
+            role: user.role 
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleSave = async () => {
+        if (!editingUser) return;
+
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    full_name: editForm.full_name,
+                    role: editForm.role
+                })
+                .eq('id', editingUser.id);
+
+            if (error) throw error;
+
+            setUsers(prev => prev.map(u => u.id === editingUser.id ? {
+                ...u,
+                name: editForm.full_name,
+                role: editForm.role
+            } : u));
+            setIsEditModalOpen(false);
+            setEditingUser(null);
+        } catch (err: any) {
+            console.error('Update failed:', err);
+            alert('Opslaan mislukt: ' + err.message);
+        }
+    };
+
+    const handleDelete = async (user: any) => {
+        if (!window.confirm(`Weet je zeker dat je "${user.name}" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`)) {
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .delete()
+                .eq('id', user.id);
+
+            if (error) throw error;
+
+            setUsers(prev => prev.filter(u => u.id !== user.id));
+        } catch (err: any) {
+            console.error('Delete failed:', err);
+            alert('Verwijderen mislukt: ' + err.message);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -70,7 +133,7 @@ export const AdminUsers: React.FC = () => {
                             <th className="px-6 py-4 font-medium text-stone-600">Rol</th>
                             <th className="px-6 py-4 font-medium text-stone-600">Geregistreerd</th>
                             <th className="px-6 py-4 font-medium text-stone-600">Status</th>
-                            <th className="px-6 py-4 font-medium text-stone-600 text-right">Actie</th>
+                            <th className="px-6 py-4 font-medium text-stone-600 text-right">Acties</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
@@ -95,15 +158,66 @@ export const AdminUsers: React.FC = () => {
                                 <td className="px-6 py-4 text-stone-600">{user.date}</td>
                                 <td className="px-6 py-4"><Badge variant="success">{user.status}</Badge></td>
                                 <td className="px-6 py-4 text-right">
-                                    <button className="text-stone-400 hover:text-stone-600">
-                                        <MoreHorizontal size={20} />
-                                    </button>
+                                    <div className="flex items-center justify-end gap-2">
+                                        <button 
+                                            onClick={() => handleEdit(user)}
+                                            className="p-1.5 text-stone-400 hover:text-brand-500 hover:bg-brand-50 rounded-lg transition-colors"
+                                            title="Bewerken"
+                                        >
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDelete(user)}
+                                            className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Verwijderen"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </Card>
+
+            {/* Edit Modal */}
+            <Modal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                title="Gebruiker Bewerken"
+            >
+                <div className="space-y-4">
+                    <Input 
+                        label="Naam" 
+                        value={editForm.full_name}
+                        onChange={(e) => setEditForm({...editForm, full_name: e.target.value})}
+                    />
+                    <Input 
+                        label="Email" 
+                        value={editForm.email}
+                        disabled
+                        className="bg-stone-50"
+                    />
+                    <div>
+                        <label className="block text-sm font-medium text-stone-700 mb-2">Rol</label>
+                        <select
+                            value={editForm.role}
+                            onChange={(e) => setEditForm({...editForm, role: e.target.value})}
+                            className="w-full px-4 py-2 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-400"
+                        >
+                            <option value="consumer">Consument</option>
+                            <option value="owner">Salon Eigenaar</option>
+                            <option value="staff">Medewerker</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Annuleren</Button>
+                        <Button onClick={handleSave}>Opslaan</Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };
