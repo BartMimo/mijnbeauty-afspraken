@@ -25,6 +25,16 @@ const UserDropdown: React.FC = () => {
         navigate('/');
     };
 
+    const role = profile?.role || 'user';
+    const roleLabel = role === 'staff' ? 'Medewerker' : role === 'owner' ? 'Salon' : role;
+    const profilePath = role === 'salon' || role === 'owner'
+        ? '/dashboard/salon/settings'
+        : role === 'staff'
+            ? '/dashboard/staff/profile'
+            : role === 'admin'
+                ? '/dashboard/admin'
+                : '/dashboard/user/profile';
+
     return (
         <div className="relative">
             <button 
@@ -42,24 +52,29 @@ const UserDropdown: React.FC = () => {
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-stone-100 py-1 z-50 animate-fadeIn origin-top-right">
                     <div className="px-4 py-2 border-b border-stone-50">
                         <p className="text-sm font-medium text-stone-900 truncate">{profile?.full_name || user?.email || 'Gast'}</p>
-                        <p className="text-xs text-stone-500 capitalize">{profile?.role === 'staff' ? 'Medewerker' : profile?.role}</p>
+                        <p className="text-xs text-stone-500 capitalize">{roleLabel}</p>
                     </div>
-                    {profile?.role === 'consumer' && (
+                    {(role === 'consumer' || role === 'user') && (
                         <Link to="/dashboard/user" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
                             Mijn Dashboard
                         </Link>
                     )}
-                    {profile?.role === 'salon' && (
+                    {(role === 'salon' || role === 'owner') && (
                          <Link to="/dashboard/salon" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
                             Salon Dashboard
                         </Link>
                     )}
-                    {profile?.role === 'staff' && (
+                    {role === 'staff' && (
                          <Link to="/dashboard/staff" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
                             Mijn Agenda
                         </Link>
                     )}
-                    <Link to={profile?.role === 'staff' ? "/dashboard/staff/profile" : "/dashboard/user/profile"} className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
+                    {role === 'admin' && (
+                        <Link to="/dashboard/admin" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
+                            Admin Dashboard
+                        </Link>
+                    )}
+                    <Link to={profilePath} className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
                         Profiel
                     </Link>
                     <button 

@@ -7,6 +7,7 @@ import { Home } from './pages/Home';
 import { SearchPage } from './pages/Search';
 import { SalonDetailPage } from './pages/SalonDetailPage';
 import { ForPartners } from './pages/ForPartners';
+import { SalonTest } from './pages/SalonTest';
 import { AuthPage } from './pages/Auth';
 import { UserDashboard } from './pages/dashboards/UserDashboard';
 import { UserProfile } from './pages/dashboards/UserProfile';
@@ -61,7 +62,7 @@ const DashboardRedirect: React.FC = () => {
 
     const role = profile?.role || 'user';
     if (role === 'admin') return <Navigate to="/dashboard/admin" replace />;
-    if (role === 'salon') return <Navigate to="/dashboard/salon" replace />;
+    if (role === 'salon' || role === 'owner') return <Navigate to="/dashboard/salon" replace />;
     if (role === 'staff') return <Navigate to="/dashboard/staff" replace />;
     return <Navigate to="/dashboard/user" replace />;
 };
@@ -73,7 +74,13 @@ const RequireRole: React.FC<{ role: 'user' | 'salon' | 'admin' | 'staff'; childr
     if (!user) return <Navigate to="/login" replace />;
 
     const userRole = profile?.role || 'user';
-    if (userRole !== role) {
+    const roleMatch = role === 'user'
+        ? (userRole === 'user' || userRole === 'consumer')
+        : role === 'salon'
+            ? (userRole === 'salon' || userRole === 'owner')
+            : userRole === role;
+
+    if (!roleMatch) {
         return <DashboardRedirect />;
     }
 
@@ -110,6 +117,7 @@ const App: React.FC = () => {
             <Route path="/search" element={<PublicLayout><SearchPage /></PublicLayout>} />
             <Route path="/salon/:id" element={<PublicLayout><SalonDetailPage /></PublicLayout>} />
             <Route path="/for-partners" element={<PublicLayout><ForPartners /></PublicLayout>} />
+            <Route path="/salontest" element={<SalonTest />} />
             
             {/* Footer Pages */}
             <Route path="/about" element={<PublicLayout><AboutPage /></PublicLayout>} />

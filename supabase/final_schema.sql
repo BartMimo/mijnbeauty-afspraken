@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email text UNIQUE NOT NULL,
   full_name text,
   phone text,
-  role text DEFAULT 'user' CHECK (role IN ('user', 'owner', 'staff', 'admin')),
+  role text DEFAULT 'user' CHECK (role IN ('user', 'consumer', 'salon', 'owner', 'staff', 'admin')),
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
