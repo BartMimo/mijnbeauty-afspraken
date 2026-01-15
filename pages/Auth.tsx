@@ -120,10 +120,69 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
 
             if (error) throw error;
 
-            // AuthContext will pick up the change and redirect
-            // But we can force redirect based on metadata if needed
-            // For now, let AuthContext handle the redirect based on role or simple navigation
-            
+            // Check if there's a pending salon to create (from registration without session)
+            const pendingSalonData = localStorage.getItem('pendingSalon');
+            if (pendingSalonData && data.user) {
+                try {
+                    const pendingSalon = JSON.parse(pendingSalonData);
+                    
+                    // Only create if this is the same user who registered
+                    if (pendingSalon.userId === data.user.id) {
+                        // First ensure profile exists with correct role
+                        await supabase
+                            .from('profiles')
+                            .upsert(
+                                { 
+                                    id: data.user.id, 
+                                    email: loginEmail, 
+                                    full_name: pendingSalon.ownerName, 
+                                    role: 'owner', 
+                                    phone: pendingSalon.phone 
+                                },
+                                { onConflict: 'id' }
+                            );
+                        
+                        // Wait for profile to be committed
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // Check if salon already exists for this user
+                        const { data: existingSalon } = await supabase
+                            .from('salons')
+                            .select('id')
+                            .eq('owner_id', data.user.id)
+                            .maybeSingle();
+                        
+                        if (!existingSalon) {
+                            // Create the salon
+                            const { error: salonError } = await supabase
+                                .from('salons')
+                                .insert({
+                                    owner_id: data.user.id,
+                                    name: pendingSalon.salonName,
+                                    slug: pendingSalon.subdomain,
+                                    subdomain: pendingSalon.subdomain,
+                                    status: 'active',
+                                    city: pendingSalon.city,
+                                    address: pendingSalon.address,
+                                    phone: pendingSalon.phone
+                                });
+                            
+                            if (salonError) {
+                                console.error('Pending salon creation error:', salonError);
+                            } else {
+                                console.log('Pending salon created successfully');
+                            }
+                        }
+                        
+                        // Clear the pending salon data
+                        localStorage.removeItem('pendingSalon');
+                    }
+                } catch (pendingErr) {
+                    console.error('Error processing pending salon:', pendingErr);
+                    localStorage.removeItem('pendingSalon');
+                }
+            }
+
             // Redirect based on profile role in AuthContext
             navigate('/dashboard');
             
@@ -218,7 +277,8 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 options: {
                     data: {
                         full_name: regName,
-                        role: 'salon'
+                        role: 'owner',
+                        phone: regPhone
                     }
                 }
             });
@@ -232,15 +292,17 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 throw new Error('Gebruiker kon niet worden aangemaakt');
             }
 
-            // 2. Wait for session to be available
+            // Build full address from form fields
+            const fullAddress = `${regStreet} ${regHouseNumber}, ${regPostalCode} ${regCity}`;
+            
+            // 2. Wait for the database trigger to create the profile
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // 3. Check if session exists (email confirmation disabled) or not
             if (data.session) {
-                // Build full address from form fields
-                const fullAddress = `${regStreet} ${regHouseNumber}, ${regPostalCode} ${regCity}`;
+                // Session exists - we can create salon directly
                 
-                // 3. Wait a bit for the database trigger to create the profile
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // 4. Try to upsert profile (works whether trigger created it or not)
+                // Upsert profile to ensure it has correct data
                 const { error: profileError } = await supabase
                     .from('profiles')
                     .upsert(
@@ -248,7 +310,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                             id: data.user.id, 
                             email: regEmail, 
                             full_name: regName, 
-                            role: 'salon', 
+                            role: 'owner', 
                             phone: regPhone 
                         },
                         { onConflict: 'id' }
@@ -256,14 +318,12 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 
                 if (profileError) {
                     console.error('Profile upsert error:', profileError);
-                    // Don't throw here - profile might be created by trigger and that's OK
-                    // We'll check if we can create the salon
                 }
 
-                // 5. Wait a bit more to ensure profile is committed
-                await new Promise(resolve => setTimeout(resolve, 300));
+                // Wait a bit more to ensure profile is committed
+                await new Promise(resolve => setTimeout(resolve, 500));
 
-                // 6. Create salon entry
+                // Create salon entry
                 const { data: salonData, error: salonError } = await supabase
                     .from('salons')
                     .insert({
@@ -282,7 +342,6 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 if (salonError) {
                     console.error('Salon creation error:', salonError);
                     
-                    // If it's a foreign key error, the profile wasn't created in time
                     if (salonError.code === '23503') {
                         throw new Error('Er ging iets mis met het aanmaken van je profiel. Probeer opnieuw in te loggen.');
                     }
@@ -294,8 +353,19 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 alert('Salon account aangemaakt! Welkom.');
                 navigate('/dashboard');
             } else {
-                // No session means email confirmation is required
-                alert('Check je email om je account te bevestigen. Daarna kun je inloggen.');
+                // No session - email confirmation required
+                // Store salon data in localStorage for later creation after email confirmation
+                localStorage.setItem('pendingSalon', JSON.stringify({
+                    userId: data.user.id,
+                    salonName: regSalonName,
+                    subdomain: regSubdomain,
+                    city: regCity,
+                    address: fullAddress,
+                    phone: regPhone,
+                    ownerName: regName
+                }));
+                
+                alert('Check je email om je account te bevestigen. Daarna kun je inloggen en wordt je salon automatisch aangemaakt.');
                 setMode('login');
             }
 

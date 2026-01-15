@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Mail, Shield, Edit2, Trash2 } from 'lucide-react';
+import { Search, Mail, Shield, Edit2, Trash2, Download } from 'lucide-react';
 import { Button, Card, Badge, Modal, Input } from '../../components/UIComponents';
 import { supabase } from '../../lib/supabase';
 
@@ -108,6 +108,31 @@ export const AdminUsers: React.FC = () => {
         }
     };
 
+    // Export to CSV
+    const handleExport = () => {
+        const headers = ['Naam', 'Email', 'Rol', 'Geregistreerd', 'Status'];
+        const csvData = filteredUsers.map(u => [
+            u.name,
+            u.email,
+            u.role,
+            u.date,
+            u.status
+        ]);
+        
+        const csvContent = [
+            headers.join(','),
+            ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `gebruikers-export-${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold text-stone-900">Gebruikersbeheer</h1>
@@ -124,7 +149,9 @@ export const AdminUsers: React.FC = () => {
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
-                    <Button variant="outline">Exporteer</Button>
+                    <Button variant="outline" onClick={handleExport}>
+                        <Download size={16} className="mr-2" /> Exporteer
+                    </Button>
                 </div>
                 <table className="w-full text-left text-sm">
                     <thead className="bg-stone-50 border-b border-stone-100">
