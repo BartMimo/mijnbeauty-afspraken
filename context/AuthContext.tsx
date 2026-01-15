@@ -22,6 +22,13 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const normalizeRole = (rawRole: unknown) => {
+    const role = (rawRole ?? 'user').toString().trim().toLowerCase();
+    if (role.includes('admin')) return 'admin';
+    if (role.includes('salon') || role.includes('owner')) return 'salon';
+    if (role.includes('staff')) return 'staff';
+    return 'user';
+  };
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
@@ -103,7 +110,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         console.warn("Profile fetch error:", error);
       } else if (data) {
-        setProfile(data);
+        // Keep data but allow role override from metadata/legacy if needed
+        const baseRole = data.role;
+        const finalRole = normalizeRole(baseRole || roleMeta);
+
+        // Check legacy users table for admin role if present
+        let legacyRole: string | undefined;
+        try {
+          const { data: legacy } = await supabase
+            .from('users')
+            .select('role, full_name, email')
+            .eq('id', userId)
+            .maybeSingle();
+          legacyRole = legacy?.role;
+          if (legacy?.full_name && !data.full_name) data.full_name = legacy.full_name;
+          if (legacy?.email && !data.email) data.email = legacy.email;
+        } catch {
+          // ignore legacy lookup failures
+        }
+
+        const legacyFinalRole = normalizeRole(legacyRole || roleMeta || baseRole);
+        setProfile({
+          ...data,
+          role: legacyFinalRole,
+          full_name: data.full_name || fullNameMeta || null,
+          email: data.email || emailMeta || null
+        });
         return;
       }
     } catch (e) {
@@ -132,7 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (fallbackRole || fallbackName || fallbackEmail) {
         setProfile({
           id: userId,
-          role: fallbackRole || 'user',
+          role: normalizeRole(fallbackRole),
           full_name: fallbackName || null,
           email: fallbackEmail || null
         });
