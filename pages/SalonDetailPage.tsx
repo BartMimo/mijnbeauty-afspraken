@@ -39,58 +39,40 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         const fetchSalon = async () => {
             if (!salonId) {
                 console.error('No salonId provided');
+                setLoading(false);
                 return;
             }
 
-            console.log('Fetching salon with id/slug:', salonId);
+            console.log('=== Fetching salon:', salonId);
 
             try {
-                // Try to fetch by slug first, then by id if that fails
-                let data = null;
-                let error = null;
+                setLoading(true);
                 
-                // First try: search by slug
-                console.log('Trying slug lookup:', salonId);
-                const slugResult = await supabase
+                // Simple single query - try both slug and UUID
+                const { data, error } = await supabase
                     .from('salons')
                     .select(`
                         *,
-                        services(id, name, description, price, duration_minutes)
+                        services(*)
                     `)
-                    .eq('slug', salonId)
-                    .maybeSingle();
-                
-                console.log('Slug result:', slugResult);
-                
-                if (slugResult.data) {
-                    data = slugResult.data;
-                    console.log('Found by slug:', data);
-                } else {
-                    // Second try: search by id (UUID)
-                    console.log('Trying UUID lookup:', salonId);
-                    const idResult = await supabase
-                        .from('salons')
-                        .select(`
-                            *,
-                            services(id, name, description, price, duration_minutes)
-                        `)
-                        .eq('id', salonId)
-                        .maybeSingle();
-                    
-                    console.log('UUID result:', idResult);
-                    data = idResult.data;
-                    error = idResult.error;
-                }
+                    .or(`slug.eq.${salonId},id.eq.${salonId}`)
+                    .single();
+
+                console.log('Query result:', { data, error });
 
                 if (error) {
-                    console.error('Error fetching salon:', error);
-                    throw error;
+                    console.error('Supabase error:', error);
+                    setLoading(false);
+                    return;
                 }
 
                 if (!data) {
-                    console.error('No salon found with id/slug:', salonId);
-                    throw new Error('Salon not found');
+                    console.error('No salon found');
+                    setLoading(false);
+                    return;
                 }
+
+                console.log('Found salon:', data.name);
 
                 setSalon({
                     id: data.slug || data.id,
@@ -98,9 +80,11 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     name: data.name,
                     city: data.city || '',
                     address: data.address || '',
-                    description: 'Welkom bij onze salon!',
+                    description: data.description || 'Welkom bij onze salon!',
                     rating: 4.5,
                     reviewCount: 0,
+                    email: data.email,
+                    phone: data.phone,
                     services: (data.services || []).map((s: any) => ({
                         id: s.id,
                         name: s.name,
@@ -109,10 +93,10 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         duration: s.duration_minutes,
                         category: 'Nails'
                     })),
-                    image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'
+                    image: data.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'
                 });
 
-                // Fetch deals
+                // Fetch deals separately
                 const { data: dealsData } = await supabase
                     .from('deals')
                     .select('*')
@@ -133,7 +117,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     })));
                 }
             } catch (err) {
-                console.error('Error fetching salon:', err);
+                console.error('Error in fetchSalon:', err);
             } finally {
                 setLoading(false);
             }
