@@ -117,7 +117,7 @@ const App: React.FC = () => {
             <Route path="/search" element={<PublicLayout><SearchPage /></PublicLayout>} />
             <Route path="/salon/:id" element={<PublicLayout><SalonDetailPage /></PublicLayout>} />
             <Route path="/for-partners" element={<PublicLayout><ForPartners /></PublicLayout>} />
-            <Route path="/salontest" element={<SalonTest />} />
+            <Route path="/salontest/*" element={<SalonTest />} />
             
             {/* Footer Pages */}
             <Route path="/about" element={<PublicLayout><AboutPage /></PublicLayout>} />

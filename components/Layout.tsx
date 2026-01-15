@@ -199,7 +199,7 @@ export const PublicLayout: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export const DashboardLayout: React.FC<{ children: React.ReactNode; role: 'user' | 'salon' | 'admin' | 'staff' }> = ({ children, role }) => {
+export const DashboardLayout: React.FC<{ children: React.ReactNode; role: 'user' | 'salon' | 'admin' | 'staff'; basePath?: string }> = ({ children, role, basePath }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { signOut } = useAuth();
@@ -237,7 +237,15 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode; role: 'user'
         ]
     };
 
-    const currentMenu = menuItems[role];
+    const resolvePath = (path: string) => {
+        if (!basePath) return path;
+        return path.replace(`/dashboard/${role}`, basePath);
+    };
+
+    const currentMenu = menuItems[role].map(item => ({
+        ...item,
+        path: resolvePath(item.path)
+    }));
 
     return (
         <div className="flex min-h-screen bg-stone-50 flex-col">

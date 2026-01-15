@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Users, CreditCard, Calendar, ArrowUpRight, Tag, Plus, Clock, Trash2, Edit2 } from 'lucide-react';
 import { Card, Badge, Button, Modal, Input, Select } from '../../components/UIComponents';
 
 export const SalonDashboard: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const basePath = location.pathname.startsWith('/salontest') ? '/salontest' : '/dashboard/salon';
 
     // --- STATE MANAGEMENT ---
     
@@ -88,7 +90,7 @@ export const SalonDashboard: React.FC = () => {
                     <Button 
                         variant="secondary" 
                         className="hidden md:inline-flex"
-                        onClick={() => navigate('/dashboard/salon/deals')}
+                        onClick={() => navigate(`${basePath}/deals`)}
                     >
                         <Tag className="mr-2 h-4 w-4" /> Promotie maken
                     </Button>
@@ -146,7 +148,7 @@ export const SalonDashboard: React.FC = () => {
                                 <Button 
                                     variant="ghost" 
                                     className="text-brand-500"
-                                    onClick={() => navigate('/dashboard/salon/schedule')}
+                                    onClick={() => navigate(`${basePath}/schedule`)}
                                 >
                                     Bekijk volledige agenda
                                 </Button>
@@ -177,11 +179,11 @@ export const SalonDashboard: React.FC = () => {
                         <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
                             {deals.filter(d => d.status === 'active').length > 0 ? deals.filter(d => d.status === 'active').map(deal => (
                                 <div key={deal.id} className="bg-white p-3 rounded-xl border border-stone-100 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-brand-200 group relative">
-                                    <div className="flex justify-between items-start" onClick={() => navigate('/dashboard/salon/deals')}>
+                                    <div className="flex justify-between items-start" onClick={() => navigate(`${basePath}/deals`)}>
                                         <span className="font-semibold text-stone-800 text-sm truncate pr-6">{deal.service}</span>
                                         <Badge variant="success">Actief</Badge>
                                     </div>
-                                    <div className="flex justify-between items-center text-xs" onClick={() => navigate('/dashboard/salon/deals')}>
+                                    <div className="flex justify-between items-center text-xs" onClick={() => navigate(`${basePath}/deals`)}>
                                         <span className="text-stone-500 flex items-center"><Clock size={12} className="mr-1" /> {deal.time}</span>
                                         <div>
                                             {deal.original && <span className="line-through text-stone-400 mr-2">€{deal.original}</span>}
@@ -197,7 +199,7 @@ export const SalonDashboard: React.FC = () => {
                             className="w-full mt-4" 
                             variant="outline" 
                             size="sm"
-                            onClick={() => navigate('/dashboard/salon/deals')}
+                            onClick={() => navigate(`${basePath}/deals`)}
                         >
                             Beheer alle deals
                         </Button>

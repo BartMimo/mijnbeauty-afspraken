@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, User, Mail, Calendar, Edit2, Trash2, Clock, Check, Shield } from 'lucide-react';
 import { Button, Card, Modal, Input } from '../../components/UIComponents';
 
@@ -22,6 +22,8 @@ type Permissions = {
 
 export const SalonStaff: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const basePath = location.pathname.startsWith('/salontest') ? '/salontest' : '/dashboard/salon';
 
     // Default schedule template
     const defaultSchedule: WeeklySchedule = {
@@ -211,7 +213,7 @@ export const SalonStaff: React.FC = () => {
                                 variant="outline" 
                                 size="sm" 
                                 className="flex-1"
-                                onClick={() => navigate('/dashboard/salon/schedule')}
+                                onClick={() => navigate(`${basePath}/schedule`)}
                             >
                                 Bekijk Agenda
                             </Button>
