@@ -44,7 +44,9 @@ export const SearchPage: React.FC = () => {
           name: salon.name,
           city: salon.city || '',
           address: salon.address || '',
-          zipCode: '',
+          zipCode: salon.zip_code || '',
+          description: salon.description || '',
+          image: salon.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800',
           rating: 4.5, // TODO: Calculate from reviews
           reviewCount: 0,
           services: (salon.services || []).map((s: any) => ({

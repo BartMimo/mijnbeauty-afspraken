@@ -35,14 +35,36 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             if (!salonId) return;
 
             try {
-                const { data, error } = await supabase
+                // Try to fetch by slug first, then by id if that fails
+                let data = null;
+                let error = null;
+                
+                // First try: search by slug
+                const slugResult = await supabase
                     .from('salons')
                     .select(`
                         *,
                         services(id, name, description, price, duration_minutes)
                     `)
-                    .or(`slug.eq.${salonId},id.eq.${salonId}`)
-                    .single();
+                    .eq('slug', salonId)
+                    .maybeSingle();
+                
+                if (slugResult.data) {
+                    data = slugResult.data;
+                } else {
+                    // Second try: search by id (UUID)
+                    const idResult = await supabase
+                        .from('salons')
+                        .select(`
+                            *,
+                            services(id, name, description, price, duration_minutes)
+                        `)
+                        .eq('id', salonId)
+                        .maybeSingle();
+                    
+                    data = idResult.data;
+                    error = idResult.error;
+                }
 
                 if (error) {
                     console.error('Error fetching salon:', error);
