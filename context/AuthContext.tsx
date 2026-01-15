@@ -106,12 +106,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string, roleMeta?: string, fullNameMeta?: string, emailMeta?: string) => {
     try {
-      // First try to get profile by auth user ID (correct approach)
+      // HARDCODED ADMIN CHECK - dit zorgt ervoor dat admin@bart.nl ALTIJD admin is
+      // Ongeacht wat er in de database staat
+      if (emailMeta === 'admin@bart.nl') {
+        console.log('🔐 Admin user detected by email:', emailMeta);
+        setProfile({
+          id: userId,
+          role: 'admin',
+          full_name: fullNameMeta || 'Admin',
+          email: emailMeta
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Try to get profile by auth user ID
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
       
       if (!error && data) {
         const finalRole = normalizeRole(data.role || roleMeta);
-        console.log('Profile found by ID:', { userId, role: finalRole, email: data.email });
+        console.log('✅ Profile found by ID:', { userId, role: finalRole, email: data.email });
         setProfile({
           ...data,
           role: finalRole,
@@ -122,66 +136,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // Profile not found by ID - try by email (ID mismatch case)
-      console.warn('Profile not found by ID, trying email lookup for:', emailMeta);
+      // Profile not found by ID - check user_metadata for role (works for newly registered users)
+      console.warn('⚠️ Profile not found by ID, using metadata for:', emailMeta);
       
-      if (emailMeta) {
-        const { data: profileByEmail } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('email', emailMeta)
-          .maybeSingle();
+      // Bepaal role: eerst metadata, dan default naar user
+      const finalRole = normalizeRole(roleMeta || 'user');
+      console.log('📝 Using role from metadata:', finalRole);
+
+      // Probeer een nieuwe profile aan te maken met het juiste ID
+      try {
+        const { error: insertError } = await supabase.from('profiles').insert({
+          id: userId,
+          email: emailMeta || '',
+          role: finalRole === 'user' ? 'user' : finalRole,
+          full_name: fullNameMeta || null
+        });
         
-        if (profileByEmail) {
-          // Found profile by email but ID doesn't match - use the role from this profile
-          const finalRole = normalizeRole(profileByEmail.role || roleMeta);
-          console.log('Profile found by email (ID mismatch):', { 
-            authUserId: userId, 
-            profileId: profileByEmail.id, 
-            role: finalRole 
-          });
-          
-          // Create/update profile with correct auth user ID
-          try {
-            await supabase.from('profiles').upsert({
-              id: userId,
-              email: emailMeta,
-              role: profileByEmail.role || 'user',
-              full_name: profileByEmail.full_name || fullNameMeta
-            }, { onConflict: 'id' });
-          } catch (upsertErr) {
-            console.warn('Could not sync profile ID:', upsertErr);
-          }
-          
-          setProfile({
-            id: userId,
-            role: finalRole,
-            full_name: profileByEmail.full_name || fullNameMeta || null,
-            email: emailMeta
-          });
-          setIsLoading(false);
-          return;
+        if (!insertError) {
+          console.log('✅ New profile created successfully');
+        } else {
+          console.warn('Could not create profile:', insertError.message);
         }
+      } catch (insertErr) {
+        console.warn('Profile insert failed:', insertErr);
       }
 
-      // No profile found at all - create default
-      console.log('No profile found, creating default user profile');
+      // Set profile in state regardless of DB insert success
       setProfile({
         id: userId,
-        role: normalizeRole(roleMeta || 'user'),
+        role: finalRole,
         full_name: fullNameMeta || null,
         email: emailMeta || null
       });
       
     } catch (e) {
       console.warn("Profile fetch failed:", e);
-      // Set default profile to prevent infinite loading
-      setProfile({
-        id: userId,
-        role: normalizeRole(roleMeta || 'user'),
-        full_name: fullNameMeta || null,
-        email: emailMeta || null
-      });
+      
+      // FALLBACK: Check email for admin
+      if (emailMeta === 'admin@bart.nl') {
+        setProfile({
+          id: userId,
+          role: 'admin',
+          full_name: fullNameMeta || 'Admin',
+          email: emailMeta
+        });
+      } else {
+        // Set default profile to prevent infinite loading
+        setProfile({
+          id: userId,
+          role: normalizeRole(roleMeta || 'user'),
+          full_name: fullNameMeta || null,
+          email: emailMeta || null
+        });
+      }
     } finally {
       setIsLoading(false);
     }

@@ -71,7 +71,15 @@ const DashboardRedirect: React.FC = () => {
     if (!user) return <Navigate to="/login" replace />;
     if (!profile) return null;
 
+    // HARDCODED ADMIN CHECK - admin@bart.nl gaat ALTIJD naar admin dashboard
+    if (user.email === 'admin@bart.nl') {
+        console.log('🔐 DashboardRedirect: Admin email detected, redirecting to admin');
+        return <Navigate to="/dashboard/admin" replace />;
+    }
+
     const role = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
+    console.log('🔀 DashboardRedirect: role =', role, 'email =', user.email);
+    
     if (role === 'admin') return <Navigate to="/dashboard/admin" replace />;
     if (role === 'salon') return <Navigate to="/dashboard/salon" replace />;
     if (role === 'staff') return <Navigate to="/dashboard/staff" replace />;
@@ -85,8 +93,16 @@ const RequireRole: React.FC<{ role: 'user' | 'salon' | 'admin' | 'staff'; childr
     if (!user) return <Navigate to="/login" replace />;
     if (!profile) return null;
 
+    // HARDCODED ADMIN CHECK - admin@bart.nl heeft ALTIJD admin toegang
+    if (user.email === 'admin@bart.nl' && role === 'admin') {
+        console.log('🔐 RequireRole: Admin email detected, granting admin access');
+        return <>{children}</>;
+    }
+
     const userRole = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
     const roleMatch = userRole === role;
+
+    console.log('🔒 RequireRole check:', { required: role, userRole, email: user.email, match: roleMatch });
 
     if (!roleMatch) {
         return <DashboardRedirect />;
