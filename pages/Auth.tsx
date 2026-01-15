@@ -323,7 +323,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 // Wait a bit more to ensure profile is committed
                 await new Promise(resolve => setTimeout(resolve, 500));
 
-                // Create salon entry
+                // Create salon entry with pending status (needs admin approval)
                 const { data: salonData, error: salonError } = await supabase
                     .from('salons')
                     .insert({
@@ -331,7 +331,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                         name: regSalonName,
                         slug: regSubdomain,
                         subdomain: regSubdomain,
-                        status: 'active',
+                        status: 'pending',
                         city: regCity,
                         address: fullAddress,
                         phone: regPhone
@@ -350,7 +350,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 }
 
                 console.log('Salon created successfully:', salonData);
-                alert('Salon account aangemaakt! Welkom.');
+                alert('Salon account aangemaakt! Je salon wordt gecontroleerd door de admin en is daarna zichtbaar.');
                 navigate('/dashboard');
             } else {
                 // No session - email confirmation required

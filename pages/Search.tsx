@@ -29,7 +29,7 @@ export const SearchPage: React.FC = () => {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  // Fetch salons from Supabase
+  // Fetch salons from Supabase - only active (approved) salons
   useEffect(() => {
     const fetchSalons = async () => {
       try {
@@ -38,7 +38,8 @@ export const SearchPage: React.FC = () => {
           .select(`
             *,
             services(id, name, price)
-          `);
+          `)
+          .eq('status', 'active');
 
         if (error) throw error;
 
