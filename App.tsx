@@ -69,6 +69,7 @@ const DashboardRedirect: React.FC = () => {
 
     if (isLoading) return null;
     if (!user) return <Navigate to="/login" replace />;
+    if (!profile) return null;
 
     const role = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
     if (role === 'admin') return <Navigate to="/dashboard/admin" replace />;
@@ -82,6 +83,7 @@ const RequireRole: React.FC<{ role: 'user' | 'salon' | 'admin' | 'staff'; childr
 
     if (isLoading) return null;
     if (!user) return <Navigate to="/login" replace />;
+    if (!profile) return null;
 
     const userRole = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
     const roleMatch = userRole === role;
