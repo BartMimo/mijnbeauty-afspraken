@@ -67,39 +67,17 @@ const normalizeRole = (rawRole: unknown) => {
 const DashboardRedirect: React.FC = () => {
     const { user, profile, isLoading } = useAuth();
 
-    console.log('🔀 DashboardRedirect render:', { 
-        isLoading, 
-        hasUser: !!user, 
-        userEmail: user?.email,
-        hasProfile: !!profile, 
-        profileRole: profile?.role 
-    });
-
-    if (isLoading) {
-        console.log('⏳ DashboardRedirect: Still loading...');
-        return null;
-    }
-    if (!user) {
-        console.log('❌ DashboardRedirect: No user, redirecting to login');
-        return <Navigate to="/login" replace />;
-    }
-    if (!profile) {
-        console.log('⏳ DashboardRedirect: No profile yet, waiting...');
-        return null;
-    }
+    if (isLoading) return null;
+    if (!user) return <Navigate to="/login" replace />;
+    if (!profile) return null;
 
     // HARDCODED ADMIN CHECK - admin@bart.nl gaat ALTIJD naar admin dashboard
     const userEmail = user.email?.toLowerCase().trim();
-    console.log('📧 DashboardRedirect: Checking email:', userEmail);
-    
     if (userEmail === 'admin@bart.nl') {
-        console.log('🔐 DashboardRedirect: Admin email detected, redirecting to admin');
         return <Navigate to="/dashboard/admin" replace />;
     }
 
     const role = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
-    console.log('🔀 DashboardRedirect: role =', role, 'email =', userEmail);
-    
     if (role === 'admin') return <Navigate to="/dashboard/admin" replace />;
     if (role === 'salon') return <Navigate to="/dashboard/salon" replace />;
     if (role === 'staff') return <Navigate to="/dashboard/staff" replace />;
@@ -109,15 +87,6 @@ const DashboardRedirect: React.FC = () => {
 const RequireRole: React.FC<{ role: 'user' | 'salon' | 'admin' | 'staff'; children: React.ReactNode }> = ({ role, children }) => {
     const { user, profile, isLoading } = useAuth();
 
-    console.log('🔒 RequireRole render:', { 
-        requiredRole: role,
-        isLoading, 
-        hasUser: !!user, 
-        userEmail: user?.email,
-        hasProfile: !!profile, 
-        profileRole: profile?.role 
-    });
-
     if (isLoading) return null;
     if (!user) return <Navigate to="/login" replace />;
     if (!profile) return null;
@@ -126,17 +95,13 @@ const RequireRole: React.FC<{ role: 'user' | 'salon' | 'admin' | 'staff'; childr
 
     // HARDCODED ADMIN CHECK - admin@bart.nl heeft ALTIJD admin toegang
     if (userEmail === 'admin@bart.nl' && role === 'admin') {
-        console.log('🔐 RequireRole: Admin email detected, granting admin access');
         return <>{children}</>;
     }
 
     const userRole = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
     const roleMatch = userRole === role;
 
-    console.log('🔒 RequireRole check:', { required: role, userRole, email: userEmail, match: roleMatch });
-
     if (!roleMatch) {
-        console.log('❌ RequireRole: Role mismatch, redirecting...');
         return <DashboardRedirect />;
     }
 

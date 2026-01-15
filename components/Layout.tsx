@@ -268,6 +268,12 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode; role: 'user'
                         <HeaderLogo />
                     </div>
 
+                    {/* Center Navigation Links */}
+                    <nav className="hidden md:flex items-center space-x-6">
+                        <Link to="/search" className="text-sm font-medium text-stone-600 hover:text-brand-500 transition-colors">Salons zoeken</Link>
+                        <Link to="/for-partners" className="text-sm font-medium text-stone-600 hover:text-brand-500 transition-colors">Voor salons</Link>
+                    </nav>
+
                     <div className="flex items-center space-x-2 md:space-x-4">
                         <button className="p-2 text-stone-400 hover:text-stone-600 transition-colors">
                             <Bell size={20} />
@@ -324,6 +330,24 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode; role: 'user'
                                         </Link>
                                     );
                                 })}
+                                {/* Divider and public links */}
+                                <div className="my-4 border-t border-stone-100"></div>
+                                <Link 
+                                    to="/search"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="flex items-center px-4 py-3 text-base font-medium rounded-xl text-stone-600 hover:bg-stone-50"
+                                >
+                                    <Scissors className="mr-4 h-5 w-5 text-stone-400" />
+                                    Salons zoeken
+                                </Link>
+                                <Link 
+                                    to="/for-partners"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="flex items-center px-4 py-3 text-base font-medium rounded-xl text-stone-600 hover:bg-stone-50"
+                                >
+                                    <Mail className="mr-4 h-5 w-5 text-stone-400" />
+                                    Voor salons
+                                </Link>
                             </nav>
                             <div className="pt-4 border-t border-stone-100">
                                 <button 

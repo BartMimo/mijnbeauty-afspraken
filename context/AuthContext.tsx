@@ -106,21 +106,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string, roleMeta?: string, fullNameMeta?: string, emailMeta?: string) => {
     const normalizedEmail = emailMeta?.toLowerCase().trim();
-    console.log('🔍 fetchProfile called:', { userId, roleMeta, fullNameMeta, email: normalizedEmail });
     
     try {
-      // HARDCODED ADMIN CHECK - dit zorgt ervoor dat admin@bart.nl ALTIJD admin is
-      // Ongeacht wat er in de database staat
+      // HARDCODED ADMIN CHECK - admin@bart.nl is ALTIJD admin
       if (normalizedEmail === 'admin@bart.nl') {
-        console.log('🔐 Admin user detected by email:', normalizedEmail);
-        const adminProfile = {
+        setProfile({
           id: userId,
           role: 'admin',
           full_name: fullNameMeta || 'Admin',
           email: normalizedEmail
-        };
-        console.log('✅ Setting admin profile:', adminProfile);
-        setProfile(adminProfile);
+        });
         setIsLoading(false);
         return;
       }
@@ -130,7 +125,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!error && data) {
         const finalRole = normalizeRole(data.role || roleMeta);
-        console.log('✅ Profile found by ID:', { userId, role: finalRole, email: data.email });
         setProfile({
           ...data,
           role: finalRole,
@@ -141,56 +135,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // Profile not found by ID - check user_metadata for role (works for newly registered users)
-      console.warn('⚠️ Profile not found by ID, using metadata for:', normalizedEmail);
-      
-      // Bepaal role: eerst metadata, dan default naar user
+      // Profile not found - use metadata
       const finalRole = normalizeRole(roleMeta || 'user');
-      console.log('📝 Using role from metadata:', finalRole);
 
-      // Probeer een nieuwe profile aan te maken met het juiste ID
+      // Try to create profile
       try {
-        const { error: insertError } = await supabase.from('profiles').insert({
+        await supabase.from('profiles').insert({
           id: userId,
           email: normalizedEmail || '',
           role: finalRole === 'user' ? 'user' : finalRole,
           full_name: fullNameMeta || null
         });
-        
-        if (!insertError) {
-          console.log('✅ New profile created successfully');
-        } else {
-          console.warn('Could not create profile:', insertError.message);
-        }
       } catch (insertErr) {
-        console.warn('Profile insert failed:', insertErr);
+        // Ignore insert errors
       }
 
-      // Set profile in state regardless of DB insert success
-      const newProfile = {
+      setProfile({
         id: userId,
         role: finalRole,
         full_name: fullNameMeta || null,
         email: normalizedEmail || null
-      };
-      console.log('📝 Setting profile from metadata:', newProfile);
-      setProfile(newProfile);
+      });
       
     } catch (e) {
-      console.warn("Profile fetch failed:", e);
-      
       // FALLBACK: Check email for admin
       if (normalizedEmail === 'admin@bart.nl') {
-        const adminProfile = {
+        setProfile({
           id: userId,
           role: 'admin',
           full_name: fullNameMeta || 'Admin',
           email: normalizedEmail
-        };
-        console.log('🔐 Fallback: Setting admin profile:', adminProfile);
-        setProfile(adminProfile);
+        });
       } else {
-        // Set default profile to prevent infinite loading
         setProfile({
           id: userId,
           role: normalizeRole(roleMeta || 'user'),
