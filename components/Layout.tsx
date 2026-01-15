@@ -25,9 +25,17 @@ const UserDropdown: React.FC = () => {
         navigate('/');
     };
 
-    const role = ((profile?.role || (user as any)?.user_metadata?.role || 'user') as string).toLowerCase();
-    const roleLabel = role === 'staff' ? 'Medewerker' : role === 'owner' || role === 'salon' ? 'Salon' : role;
-    const profilePath = role === 'salon' || role === 'owner'
+    const normalizeRole = (rawRole: unknown) => {
+        const value = (rawRole ?? 'user').toString().trim().toLowerCase();
+        if (value.includes('admin')) return 'admin';
+        if (value.includes('salon') || value.includes('owner')) return 'salon';
+        if (value.includes('staff')) return 'staff';
+        return 'user';
+    };
+
+    const role = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
+    const roleLabel = role === 'staff' ? 'Medewerker' : role === 'salon' ? 'Salon' : role;
+    const profilePath = role === 'salon'
         ? '/dashboard/salon/settings'
         : role === 'staff'
             ? '/dashboard/staff/profile'
@@ -54,12 +62,12 @@ const UserDropdown: React.FC = () => {
                         <p className="text-sm font-medium text-stone-900 truncate">{profile?.full_name || user?.email || 'Gast'}</p>
                         <p className="text-xs text-stone-500 capitalize">{roleLabel}</p>
                     </div>
-                    {(role === 'consumer' || role === 'user') && (
+                    {role === 'user' && (
                         <Link to="/dashboard/user" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
                             Mijn Dashboard
                         </Link>
                     )}
-                    {(role === 'salon' || role === 'owner') && (
+                    {role === 'salon' && (
                          <Link to="/dashboard/salon" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
                             Salon Dashboard
                         </Link>

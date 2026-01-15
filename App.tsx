@@ -54,13 +54,21 @@ const getSubdomain = () => {
     return subdomain;
 };
 
+const normalizeRole = (rawRole: unknown) => {
+    const role = (rawRole ?? 'user').toString().trim().toLowerCase();
+    if (role.includes('admin')) return 'admin';
+    if (role.includes('salon') || role.includes('owner')) return 'salon';
+    if (role.includes('staff')) return 'staff';
+    return 'user';
+};
+
 const DashboardRedirect: React.FC = () => {
     const { user, profile, isLoading } = useAuth();
 
     if (isLoading) return null;
     if (!user) return <Navigate to="/login" replace />;
 
-    const role = ((profile?.role || (user as any)?.user_metadata?.role || 'user') as string).toLowerCase();
+    const role = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
     if (role === 'admin') return <Navigate to="/dashboard/admin" replace />;
     if (role === 'salon' || role === 'owner') return <Navigate to="/dashboard/salon" replace />;
     if (role === 'staff') return <Navigate to="/dashboard/staff" replace />;
@@ -73,12 +81,8 @@ const RequireRole: React.FC<{ role: 'user' | 'salon' | 'admin' | 'staff'; childr
     if (isLoading) return null;
     if (!user) return <Navigate to="/login" replace />;
 
-    const userRole = ((profile?.role || (user as any)?.user_metadata?.role || 'user') as string).toLowerCase();
-    const roleMatch = role === 'user'
-        ? (userRole === 'user' || userRole === 'consumer')
-        : role === 'salon'
-            ? (userRole === 'salon' || userRole === 'owner')
-            : userRole === role;
+    const userRole = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
+    const roleMatch = userRole === role;
 
     if (!roleMatch) {
         return <DashboardRedirect />;
