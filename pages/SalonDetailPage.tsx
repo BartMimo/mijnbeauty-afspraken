@@ -44,7 +44,15 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     .or(`slug.eq.${salonId},id.eq.${salonId}`)
                     .single();
 
-                if (error) throw error;
+                if (error) {
+                    console.error('Error fetching salon:', error);
+                    throw error;
+                }
+
+                if (!data) {
+                    console.error('No salon found with id/slug:', salonId);
+                    throw new Error('Salon not found');
+                }
 
                 setSalon({
                     id: data.slug || data.id,
@@ -70,8 +78,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 const { data: dealsData } = await supabase
                     .from('deals')
                     .select('*')
-                    .eq('salon_id', data.id)
-                    .eq('active', true);
+                    .eq('salon_id', data.id);
 
                 if (dealsData) {
                     setActiveDeals(dealsData.map((d: any) => ({

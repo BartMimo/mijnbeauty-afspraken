@@ -21,7 +21,6 @@ export const Home: React.FC = () => {
             *,
             salon:salons(id, name, slug)
           `)
-          .eq('active', true)
           .limit(4);
 
         if (error) throw error;
