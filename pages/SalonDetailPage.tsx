@@ -16,6 +16,11 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const { user } = useAuth();
     const salonId = subdomain || id;
     
+    console.log('=== SalonDetailPage Mounted ===');
+    console.log('Subdomain prop:', subdomain);
+    console.log('URL param id:', id);
+    console.log('Final salonId:', salonId);
+    
     const [salon, setSalon] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [bookingLoading, setBookingLoading] = useState(false);
