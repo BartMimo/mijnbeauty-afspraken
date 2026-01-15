@@ -374,6 +374,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Only add triggers to tables that have updated_at column
 DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -397,6 +398,8 @@ CREATE TRIGGER update_appointments_updated_at BEFORE UPDATE ON appointments
 DROP TRIGGER IF EXISTS update_reviews_updated_at ON reviews;
 CREATE TRIGGER update_reviews_updated_at BEFORE UPDATE ON reviews
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Note: favorites table only has created_at, no updated_at, so no trigger needed
 
 -- ============================================
 -- VERIFICATION QUERIES
