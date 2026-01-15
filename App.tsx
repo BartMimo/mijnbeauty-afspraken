@@ -8,6 +8,8 @@ import { SearchPage } from './pages/Search';
 import { SalonDetailPage } from './pages/SalonDetailPage';
 import { ForPartners } from './pages/ForPartners';
 import { SalonTest } from './pages/SalonTest';
+import { UserTest } from './pages/UserTest';
+import { AdminTest } from './pages/AdminTest';
 import { AuthPage } from './pages/Auth';
 import { UserDashboard } from './pages/dashboards/UserDashboard';
 import { UserProfile } from './pages/dashboards/UserProfile';
@@ -122,6 +124,8 @@ const App: React.FC = () => {
             <Route path="/salon/:id" element={<PublicLayout><SalonDetailPage /></PublicLayout>} />
             <Route path="/for-partners" element={<PublicLayout><ForPartners /></PublicLayout>} />
             <Route path="/salontest/*" element={<SalonTest />} />
+            <Route path="/usertest/*" element={<UserTest />} />
+            <Route path="/admintest/*" element={<AdminTest />} />
             
             {/* Footer Pages */}
             <Route path="/about" element={<PublicLayout><AboutPage /></PublicLayout>} />
