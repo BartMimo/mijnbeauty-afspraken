@@ -2,73 +2,72 @@ import React, { useState, useEffect } from 'react';
 import { User, Mail, Save, Clock } from 'lucide-react';
 import { Button, Input, Card } from '../../components/UIComponents';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 export const StaffProfile: React.FC = () => {
     // Get current user from AuthContext
     const { user, profile } = useAuth();
-    const userEmail = user?.email || profile?.email || 'staff@salon.nl';
+    const userEmail = user?.email || profile?.email || '';
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
-    // Load full staff list to find and update "me"
-    const [allStaff, setAllStaff] = useState<any[]>([]);
+    // Profile state
     const [myProfile, setMyProfile] = useState<any>(null);
 
-    // Initial Load
+    // Default schedule
+    const defaultSchedule = {
+        ma: { active: true, start: '09:00', end: '17:00' },
+        di: { active: true, start: '09:00', end: '17:00' },
+        wo: { active: true, start: '09:00', end: '17:00' },
+        do: { active: true, start: '09:00', end: '17:00' },
+        vr: { active: true, start: '09:00', end: '17:00' },
+        za: { active: false, start: '10:00', end: '16:00' },
+        zo: { active: false, start: '10:00', end: '16:00' },
+    };
+
+    // Initial Load - get profile from Supabase
     useEffect(() => {
-        const savedStaff = localStorage.getItem('salon_staff_v2');
-        if (savedStaff) {
-            const parsed = JSON.parse(savedStaff);
-            setAllStaff(parsed);
-            const me = parsed.find((s: any) => s.email === userEmail);
-            if (me) setMyProfile(me);
-        } else {
-             // SEED DATA FOR DEMO IF EMPTY (So Mike can see his profile)
-             const defaultSchedule = {
-                ma: { active: true, start: '09:00', end: '17:00' },
-                di: { active: true, start: '09:00', end: '17:00' },
-                wo: { active: true, start: '09:00', end: '17:00' },
-                do: { active: true, start: '09:00', end: '17:00' },
-                vr: { active: true, start: '09:00', end: '17:00' },
-                za: { active: false, start: '10:00', end: '16:00' },
-                zo: { active: false, start: '10:00', end: '16:00' },
-            };
-            const demoStaff = [
-                { 
-                    id: 1, 
-                    name: 'Sarah Janssen', 
-                    role: 'Eigenaar / Stylist', 
-                    email: 'sarah@salon.nl', 
-                    schedule: { ...defaultSchedule } 
-                },
-                { 
-                    id: 2, 
-                    name: 'Mike de Boer', 
-                    role: 'Stylist', 
-                    email: 'mike@salon.nl', 
-                    schedule: {
-                        ...defaultSchedule,
-                        ma: { active: false, start: '09:00', end: '17:00' },
-                        za: { active: true, start: '10:00', end: '15:00' }
-                    }
-                },
-            ];
-            localStorage.setItem('salon_staff_v2', JSON.stringify(demoStaff));
-            setAllStaff(demoStaff);
-            const me = demoStaff.find((s: any) => s.email === userEmail);
-            if (me) setMyProfile(me);
+        const loadProfile = async () => {
+            if (!user || !profile) {
+                setLoading(false);
+                return;
+            }
+
+            // Build profile from auth context
+            setMyProfile({
+                id: user.id,
+                name: profile.full_name || '',
+                role: profile.role === 'salon' ? 'Eigenaar' : 'Medewerker',
+                email: user.email || '',
+                schedule: defaultSchedule
+            });
+            setLoading(false);
+        };
+
+        loadProfile();
+    }, [user, profile]);
+
+    const handleSave = async () => {
+        if (!myProfile || !user) return;
+
+        setSaving(true);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    full_name: myProfile.name,
+                    phone: myProfile.phone
+                })
+                .eq('id', user.id);
+
+            if (error) throw error;
+            alert('Wijzigingen opgeslagen!');
+        } catch (err) {
+            console.error('Error saving profile:', err);
+            alert('Opslaan mislukt');
+        } finally {
+            setSaving(false);
         }
-    }, [userEmail]);
-
-    const handleSave = () => {
-        if (!myProfile) return;
-
-        // Update the big list
-        const updatedStaffList = allStaff.map(s => s.id === myProfile.id ? myProfile : s);
-        
-        // Save to storage (Syncs with Owner view)
-        // NOTE: In production, this should save to Supabase staff table
-        localStorage.setItem('salon_staff_v2', JSON.stringify(updatedStaffList));
-
-        alert('Wijzigingen opgeslagen!');
     };
 
     const handleScheduleChange = (day: string, field: string, value: any) => {
@@ -87,7 +86,15 @@ export const StaffProfile: React.FC = () => {
     const days = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
     const dayLabels: {[key:string]: string} = { ma: 'Maandag', di: 'Dinsdag', wo: 'Woensdag', do: 'Donderdag', vr: 'Vrijdag', za: 'Zaterdag', zo: 'Zondag' };
 
-    if (!myProfile) return <div className="p-8 text-center text-stone-500">Profiel aan het laden...</div>;
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+            </div>
+        );
+    }
+
+    if (!myProfile) return <div className="p-8 text-center text-stone-500">Geen profiel gevonden</div>;
 
     return (
         <div className="max-w-3xl mx-auto space-y-6">

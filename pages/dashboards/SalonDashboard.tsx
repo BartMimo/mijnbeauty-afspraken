@@ -2,43 +2,125 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Users, CreditCard, Calendar, ArrowUpRight, Tag, Plus, Clock, Trash2, Edit2 } from 'lucide-react';
 import { Card, Badge, Button, Modal, Input, Select } from '../../components/UIComponents';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 export const SalonDashboard: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { user } = useAuth();
     const basePath = location.pathname.startsWith('/salontest') ? '/salontest' : '/dashboard/salon';
 
     // --- STATE MANAGEMENT ---
-    
-    // Deals State (Read-only for dashboard widget now)
-    const [deals, setDeals] = useState<any[]>(() => {
-        const saved = localStorage.getItem('salon_deals');
-        return saved ? JSON.parse(saved) : [
-             { id: 1, service: 'Biab Nagels (Last-minute)', price: '30', original: '45', time: 'Vandaag, 15:30', status: 'active' },
-             { id: 2, service: 'Wimperlift', price: '40', original: '55', time: 'Morgen, 09:00', status: 'active' }
-        ];
-    });
-
-    // Appointments State (shared with Schedule page via localStorage key 'salon_appointments')
+    const [salonId, setSalonId] = useState<string | null>(null);
+    const [salonName, setSalonName] = useState<string>('Mijn Salon');
+    const [deals, setDeals] = useState<any[]>([]);
     const [appointments, setAppointments] = useState<any[]>([]);
+    const [stats, setStats] = useState({
+        totalBookings: 0,
+        revenue: 0,
+        newClients: 0
+    });
+    const [loading, setLoading] = useState(true);
 
+    // Fetch salon data on mount
     useEffect(() => {
-        // Sync deals on mount in case they changed elsewhere
-        const savedDeals = localStorage.getItem('salon_deals');
-        if (savedDeals) setDeals(JSON.parse(savedDeals));
+        const fetchSalonData = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
 
-        // Load appointments
-        const savedApts = localStorage.getItem('salon_appointments');
-        if (savedApts) {
-            setAppointments(JSON.parse(savedApts).slice(0, 3)); 
-        } else {
-             setAppointments([
-                { id: 101, time: '09:00', client: 'Lisa M.', service: 'Knippen & Drogen', price: '45' },
-                { id: 102, time: '10:30', client: 'Sophie de V.', service: 'Biab Nagels', price: '45' },
-                { id: 103, time: '13:00', client: 'Eva K.', service: 'Wimperlift', price: '55' },
-            ]);
-        }
-    }, []);
+            try {
+                // Get salon owned by this user
+                const { data: salon, error: salonError } = await supabase
+                    .from('salons')
+                    .select('id, name')
+                    .eq('owner_id', user.id)
+                    .maybeSingle();
+
+                if (salonError) throw salonError;
+                
+                if (!salon) {
+                    setLoading(false);
+                    return;
+                }
+
+                setSalonId(salon.id);
+                setSalonName(salon.name);
+
+                // Fetch deals for this salon
+                const { data: dealsData } = await supabase
+                    .from('deals')
+                    .select('*')
+                    .eq('salon_id', salon.id)
+                    .eq('status', 'active')
+                    .order('date', { ascending: true });
+
+                if (dealsData) {
+                    setDeals(dealsData.map(d => ({
+                        id: d.id,
+                        service: d.service_name,
+                        price: d.discount_price,
+                        original: d.original_price,
+                        time: `${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${d.time || ''}`,
+                        status: d.status
+                    })));
+                }
+
+                // Fetch today's appointments
+                const today = new Date().toISOString().split('T')[0];
+                const { data: appointmentsData } = await supabase
+                    .from('appointments')
+                    .select(`
+                        *,
+                        profiles:user_id (full_name),
+                        services:service_id (name, price)
+                    `)
+                    .eq('salon_id', salon.id)
+                    .eq('date', today)
+                    .order('time', { ascending: true })
+                    .limit(5);
+
+                if (appointmentsData) {
+                    setAppointments(appointmentsData.map(a => ({
+                        id: a.id,
+                        time: a.time,
+                        client: a.profiles?.full_name || 'Onbekend',
+                        service: a.services?.name || 'Dienst',
+                        price: a.price || a.services?.price || 0,
+                        status: a.status
+                    })));
+                }
+
+                // Calculate stats
+                const startOfMonth = new Date();
+                startOfMonth.setDate(1);
+                startOfMonth.setHours(0, 0, 0, 0);
+
+                const { data: monthlyAppointments, count } = await supabase
+                    .from('appointments')
+                    .select('price', { count: 'exact' })
+                    .eq('salon_id', salon.id)
+                    .gte('date', startOfMonth.toISOString().split('T')[0]);
+
+                const revenue = monthlyAppointments?.reduce((sum, a) => sum + (a.price || 0), 0) || 0;
+                
+                setStats({
+                    totalBookings: count || 0,
+                    revenue: revenue,
+                    newClients: Math.floor((count || 0) * 0.3) // Estimate 30% are new
+                });
+
+            } catch (err) {
+                console.error('Error fetching salon data:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchSalonData();
+    }, [user]);
 
     // --- MODAL STATES ---
     const [isAptModalOpen, setIsAptModalOpen] = useState(false);
@@ -46,45 +128,45 @@ export const SalonDashboard: React.FC = () => {
 
     // --- ACTIONS: APPOINTMENTS ---
     
-    const handleSaveApt = () => {
-        // Simple add to local state for dashboard view, 
-        // ideally this writes to the main 'salon_appointments' key used by Schedule page.
-        const newApt = { id: Date.now(), ...aptForm };
-        
-        // Update local view
-        setAppointments(prev => [newApt, ...prev]);
-        
-        // Update persistent storage for Schedule page to pick up (simplified sync)
-        const currentStored = JSON.parse(localStorage.getItem('salon_appointments') || '[]');
-        localStorage.setItem('salon_appointments', JSON.stringify([...currentStored, {
-            id: newApt.id,
-            client: newApt.client,
-            service: newApt.service,
-            date: new Date().toISOString().split('T')[0], // Set to today
-            time: newApt.time,
-            duration: 60,
-            staff: 'Sarah', // Default
-            color: 'bg-stone-100 border-stone-200 text-stone-700'
-        }]));
+    const handleSaveApt = async () => {
+        if (!salonId) return;
 
+        // For now, just add to local state - full implementation would create in Supabase
+        const newApt = { 
+            id: Date.now().toString(), 
+            time: aptForm.time,
+            client: aptForm.client,
+            service: aptForm.service,
+            price: parseFloat(aptForm.price) || 0,
+            status: 'pending'
+        };
+        
+        setAppointments(prev => [newApt, ...prev]);
         setIsAptModalOpen(false);
         setAptForm({ client: '', service: '', time: '09:00', price: '' });
     };
 
-
-    // Mock data for dashboard stats
-    const stats = [
-        { label: 'Totaal Boekingen', value: '124', trend: '+12%', icon: Calendar },
-        { label: 'Omzet deze maand', value: '€4.250', trend: '+8%', icon: CreditCard },
-        { label: 'Nieuwe Klanten', value: '28', trend: '+5%', icon: Users },
+    // Stats display data
+    const statsDisplay = [
+        { label: 'Totaal Boekingen', value: stats.totalBookings.toString(), trend: '+12%', icon: Calendar },
+        { label: 'Omzet deze maand', value: `€${stats.revenue.toFixed(0)}`, trend: '+8%', icon: CreditCard },
+        { label: 'Nieuwe Klanten', value: stats.newClients.toString(), trend: '+5%', icon: Users },
     ];
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-stone-900">Salon Dashboard</h1>
-                    <p className="text-stone-500">Welkom terug, Glow & Shine Studio</p>
+                    <p className="text-stone-500">Welkom terug, {salonName}</p>
                 </div>
                 <div className="flex gap-2">
                     <Button 
@@ -102,7 +184,7 @@ export const SalonDashboard: React.FC = () => {
 
             {/* Stats Grid */}
             <div className="grid gap-6 md:grid-cols-3">
-                {stats.map((stat, idx) => (
+                {statsDisplay.map((stat, idx) => (
                     <Card key={idx} className="p-6">
                         <div className="flex items-center justify-between mb-4">
                             <div className="p-3 bg-brand-50 rounded-xl text-brand-500">

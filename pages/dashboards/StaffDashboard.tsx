@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, CheckCircle } from 'lucide-react';
 import { Button, Card, Badge } from '../../components/UIComponents';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 export const StaffDashboard: React.FC = () => {
     // Get current user from AuthContext
     const { user, profile } = useAuth();
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [loading, setLoading] = useState(true);
 
     // Helper to format date as YYYY-MM-DD
     const toDateString = (date: Date) => date.toISOString().split('T')[0];
@@ -15,22 +17,49 @@ export const StaffDashboard: React.FC = () => {
     const [appointments, setAppointments] = useState<any[]>([]);
 
     useEffect(() => {
-        // Load shared appointments
-        const savedApts = localStorage.getItem('salon_appointments');
-        if (savedApts) {
-            setAppointments(JSON.parse(savedApts));
-        } else {
-            // SEED DATA FOR DEMO IF EMPTY (So Mike sees something)
-            const todayStr = toDateString(new Date());
-            const demoAppointments = [
-                { id: 1, client: 'Lisa M.', service: 'Knippen & Drogen', date: todayStr, time: '09:00', duration: 60, staff: 'Sarah', color: 'bg-rose-100 border-rose-200 text-rose-700' },
-                { id: 3, client: 'Eva K.', service: 'Wimperlift', date: todayStr, time: '13:00', duration: 90, staff: 'Mike', color: 'bg-purple-100 border-purple-200 text-purple-700' },
-                { id: 4, client: 'Anouk B.', service: 'Kleurbehandeling', date: todayStr, time: '15:30', duration: 120, staff: 'Mike', color: 'bg-amber-100 border-amber-200 text-amber-700' },
-            ];
-            setAppointments(demoAppointments);
-            localStorage.setItem('salon_appointments', JSON.stringify(demoAppointments));
-        }
-    }, []);
+        const fetchAppointments = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                // For staff, we'd ideally have a staff_id field on appointments
+                // For now, fetch all appointments from salons where user works
+                // This is simplified - a real app would have proper staff assignment
+                
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select(`
+                        *,
+                        profiles:user_id (full_name),
+                        services:service_id (name)
+                    `)
+                    .order('date', { ascending: true })
+                    .order('time', { ascending: true });
+
+                if (error) throw error;
+                
+                setAppointments(data?.map(a => ({
+                    id: a.id,
+                    client: a.profiles?.full_name || 'Klant',
+                    service: a.services?.name || 'Dienst',
+                    date: a.date,
+                    time: a.time,
+                    duration: 60,
+                    staff: a.staff_name || profile?.full_name?.split(' ')[0] || 'Staff',
+                    color: 'bg-stone-100 border-stone-200 text-stone-700'
+                })) || []);
+
+            } catch (err) {
+                console.error('Error fetching appointments:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAppointments();
+    }, [user, profile]);
 
     const changeDate = (days: number) => {
         const newDate = new Date(currentDate);
@@ -69,6 +98,14 @@ export const StaffDashboard: React.FC = () => {
         const height = duration * 2;
         return { top: `${top}px`, height: `${height}px` };
     };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col h-[calc(100vh-8rem)]">

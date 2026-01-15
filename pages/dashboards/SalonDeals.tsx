@@ -1,20 +1,66 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Clock, Tag } from 'lucide-react';
 import { Button, Card, Badge, Modal, Input } from '../../components/UIComponents';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 export const SalonDeals: React.FC = () => {
-    // State
-    const [deals, setDeals] = useState<any[]>(() => {
-        const saved = localStorage.getItem('salon_deals');
-        return saved ? JSON.parse(saved) : [
-             { id: 1, service: 'Biab Nagels (Last-minute)', price: '30', original: '45', time: 'Vandaag, 15:30', status: 'active' },
-             { id: 2, service: 'Wimperlift', price: '40', original: '55', time: 'Morgen, 09:00', status: 'active' }
-        ];
-    });
+    const { user } = useAuth();
+    const [salonId, setSalonId] = useState<string | null>(null);
+    const [deals, setDeals] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
+    // Fetch salon and deals on mount
     useEffect(() => {
-        localStorage.setItem('salon_deals', JSON.stringify(deals));
-    }, [deals]);
+        const fetchData = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                // Get salon owned by this user
+                const { data: salon } = await supabase
+                    .from('salons')
+                    .select('id')
+                    .eq('owner_id', user.id)
+                    .maybeSingle();
+
+                if (!salon) {
+                    setLoading(false);
+                    return;
+                }
+
+                setSalonId(salon.id);
+
+                // Fetch deals for this salon
+                const { data: dealsData, error } = await supabase
+                    .from('deals')
+                    .select('*')
+                    .eq('salon_id', salon.id)
+                    .order('date', { ascending: true });
+
+                if (error) throw error;
+                
+                setDeals(dealsData?.map(d => ({
+                    id: d.id,
+                    service: d.service_name,
+                    price: d.discount_price,
+                    original: d.original_price,
+                    time: d.time ? `${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${d.time}` : new Date(d.date).toLocaleDateString('nl-NL'),
+                    date: d.date,
+                    status: d.status
+                })) || []);
+
+            } catch (err) {
+                console.error('Error fetching deals:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [user]);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,29 +80,103 @@ export const SalonDeals: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: string) => {
         if (window.confirm('Weet je zeker dat je deze deal wilt verwijderen?')) {
+            const { error } = await supabase.from('deals').delete().eq('id', id);
+            if (error) {
+                console.error('Delete failed:', error);
+                alert('Verwijderen mislukt');
+                return;
+            }
             setDeals(prev => prev.filter(d => d.id !== id));
         }
     };
 
-    const handleSave = () => {
-        if (editingDeal) {
-            setDeals(prev => prev.map(d => d.id === editingDeal.id ? { ...d, ...form } : d));
-        } else {
-            setDeals(prev => [...prev, { id: Date.now(), ...form }]);
+    const handleSave = async () => {
+        if (!salonId) return;
+
+        try {
+            // Parse date from time string or use today
+            const dealDate = new Date().toISOString().split('T')[0];
+            
+            if (editingDeal) {
+                // Update existing deal
+                const { error } = await supabase
+                    .from('deals')
+                    .update({
+                        service_name: form.service,
+                        original_price: parseFloat(form.original),
+                        discount_price: parseFloat(form.price),
+                        time: form.time,
+                        status: form.status
+                    })
+                    .eq('id', editingDeal.id);
+
+                if (error) throw error;
+                setDeals(prev => prev.map(d => d.id === editingDeal.id ? { ...d, ...form } : d));
+            } else {
+                // Create new deal
+                const { data, error } = await supabase
+                    .from('deals')
+                    .insert({
+                        salon_id: salonId,
+                        service_name: form.service,
+                        original_price: parseFloat(form.original),
+                        discount_price: parseFloat(form.price),
+                        date: dealDate,
+                        time: form.time,
+                        status: form.status
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                setDeals(prev => [...prev, { 
+                    id: data.id, 
+                    service: data.service_name,
+                    price: data.discount_price,
+                    original: data.original_price,
+                    time: form.time,
+                    status: data.status
+                }]);
+            }
+            setIsModalOpen(false);
+        } catch (err: any) {
+            console.error('Save failed:', err);
+            alert('Opslaan mislukt: ' + err.message);
         }
-        setIsModalOpen(false);
     };
 
-    const toggleStatus = (id: number) => {
+    const toggleStatus = async (id: string) => {
+        const deal = deals.find(d => d.id === id);
+        if (!deal) return;
+
+        const newStatus = deal.status === 'active' ? 'inactive' : 'active';
+        const { error } = await supabase
+            .from('deals')
+            .update({ status: newStatus })
+            .eq('id', id);
+
+        if (error) {
+            console.error('Status toggle failed:', error);
+            return;
+        }
+
         setDeals(prev => prev.map(d => {
             if (d.id === id) {
-                return { ...d, status: d.status === 'active' ? 'inactive' : 'active' };
+                return { ...d, status: newStatus };
             }
             return d;
         }));
     };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

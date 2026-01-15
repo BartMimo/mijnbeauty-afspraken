@@ -1,21 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Clock, Euro } from 'lucide-react';
 import { Button, Card, Badge, Modal, Input, Select } from '../../components/UIComponents';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 export const SalonServices: React.FC = () => {
-    // State
-    const [services, setServices] = useState<any[]>(() => {
-        const saved = localStorage.getItem('salon_services');
-        return saved ? JSON.parse(saved) : [
-            { id: 1, name: 'Biab Nagels', category: 'Nagels', duration: 60, price: 45, active: true },
-            { id: 2, name: 'Biab Nagels + Verlenging', category: 'Nagels', duration: 90, price: 65, active: true },
-            { id: 3, name: 'Wimperlift', category: 'Wimpers', duration: 45, price: 55, active: true },
-        ];
-    });
+    const { user } = useAuth();
+    const [salonId, setSalonId] = useState<string | null>(null);
+    const [services, setServices] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
+    // Fetch salon and services on mount
     useEffect(() => {
-        localStorage.setItem('salon_services', JSON.stringify(services));
-    }, [services]);
+        const fetchData = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                // Get salon owned by this user
+                const { data: salon } = await supabase
+                    .from('salons')
+                    .select('id')
+                    .eq('owner_id', user.id)
+                    .maybeSingle();
+
+                if (!salon) {
+                    setLoading(false);
+                    return;
+                }
+
+                setSalonId(salon.id);
+
+                // Fetch services for this salon
+                const { data: servicesData, error } = await supabase
+                    .from('services')
+                    .select('*')
+                    .eq('salon_id', salon.id)
+                    .order('name');
+
+                if (error) throw error;
+                
+                setServices(servicesData?.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    category: s.category || 'Overig',
+                    duration: s.duration_minutes,
+                    price: s.price,
+                    active: s.active
+                })) || []);
+
+            } catch (err) {
+                console.error('Error fetching services:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [user]);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,20 +79,76 @@ export const SalonServices: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = async (id: string) => {
         if (window.confirm('Weet je zeker dat je deze dienst wilt verwijderen?')) {
+            const { error } = await supabase.from('services').delete().eq('id', id);
+            if (error) {
+                console.error('Delete failed:', error);
+                alert('Verwijderen mislukt');
+                return;
+            }
             setServices(prev => prev.filter(s => s.id !== id));
         }
     };
 
-    const handleSave = () => {
-        if (editingService) {
-            setServices(prev => prev.map(s => s.id === editingService.id ? { ...s, ...form } : s));
-        } else {
-            setServices(prev => [...prev, { id: Date.now(), ...form }]);
+    const handleSave = async () => {
+        if (!salonId) return;
+
+        try {
+            if (editingService) {
+                // Update existing service
+                const { error } = await supabase
+                    .from('services')
+                    .update({
+                        name: form.name,
+                        category: form.category,
+                        duration_minutes: form.duration,
+                        price: form.price,
+                        active: form.active
+                    })
+                    .eq('id', editingService.id);
+
+                if (error) throw error;
+                setServices(prev => prev.map(s => s.id === editingService.id ? { ...s, ...form } : s));
+            } else {
+                // Create new service
+                const { data, error } = await supabase
+                    .from('services')
+                    .insert({
+                        salon_id: salonId,
+                        name: form.name,
+                        category: form.category,
+                        duration_minutes: form.duration,
+                        price: form.price,
+                        active: form.active
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                setServices(prev => [...prev, { 
+                    id: data.id, 
+                    name: data.name,
+                    category: data.category,
+                    duration: data.duration_minutes,
+                    price: data.price,
+                    active: data.active
+                }]);
+            }
+            setIsModalOpen(false);
+        } catch (err: any) {
+            console.error('Save failed:', err);
+            alert('Opslaan mislukt: ' + err.message);
         }
-        setIsModalOpen(false);
     };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

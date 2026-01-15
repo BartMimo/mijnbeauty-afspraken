@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scissors, User, Store, Briefcase, ShieldCheck, ArrowRight, ArrowLeft, Check, Landmark, CreditCard, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button, Input, Card } from '../components/UIComponents';
-import { MOCK_SALONS } from '../services/mockData';
 import { supabase } from '../lib/supabase';
 
 export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ initialMode = 'login' }) => {
@@ -30,6 +29,13 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     const [regSubdomain, setRegSubdomain] = useState('');
     const [subdomainStatus, setSubdomainStatus] = useState<'idle' | 'available' | 'taken'>('idle');
 
+    // Step 2: Address fields
+    const [regStreet, setRegStreet] = useState('');
+    const [regHouseNumber, setRegHouseNumber] = useState('');
+    const [regPostalCode, setRegPostalCode] = useState('');
+    const [regCity, setRegCity] = useState('');
+    const [regPhone, setRegPhone] = useState('');
+    
     const [paymentMethod, setPaymentMethod] = useState<'ideal' | 'creditcard' | null>(null);
     const [selectedBank, setSelectedBank] = useState<string>('');
     const [discountCode, setDiscountCode] = useState('');
@@ -65,14 +71,32 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         }
     }, [regSalonName]);
 
-    const checkAvailability = (slug: string) => {
+    const checkAvailability = async (slug: string) => {
         if (!slug) {
             setSubdomainStatus('idle');
             return;
         }
-        // In real app: check Supabase 'salons' table for slug uniqueness
-        const taken = MOCK_SALONS.some(s => s.subdomain === slug);
-        setSubdomainStatus(taken ? 'taken' : 'available');
+        
+        try {
+            // Check real Supabase database for existing subdomain
+            const { data, error } = await supabase
+                .from('salons')
+                .select('subdomain')
+                .eq('subdomain', slug)
+                .maybeSingle();
+            
+            if (error) {
+                console.error('Error checking subdomain:', error);
+                // Fallback to available if we can't check
+                setSubdomainStatus('available');
+                return;
+            }
+            
+            setSubdomainStatus(data ? 'taken' : 'available');
+        } catch (err) {
+            console.error('Error checking subdomain:', err);
+            setSubdomainStatus('available');
+        }
     };
 
     const handleSubdomainChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -164,6 +188,13 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 return;
             }
         }
+        if (salonStep === 2) {
+            // Validate step 2 fields
+            if (!regStreet || !regHouseNumber || !regPostalCode || !regCity || !regPhone) {
+                alert("Vul alle adresgegevens in.");
+                return;
+            }
+        }
         setSalonStep(prev => prev + 1);
     };
 
@@ -180,9 +211,6 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         setErrorMsg(null);
 
         try {
-            // If using discount code, skip payment (for now)
-            // TODO: Integrate Stripe payment flow when hasValidDiscount is false
-            
             // 1. Create Auth User
             const { data, error } = await supabase.auth.signUp({
                 email: regEmail,
@@ -195,47 +223,84 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 }
             });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Auth signup error:', error);
+                throw error;
+            }
 
-            // 2. Create Salon Entry (If User creation successful)
-            if (data.user && data.session) {
-                // Upsert profile only if we have a session (auth.uid available under RLS)
-                await supabase
+            if (!data.user) {
+                throw new Error('Gebruiker kon niet worden aangemaakt');
+            }
+
+            // 2. Wait for session to be available
+            if (data.session) {
+                // Build full address from form fields
+                const fullAddress = `${regStreet} ${regHouseNumber}, ${regPostalCode} ${regCity}`;
+                
+                // 3. Wait a bit for the database trigger to create the profile
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 4. Try to upsert profile (works whether trigger created it or not)
+                const { error: profileError } = await supabase
                     .from('profiles')
                     .upsert(
-                        { id: data.user.id, email: regEmail, full_name: regName, role: 'salon' },
+                        { 
+                            id: data.user.id, 
+                            email: regEmail, 
+                            full_name: regName, 
+                            role: 'salon', 
+                            phone: regPhone 
+                        },
                         { onConflict: 'id' }
                     );
-                const { error: salonError } = await supabase
+                
+                if (profileError) {
+                    console.error('Profile upsert error:', profileError);
+                    // Don't throw here - profile might be created by trigger and that's OK
+                    // We'll check if we can create the salon
+                }
+
+                // 5. Wait a bit more to ensure profile is committed
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                // 6. Create salon entry
+                const { data: salonData, error: salonError } = await supabase
                     .from('salons')
-                    .insert([
-                        {
-                            owner_id: data.user.id,
-                            name: regSalonName,
-                            slug: regSubdomain,
-                            subdomain: regSubdomain,
-                            status: 'active',
-                            city: 'Amsterdam', // Default for now, usually form step 2
-                            address: 'Kerkstraat 12' // Default
-                        }
-                    ]);
+                    .insert({
+                        owner_id: data.user.id,
+                        name: regSalonName,
+                        slug: regSubdomain,
+                        subdomain: regSubdomain,
+                        status: 'active',
+                        city: regCity,
+                        address: fullAddress,
+                        phone: regPhone
+                    })
+                    .select()
+                    .single();
                 
                 if (salonError) {
                     console.error('Salon creation error:', salonError);
-                    setErrorMsg('Salon aanmaken mislukt. Controleer je rechten en probeer opnieuw.');
-                    setLoading(false);
-                    return;
+                    
+                    // If it's a foreign key error, the profile wasn't created in time
+                    if (salonError.code === '23503') {
+                        throw new Error('Er ging iets mis met het aanmaken van je profiel. Probeer opnieuw in te loggen.');
+                    }
+                    
+                    throw new Error('Salon aanmaken mislukt: ' + salonError.message);
                 }
-            }
 
-            alert('Salon account aangemaakt! Welkom.');
-            if (data.session) {
+                console.log('Salon created successfully:', salonData);
+                alert('Salon account aangemaakt! Welkom.');
                 navigate('/dashboard');
             } else {
+                // No session means email confirmation is required
+                alert('Check je email om je account te bevestigen. Daarna kun je inloggen.');
                 setMode('login');
             }
 
         } catch (err: any) {
+            console.error('Registration error:', err);
             setErrorMsg(err.message || 'Registratie mislukt');
         } finally {
             setLoading(false);
@@ -461,21 +526,51 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                 </div>
                                                 <div className="grid grid-cols-3 gap-4">
                                                     <div className="col-span-2">
-                                                        <Input label="Straat" placeholder="Kerkstraat" required />
+                                                        <Input 
+                                                            label="Straat" 
+                                                            placeholder="Kerkstraat" 
+                                                            required 
+                                                            value={regStreet}
+                                                            onChange={e => setRegStreet(e.target.value)}
+                                                        />
                                                     </div>
                                                     <div>
-                                                        <Input label="Nr" placeholder="12" required />
+                                                        <Input 
+                                                            label="Nr" 
+                                                            placeholder="12" 
+                                                            required 
+                                                            value={regHouseNumber}
+                                                            onChange={e => setRegHouseNumber(e.target.value)}
+                                                        />
                                                     </div>
                                                 </div>
                                                 <div className="grid grid-cols-3 gap-4">
                                                     <div>
-                                                        <Input label="Postcode" placeholder="1234 AB" required />
+                                                        <Input 
+                                                            label="Postcode" 
+                                                            placeholder="1234 AB" 
+                                                            required 
+                                                            value={regPostalCode}
+                                                            onChange={e => setRegPostalCode(e.target.value)}
+                                                        />
                                                     </div>
                                                     <div className="col-span-2">
-                                                        <Input label="Plaats" placeholder="Amsterdam" required />
+                                                        <Input 
+                                                            label="Plaats" 
+                                                            placeholder="Amsterdam" 
+                                                            required 
+                                                            value={regCity}
+                                                            onChange={e => setRegCity(e.target.value)}
+                                                        />
                                                     </div>
                                                 </div>
-                                                <Input label="Telefoonnummer (Zakelijk)" placeholder="020 - 123 45 67" required />
+                                                <Input 
+                                                    label="Telefoonnummer (Zakelijk)" 
+                                                    placeholder="020 - 123 45 67" 
+                                                    required 
+                                                    value={regPhone}
+                                                    onChange={e => setRegPhone(e.target.value)}
+                                                />
                                                 
                                                 <div className="flex gap-3 mt-6">
                                                     <Button type="button" variant="outline" onClick={() => setSalonStep(1)}>

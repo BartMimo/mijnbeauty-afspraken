@@ -20,7 +20,7 @@ interface AdminSalon {
 }
 
 export const AdminSalons: React.FC = () => {
-    // Initialize State with MOCK_SALONS + Some Mock Pending Data
+    // State - fetched from Supabase
     const [salons, setSalons] = useState<AdminSalon[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);

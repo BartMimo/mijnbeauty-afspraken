@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, User, Mail, Calendar, Edit2, Trash2, Clock, Check, Shield } from 'lucide-react';
 import { Button, Card, Modal, Input } from '../../components/UIComponents';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 // Helper types for the new schedule structure
 type DaySchedule = {
@@ -23,7 +25,11 @@ type Permissions = {
 export const SalonStaff: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { user, profile } = useAuth();
     const basePath = location.pathname.startsWith('/salontest') ? '/salontest' : '/dashboard/salon';
+    
+    const [loading, setLoading] = useState(true);
+    const [salonId, setSalonId] = useState<string | null>(null);
 
     // Default schedule template
     const defaultSchedule: WeeklySchedule = {
@@ -42,36 +48,47 @@ export const SalonStaff: React.FC = () => {
         canManageSettings: false
     };
 
-    // State
-    const [staff, setStaff] = useState<any[]>(() => {
-        const saved = localStorage.getItem('salon_staff_v2'); 
-        return saved ? JSON.parse(saved) : [
-            { 
-                id: 1, 
-                name: 'Sarah Janssen', 
-                role: 'Eigenaar / Stylist', 
-                email: 'sarah@salon.nl', 
-                schedule: { ...defaultSchedule },
-                permissions: { canManageSchedule: true, canSeeRevenue: true, canManageSettings: true }
-            },
-            { 
-                id: 2, 
-                name: 'Mike de Boer', 
-                role: 'Stylist', 
-                email: 'mike@salon.nl', 
-                schedule: {
-                    ...defaultSchedule,
-                    ma: { active: false, start: '09:00', end: '17:00' }, 
-                    za: { active: true, start: '10:00', end: '15:00' }   
-                },
-                permissions: { ...defaultPermissions }
-            },
-        ];
-    });
+    // State - for now using local state since we don't have a staff table
+    // In a production app, you'd create a salon_staff table
+    const [staff, setStaff] = useState<any[]>([]);
 
+    // Fetch salon and create owner as staff
     useEffect(() => {
-        localStorage.setItem('salon_staff_v2', JSON.stringify(staff));
-    }, [staff]);
+        const fetchData = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const { data: salon } = await supabase
+                    .from('salons')
+                    .select('id, name')
+                    .eq('owner_id', user.id)
+                    .maybeSingle();
+
+                if (salon) {
+                    setSalonId(salon.id);
+                    
+                    // Add owner as the first staff member
+                    setStaff([{
+                        id: user.id,
+                        name: profile?.full_name || user.email?.split('@')[0] || 'Eigenaar',
+                        role: 'Eigenaar',
+                        email: user.email || '',
+                        schedule: defaultSchedule,
+                        permissions: { canManageSchedule: true, canSeeRevenue: true, canManageSettings: true }
+                    }]);
+                }
+            } catch (err) {
+                console.error('Error fetching salon:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [user, profile]);
 
     // Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -145,6 +162,14 @@ export const SalonStaff: React.FC = () => {
 
     const days = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
     const dayLabels: {[key:string]: string} = { ma: 'Maandag', di: 'Dinsdag', wo: 'Woensdag', do: 'Donderdag', vr: 'Vrijdag', za: 'Zaterdag', zo: 'Zondag' };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

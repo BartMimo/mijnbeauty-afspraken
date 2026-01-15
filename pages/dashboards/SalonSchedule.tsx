@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Plus, User, MoreVertical, Trash2, Filter, Coffee } from 'lucide-react';
 import { Button, Card, Modal, Input, Select } from '../../components/UIComponents';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 // Types for local use
 interface ScheduleAppointment {
-    id: number;
-    type: 'appointment' | 'block'; // Added type
-    client: string; // Used as "Title" for blocks
+    id: string;
+    type: 'appointment' | 'block';
+    client: string;
     service: string;
     date: string; // YYYY-MM-DD
     time: string;
@@ -16,9 +18,12 @@ interface ScheduleAppointment {
 }
 
 export const SalonSchedule: React.FC = () => {
+    const { user } = useAuth();
+    const [salonId, setSalonId] = useState<string | null>(null);
     const [currentDate, setCurrentDate] = useState(new Date());
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingApt, setEditingApt] = useState<ScheduleAppointment | null>(null);
+    const [loading, setLoading] = useState(true);
     
     // Filter State
     const [staffFilter, setStaffFilter] = useState<string>('all');
@@ -29,28 +34,64 @@ export const SalonSchedule: React.FC = () => {
     // State for appointments
     const [appointments, setAppointments] = useState<ScheduleAppointment[]>([]);
 
+    // Fetch salon and appointments on mount
     useEffect(() => {
-        const savedApts = localStorage.getItem('salon_appointments');
-        
-        if (savedApts) {
-            setAppointments(JSON.parse(savedApts));
-        } else {
-            const todayStr = toDateString(new Date());
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            const tomorrowStr = toDateString(tomorrow);
+        const fetchData = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
 
-            const initialData: ScheduleAppointment[] = [
-                { id: 1, type: 'appointment', client: 'Lisa M.', service: 'Knippen & Drogen', date: todayStr, time: '09:00', duration: 60, staff: 'Sarah', color: 'bg-rose-100 border-rose-200 text-rose-700' },
-                { id: 2, type: 'appointment', client: 'Sophie de V.', service: 'Biab Nagels', date: todayStr, time: '10:30', duration: 60, staff: 'Sarah', color: 'bg-sky-100 border-sky-200 text-sky-700' },
-                { id: 99, type: 'block', client: 'Lunchpauze', service: '', date: todayStr, time: '12:00', duration: 30, staff: 'Sarah', color: 'bg-stone-200 border-stone-300 text-stone-600' },
-                { id: 3, type: 'appointment', client: 'Eva K.', service: 'Wimperlift', date: todayStr, time: '13:00', duration: 90, staff: 'Mike', color: 'bg-purple-100 border-purple-200 text-purple-700' },
-                { id: 4, type: 'appointment', client: 'Anouk B.', service: 'Kleurbehandeling', date: tomorrowStr, time: '10:00', duration: 120, staff: 'Sarah', color: 'bg-amber-100 border-amber-200 text-amber-700' },
-            ];
-            setAppointments(initialData);
-            localStorage.setItem('salon_appointments', JSON.stringify(initialData));
-        }
-    }, []);
+            try {
+                // Get salon owned by this user
+                const { data: salon } = await supabase
+                    .from('salons')
+                    .select('id')
+                    .eq('owner_id', user.id)
+                    .maybeSingle();
+
+                if (!salon) {
+                    setLoading(false);
+                    return;
+                }
+
+                setSalonId(salon.id);
+
+                // Fetch appointments for this salon
+                const { data: appointmentsData, error } = await supabase
+                    .from('appointments')
+                    .select(`
+                        *,
+                        profiles:user_id (full_name),
+                        services:service_id (name)
+                    `)
+                    .eq('salon_id', salon.id)
+                    .order('date', { ascending: true })
+                    .order('time', { ascending: true });
+
+                if (error) throw error;
+                
+                setAppointments(appointmentsData?.map(a => ({
+                    id: a.id,
+                    type: 'appointment' as const,
+                    client: a.profiles?.full_name || 'Onbekend',
+                    service: a.services?.name || 'Dienst',
+                    date: a.date,
+                    time: a.time,
+                    duration: 60, // Default duration
+                    staff: a.staff_name || 'Medewerker',
+                    color: 'bg-stone-100 border-stone-200 text-stone-700'
+                })) || []);
+
+            } catch (err) {
+                console.error('Error fetching appointments:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [user]);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -98,7 +139,9 @@ export const SalonSchedule: React.FC = () => {
                date.getFullYear() === today.getFullYear();
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        // Note: This is simplified - in a real app you'd have a proper appointment creation flow
+        // For now, just update local state as the appointment creation should come from customer booking
         let newAppointments;
         const isBlock = formData.type === 'block';
         
@@ -109,31 +152,46 @@ export const SalonSchedule: React.FC = () => {
             duration: Number(formData.duration),
             staff: formData.staff,
             type: formData.type,
-            color: isBlock ? 'bg-stone-200 border-stone-300 text-stone-600' : 'bg-stone-100 border-stone-200 text-stone-700' // Default fallback color
+            color: isBlock ? 'bg-stone-200 border-stone-300 text-stone-600' : 'bg-stone-100 border-stone-200 text-stone-700'
         };
 
         if (editingApt) {
+            // Update in Supabase
+            if (!isBlock && salonId) {
+                await supabase
+                    .from('appointments')
+                    .update({
+                        time: formData.time,
+                        staff_name: formData.staff
+                    })
+                    .eq('id', editingApt.id);
+            }
             newAppointments = appointments.map(a => a.id === editingApt.id ? { ...a, ...aptData } : a);
         } else {
+            // For new appointments, just add to local state (blocks)
             const newApt: ScheduleAppointment = {
-                id: Math.random(),
+                id: crypto.randomUUID(),
                 date: toDateString(currentDate),
-                ...aptData,
-                color: isBlock ? 'bg-stone-200 border-stone-300 text-stone-600' : 'bg-stone-100 border-stone-200 text-stone-700'
+                ...aptData
             };
             newAppointments = [...appointments, newApt];
         }
         setAppointments(newAppointments);
-        localStorage.setItem('salon_appointments', JSON.stringify(newAppointments));
         setIsModalOpen(false);
         setEditingApt(null);
     };
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
         if (editingApt) {
+            // Delete from Supabase if it's a real appointment
+            if (editingApt.type === 'appointment' && salonId) {
+                await supabase
+                    .from('appointments')
+                    .delete()
+                    .eq('id', editingApt.id);
+            }
             const newAppointments = appointments.filter(a => a.id !== editingApt.id);
             setAppointments(newAppointments);
-            localStorage.setItem('salon_appointments', JSON.stringify(newAppointments));
             setIsModalOpen(false);
             setEditingApt(null);
         }

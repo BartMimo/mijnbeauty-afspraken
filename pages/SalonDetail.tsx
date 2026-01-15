@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Phone, Mail, MessageCircle, Zap, Edit3, Heart } from 'lucide-react';
 import { Button, Card, Badge, Modal, Input } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
-import { MOCK_REVIEWS } from '../services/mockData';
+import { useAuth } from '../context/AuthContext';
 import { Service, Deal } from '../types';
 
 interface SalonDetailPageProps {
@@ -12,6 +12,7 @@ interface SalonDetailPageProps {
 
 export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) => {
     const { id } = useParams<{ id: string }>();
+    const { user } = useAuth();
     const salonId = subdomain || id;
     
     console.log('=== SalonDetail.tsx Mounted ===');
@@ -20,7 +21,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     // State
     const [salon, setSalon] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [reviews, setReviews] = useState(MOCK_REVIEWS);
+    const [reviews, setReviews] = useState<any[]>([]);
     const [activeDeals, setActiveDeals] = useState<Deal[]>([]);
     const [selectedService, setSelectedService] = useState<string | null>(null);
     const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
@@ -128,9 +129,37 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     })));
                 }
 
-                // Load favorites
-                const favorites = JSON.parse(localStorage.getItem('user_favorites') || '[]');
-                setIsFavorite(favorites.includes(data.slug || data.id));
+                // Fetch reviews from Supabase
+                const { data: reviewsData } = await supabase
+                    .from('reviews')
+                    .select(`
+                        *,
+                        profiles:user_id (full_name)
+                    `)
+                    .eq('salon_id', data.id)
+                    .order('created_at', { ascending: false });
+
+                if (reviewsData) {
+                    setReviews(reviewsData.map((r: any) => ({
+                        id: r.id,
+                        name: r.profiles?.full_name || 'Anoniem',
+                        rating: r.rating,
+                        text: r.comment || '',
+                        date: new Date(r.created_at).toLocaleDateString('nl-NL')
+                    })));
+                }
+
+                // Check if user has this salon as favorite
+                if (user) {
+                    const { data: favoriteData } = await supabase
+                        .from('favorites')
+                        .select('id')
+                        .eq('user_id', user.id)
+                        .eq('salon_id', data.id)
+                        .maybeSingle();
+                    
+                    setIsFavorite(!!favoriteData);
+                }
 
             } catch (err) {
                 console.error('Error fetching salon:', err);
@@ -140,19 +169,36 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         };
 
         fetchSalon();
-    }, [salonId]);
+    }, [salonId, user]);
 
-    const toggleFavorite = () => {
-        if (!salon) return;
-        const favorites = JSON.parse(localStorage.getItem('user_favorites') || '[]');
-        let newFavs;
-        if (isFavorite) {
-            newFavs = favorites.filter((fid: string) => fid !== salon.id);
-        } else {
-            newFavs = [...favorites, salon.id];
+    const toggleFavorite = async () => {
+        if (!salon || !user) {
+            // Redirect to login or show message
+            alert('Log in om salons toe te voegen aan je favorieten');
+            return;
         }
-        localStorage.setItem('user_favorites', JSON.stringify(newFavs));
-        setIsFavorite(!isFavorite);
+
+        try {
+            if (isFavorite) {
+                // Remove from favorites
+                await supabase
+                    .from('favorites')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .eq('salon_id', salon.supabaseId);
+            } else {
+                // Add to favorites
+                await supabase
+                    .from('favorites')
+                    .insert({
+                        user_id: user.id,
+                        salon_id: salon.supabaseId
+                    });
+            }
+            setIsFavorite(!isFavorite);
+        } catch (err) {
+            console.error('Error toggling favorite:', err);
+        }
     };
 
     if (loading) {

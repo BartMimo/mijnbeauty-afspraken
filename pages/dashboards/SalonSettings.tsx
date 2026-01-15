@@ -1,40 +1,85 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Store, MapPin, Clock, Image as ImageIcon, Upload, Trash2, Smartphone, Check, Calendar, Copy, Link as LinkIcon, RefreshCw, X } from 'lucide-react';
 import { Button, Input, Card, Badge, Modal } from '../../components/UIComponents';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 export const SalonSettings: React.FC = () => {
+    const { user } = useAuth();
+    const [salonId, setSalonId] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    
     // Tab State
     const [activeTab, setActiveTab] = useState<'general' | 'portfolio' | 'sync'>('general');
 
     // State initialization
-    const [settings, setSettings] = useState(() => {
-        const saved = localStorage.getItem('salon_settings');
-        return saved ? JSON.parse(saved) : {
-            name: 'Glow & Shine Studio',
-            description: 'Specialist in biab nagels en wimperextensions. Een rustige plek voor jezelf.',
-            address: 'Kerkstraat 12',
-            zipCode: '1012 AB',
-            city: 'Amsterdam',
-            phone: '020 1234567',
-            email: 'info@glowshine.nl',
-            openings: {
-                ma: { start: '09:00', end: '18:00' },
-                di: { start: '09:00', end: '18:00' },
-                wo: { start: '09:00', end: '18:00' },
-                do: { start: '09:00', end: '18:00' },
-                vr: { start: '09:00', end: '18:00' },
-                za: { start: '10:00', end: '17:00' }
-            },
-            portfolio: [
-                'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&q=80&w=400',
-                'https://images.unsplash.com/photo-1560750588-73207b1ef5b8?auto=format&fit=crop&q=80&w=400'
-            ],
-            calendarSync: {
-                google: { connected: false, email: '' },
-                apple: { connected: false, url: '' }
+    const [settings, setSettings] = useState({
+        name: '',
+        description: '',
+        address: '',
+        zipCode: '',
+        city: '',
+        phone: '',
+        email: '',
+        openings: {
+            ma: { start: '09:00', end: '18:00' },
+            di: { start: '09:00', end: '18:00' },
+            wo: { start: '09:00', end: '18:00' },
+            do: { start: '09:00', end: '18:00' },
+            vr: { start: '09:00', end: '18:00' },
+            za: { start: '10:00', end: '17:00' }
+        },
+        portfolio: [] as string[],
+        calendarSync: {
+            google: { connected: false, email: '' },
+            apple: { connected: false, url: '' }
+        }
+    });
+
+    // Fetch salon data
+    useEffect(() => {
+        const fetchSalonData = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const { data: salon, error } = await supabase
+                    .from('salons')
+                    .select('*')
+                    .eq('owner_id', user.id)
+                    .maybeSingle();
+
+                if (error) throw error;
+                
+                if (salon) {
+                    setSalonId(salon.id);
+                    
+                    // Parse address into parts if possible
+                    const addressParts = salon.address?.match(/^(.+?),\s*(\d{4}\s*\w{2})\s+(.+)$/);
+                    
+                    setSettings(prev => ({
+                        ...prev,
+                        name: salon.name || '',
+                        description: salon.description || '',
+                        address: addressParts ? addressParts[1] : salon.address || '',
+                        zipCode: addressParts ? addressParts[2] : salon.zip_code || '',
+                        city: addressParts ? addressParts[3] : salon.city || '',
+                        phone: salon.phone || '',
+                        email: salon.email || '',
+                        portfolio: salon.image_url ? [salon.image_url] : []
+                    }));
+                }
+            } catch (err) {
+                console.error('Error fetching salon:', err);
+            } finally {
+                setLoading(false);
             }
         };
-    });
+
+        fetchSalonData();
+    }, [user]);
 
     const [isSaved, setIsSaved] = useState(false);
     
@@ -43,10 +88,34 @@ export const SalonSettings: React.FC = () => {
     const [isICalModalOpen, setIsICalModalOpen] = useState(false);
     const [icalInput, setIcalInput] = useState('');
 
-    const handleSave = () => {
-        localStorage.setItem('salon_settings', JSON.stringify(settings));
-        setIsSaved(true);
-        setTimeout(() => setIsSaved(false), 3000);
+    const handleSave = async () => {
+        if (!salonId) return;
+
+        try {
+            const fullAddress = `${settings.address}, ${settings.zipCode} ${settings.city}`;
+            
+            const { error } = await supabase
+                .from('salons')
+                .update({
+                    name: settings.name,
+                    description: settings.description,
+                    address: fullAddress,
+                    city: settings.city,
+                    zip_code: settings.zipCode,
+                    phone: settings.phone,
+                    email: settings.email,
+                    image_url: settings.portfolio[0] || null
+                })
+                .eq('id', salonId);
+
+            if (error) throw error;
+            
+            setIsSaved(true);
+            setTimeout(() => setIsSaved(false), 3000);
+        } catch (err) {
+            console.error('Error saving settings:', err);
+            alert('Opslaan mislukt');
+        }
     };
 
     const handleChange = (field: string, value: string) => {
@@ -122,6 +191,14 @@ export const SalonSettings: React.FC = () => {
         navigator.clipboard.writeText("https://api.mijnbeauty.nl/cal/837492.ics");
         alert("Link gekopieerd naar klembord!");
     };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
