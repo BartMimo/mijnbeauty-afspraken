@@ -41,6 +41,8 @@ export const SearchPage: React.FC = () => {
 
         const transformed = (data || []).map((salon: any) => ({
           id: salon.slug || salon.id,
+          slug: salon.slug,
+          uuid: salon.id,
           name: salon.name,
           city: salon.city || '',
           address: salon.address || '',
