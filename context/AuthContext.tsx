@@ -106,96 +106,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string, roleMeta?: string, fullNameMeta?: string, emailMeta?: string) => {
     try {
+      // First try to get profile by auth user ID (correct approach)
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (error) {
-        console.warn("Profile fetch error:", error);
-      } else if (data) {
-        // Keep data but allow role override from metadata/legacy if needed
-        const baseRole = data.role;
-        const finalRole = normalizeRole(baseRole || roleMeta);
-
-        // Check legacy users table for admin role if present
-        let legacyRole: string | undefined;
-        try {
-          const { data: legacy } = await supabase
-            .from('users')
-            .select('role, full_name, email')
-            .eq('id', userId)
-            .maybeSingle();
-          legacyRole = legacy?.role;
-          if (legacy?.full_name && !data.full_name) data.full_name = legacy.full_name;
-          if (legacy?.email && !data.email) data.email = legacy.email;
-        } catch {
-          // ignore legacy lookup failures
-        }
-
-        const legacyFinalRole = normalizeRole(legacyRole || roleMeta || baseRole);
+      
+      if (!error && data) {
+        const finalRole = normalizeRole(data.role || roleMeta);
+        console.log('Profile found by ID:', { userId, role: finalRole, email: data.email });
         setProfile({
           ...data,
-          role: legacyFinalRole,
+          role: finalRole,
           full_name: data.full_name || fullNameMeta || null,
           email: data.email || emailMeta || null
         });
         setIsLoading(false);
         return;
       }
-    } catch (e) {
-      console.warn("Profile fetch failed:", e);
-    }
 
-    // Fallback: try profile by email, then legacy public.users by email
-    try {
-      let fallbackRole = roleMeta;
-      let fallbackName = fullNameMeta;
-      let fallbackEmail = emailMeta;
-
+      // Profile not found by ID - try by email (ID mismatch case)
+      console.warn('Profile not found by ID, trying email lookup for:', emailMeta);
+      
       if (emailMeta) {
         const { data: profileByEmail } = await supabase
           .from('profiles')
           .select('*')
           .eq('email', emailMeta)
           .maybeSingle();
+        
         if (profileByEmail) {
-          fallbackRole = profileByEmail.role || fallbackRole;
-          fallbackName = profileByEmail.full_name || fallbackName;
-          fallbackEmail = profileByEmail.email || fallbackEmail;
+          // Found profile by email but ID doesn't match - use the role from this profile
+          const finalRole = normalizeRole(profileByEmail.role || roleMeta);
+          console.log('Profile found by email (ID mismatch):', { 
+            authUserId: userId, 
+            profileId: profileByEmail.id, 
+            role: finalRole 
+          });
+          
+          // Create/update profile with correct auth user ID
+          try {
+            await supabase.from('profiles').upsert({
+              id: userId,
+              email: emailMeta,
+              role: profileByEmail.role || 'user',
+              full_name: profileByEmail.full_name || fullNameMeta
+            }, { onConflict: 'id' });
+          } catch (upsertErr) {
+            console.warn('Could not sync profile ID:', upsertErr);
+          }
+          
+          setProfile({
+            id: userId,
+            role: finalRole,
+            full_name: profileByEmail.full_name || fullNameMeta || null,
+            email: emailMeta
+          });
+          setIsLoading(false);
+          return;
         }
       }
 
-      const { data: legacyById } = await supabase
-        .from('users')
-        .select('role, full_name, email')
-        .eq('id', userId)
-        .maybeSingle();
-      if (legacyById) {
-        fallbackRole = legacyById.role || fallbackRole;
-        fallbackName = legacyById.full_name || fallbackName;
-        fallbackEmail = legacyById.email || fallbackEmail;
-      }
-
-      if (emailMeta) {
-        const { data: legacyByEmail } = await supabase
-          .from('users')
-          .select('role, full_name, email')
-          .eq('email', emailMeta)
-          .maybeSingle();
-        if (legacyByEmail) {
-          fallbackRole = legacyByEmail.role || fallbackRole;
-          fallbackName = legacyByEmail.full_name || fallbackName;
-          fallbackEmail = legacyByEmail.email || fallbackEmail;
-        }
-      }
-
-      if (fallbackRole || fallbackName || fallbackEmail) {
-        setProfile({
-          id: userId,
-          role: normalizeRole(fallbackRole),
-          full_name: fallbackName || null,
-          email: fallbackEmail || null
-        });
-      }
+      // No profile found at all - create default
+      console.log('No profile found, creating default user profile');
+      setProfile({
+        id: userId,
+        role: normalizeRole(roleMeta || 'user'),
+        full_name: fullNameMeta || null,
+        email: emailMeta || null
+      });
+      
     } catch (e) {
-      console.warn('Fallback profile failed:', e);
+      console.warn("Profile fetch failed:", e);
+      // Set default profile to prevent infinite loading
+      setProfile({
+        id: userId,
+        role: normalizeRole(roleMeta || 'user'),
+        full_name: fullNameMeta || null,
+        email: emailMeta || null
+      });
     } finally {
       setIsLoading(false);
     }
