@@ -25,8 +25,8 @@ const UserDropdown: React.FC = () => {
         navigate('/');
     };
 
-    const role = profile?.role || 'user';
-    const roleLabel = role === 'staff' ? 'Medewerker' : role === 'owner' ? 'Salon' : role;
+    const role = ((profile?.role || (user as any)?.user_metadata?.role || 'user') as string).toLowerCase();
+    const roleLabel = role === 'staff' ? 'Medewerker' : role === 'owner' || role === 'salon' ? 'Salon' : role;
     const profilePath = role === 'salon' || role === 'owner'
         ? '/dashboard/salon/settings'
         : role === 'staff'
