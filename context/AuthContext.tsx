@@ -180,16 +180,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    // Clear all localStorage that might contain old demo/test data
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('userAppointments');
-    localStorage.removeItem('user_favorites');
-    localStorage.removeItem('salon_deals');
-    localStorage.removeItem('salon_appointments');
-    localStorage.removeItem('salon_services');
-    localStorage.removeItem('salon_settings');
-    localStorage.removeItem('salon_staff_v2');
+    try {
+      await supabase.auth.signOut();
+      // Clear state
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      // Clear all localStorage that might contain old demo/test data
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('userAppointments');
+      localStorage.removeItem('user_favorites');
+      localStorage.removeItem('salon_deals');
+      localStorage.removeItem('salon_appointments');
+      localStorage.removeItem('salon_services');
+      localStorage.removeItem('salon_settings');
+      localStorage.removeItem('salon_staff_v2');
+      localStorage.removeItem('pendingSalon');
+    } catch (err) {
+      console.error('Sign out error:', err);
+    }
   };
 
   if (isLoading) {
