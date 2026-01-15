@@ -285,6 +285,10 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
 
             if (error) {
                 console.error('Auth signup error:', error);
+                // Better error message for duplicate email
+                if (error.message?.includes('already registered') || error.message?.includes('already exists')) {
+                    throw new Error('Dit e-mailadres is al in gebruik. Probeer in te loggen of gebruik een ander e-mailadres.');
+                }
                 throw error;
             }
 
