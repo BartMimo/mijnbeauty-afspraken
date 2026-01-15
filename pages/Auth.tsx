@@ -127,7 +127,6 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                     );
             }
             
-            alert('Account aangemaakt! Controleer je e-mail voor bevestiging (of log in als dit een testomgeving is).');
             if (data.session) {
                 navigate('/dashboard');
             } else {
