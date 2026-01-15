@@ -33,12 +33,18 @@ export const AdminSalons: React.FC = () => {
     useEffect(() => {
         const fetchSalons = async () => {
             try {
-                const { data, error } = await supabase
+                console.log('Fetching salons...');
+                const { data, error, count } = await supabase
                     .from('salons')
-                    .select('id, name, city, address, rating, status')
+                    .select('*', { count: 'exact' })
                     .order('created_at', { ascending: false });
 
-                if (error) throw error;
+                console.log('Salons fetch result:', { data, error, count });
+
+                if (error) {
+                    console.error('Supabase error details:', error);
+                    throw error;
+                }
 
                 const mapped: AdminSalon[] = (data || []).map((s: any) => ({
                     id: s.id,
@@ -50,6 +56,7 @@ export const AdminSalons: React.FC = () => {
                     subscription: { plan: 'Geen', status: 'none' }
                 }));
 
+                console.log('Mapped salons:', mapped);
                 setSalons(mapped);
             } catch (err) {
                 console.error('Error loading salons:', err);
