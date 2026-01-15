@@ -32,7 +32,12 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     // Fetch salon data from Supabase
     useEffect(() => {
         const fetchSalon = async () => {
-            if (!salonId) return;
+            if (!salonId) {
+                console.error('No salonId provided');
+                return;
+            }
+
+            console.log('Fetching salon with id/slug:', salonId);
 
             try {
                 // Try to fetch by slug first, then by id if that fails
@@ -40,6 +45,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 let error = null;
                 
                 // First try: search by slug
+                console.log('Trying slug lookup:', salonId);
                 const slugResult = await supabase
                     .from('salons')
                     .select(`
@@ -49,10 +55,14 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     .eq('slug', salonId)
                     .maybeSingle();
                 
+                console.log('Slug result:', slugResult);
+                
                 if (slugResult.data) {
                     data = slugResult.data;
+                    console.log('Found by slug:', data);
                 } else {
                     // Second try: search by id (UUID)
+                    console.log('Trying UUID lookup:', salonId);
                     const idResult = await supabase
                         .from('salons')
                         .select(`
@@ -62,6 +72,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         .eq('id', salonId)
                         .maybeSingle();
                     
+                    console.log('UUID result:', idResult);
                     data = idResult.data;
                     error = idResult.error;
                 }
