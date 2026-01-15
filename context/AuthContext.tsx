@@ -51,7 +51,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSession(session);
           setUser(session?.user ?? null);
           if (session?.user) {
-            await fetchProfile(session.user.id);
+            await fetchProfile(
+              session.user.id,
+              session.user.user_metadata?.role,
+              session.user.user_metadata?.full_name,
+              session.user.email
+            );
           } else {
             setIsLoading(false);
           }
@@ -71,7 +76,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (mounted) {
         setSession(session);
         setUser(session?.user ?? null);
-        if (session?.user) fetchProfile(session.user.id);
+        if (session?.user) {
+          fetchProfile(
+            session.user.id,
+            session.user.user_metadata?.role,
+            session.user.user_metadata?.full_name,
+            session.user.email
+          );
+        }
         else {
           setProfile(null);
           setIsLoading(false);
@@ -85,16 +97,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, roleMeta?: string, fullNameMeta?: string, emailMeta?: string) => {
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
       if (error) {
         console.warn("Profile fetch error:", error);
       } else if (data) {
         setProfile(data);
+        return;
       }
     } catch (e) {
       console.warn("Profile fetch failed:", e);
+    }
+
+    // Fallback: use auth metadata or legacy public.users table
+    try {
+      let fallbackRole = roleMeta;
+      let fallbackName = fullNameMeta;
+      let fallbackEmail = emailMeta;
+
+      if (!fallbackRole) {
+        const { data: legacy, error: legacyErr } = await supabase
+          .from('users')
+          .select('role, full_name, email')
+          .eq('id', userId)
+          .maybeSingle();
+        if (!legacyErr && legacy) {
+          fallbackRole = legacy.role;
+          fallbackName = fallbackName || legacy.full_name;
+          fallbackEmail = fallbackEmail || legacy.email;
+        }
+      }
+
+      if (fallbackRole || fallbackName || fallbackEmail) {
+        setProfile({
+          id: userId,
+          role: fallbackRole || 'user',
+          full_name: fallbackName || null,
+          email: fallbackEmail || null
+        });
+      }
+    } catch (e) {
+      console.warn('Fallback profile failed:', e);
     } finally {
       setIsLoading(false);
     }
