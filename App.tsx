@@ -5,7 +5,7 @@ import { PublicLayout, DashboardLayout } from './components/Layout';
 import { AuthProvider } from './context/AuthContext'; // Import AuthProvider
 import { Home } from './pages/Home';
 import { SearchPage } from './pages/Search';
-import { SalonDetailPage } from './pages/SalonDetail';
+import { SalonDetailPage } from './pages/SalonDetailPage';
 import { ForPartners } from './pages/ForPartners';
 import { AuthPage } from './pages/Auth';
 import { UserDashboard } from './pages/dashboards/UserDashboard';

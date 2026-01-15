@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Phone, Mail, MessageCircle, Zap, Edit3, Heart } from 'lucide-react';
 import { Button, Card, Badge, Modal, Input } from '../components/UIComponents';
-import { MOCK_SALONS, MOCK_REVIEWS, MOCK_DEALS } from '../services/mockData';
+import { supabase } from '../lib/supabase';
+import { MOCK_REVIEWS } from '../services/mockData';
 import { Service, Deal } from '../types';
 
 interface SalonDetailPageProps {
@@ -11,14 +12,15 @@ interface SalonDetailPageProps {
 
 export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) => {
     const { id } = useParams<{ id: string }>();
+    const salonId = subdomain || id;
     
-    // Find salon: either by ID (standard route) or by Subdomain (custom domain route)
-    const salon = MOCK_SALONS.find(s => 
-        subdomain ? s.subdomain === subdomain : s.id === id
-    );
+    console.log('=== SalonDetail.tsx Mounted ===');
+    console.log('salonId:', salonId);
     
     // State
-    const [reviews, setReviews] = useState(MOCK_REVIEWS); // Load initial mock reviews
+    const [salon, setSalon] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [reviews, setReviews] = useState(MOCK_REVIEWS);
     const [activeDeals, setActiveDeals] = useState<Deal[]>([]);
     const [selectedService, setSelectedService] = useState<string | null>(null);
     const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
@@ -37,40 +39,93 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
-    // Load deals (Combine MOCK_DEALS with LocalStorage deals from Dashboard)
+    // Fetch salon from Supabase
     useEffect(() => {
-        if (!salon) return;
-
-        // Load Favorites
-        const favorites = JSON.parse(localStorage.getItem('user_favorites') || '[]');
-        setIsFavorite(favorites.includes(salon.id));
-
-        // 1. Get static mock deals for this salon
-        const staticDeals = MOCK_DEALS.filter(d => d.salonId === salon.id);
-
-        // 2. Get dynamic deals created in Dashboard (localStorage)
-        let dynamicDeals: Deal[] = [];
-        if (salon.id === '1') {
-            const saved = localStorage.getItem('salon_deals');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                dynamicDeals = parsed.filter((d: any) => d.status === 'active').map((d: any) => ({
-                    id: `local-${d.id}`,
-                    salonId: '1',
-                    salonName: salon.name,
-                    salonCity: salon.city,
-                    serviceName: d.service,
-                    originalPrice: parseFloat(d.original || '0'),
-                    discountPrice: parseFloat(d.price),
-                    date: 'Binnenkort', 
-                    time: d.time,
-                    description: 'Exclusieve online deal'
-                }));
+        const fetchSalon = async () => {
+            if (!salonId) {
+                setLoading(false);
+                return;
             }
-        }
 
-        setActiveDeals([...staticDeals, ...dynamicDeals]);
-    }, [salon]);
+            console.log('Fetching salon:', salonId);
+
+            try {
+                const { data, error } = await supabase
+                    .from('salons')
+                    .select(`
+                        *,
+                        services(*)
+                    `)
+                    .or(`slug.eq.${salonId},id.eq.${salonId}`)
+                    .single();
+
+                console.log('Supabase result:', { data, error });
+
+                if (error || !data) {
+                    console.error('Salon not found:', error);
+                    setLoading(false);
+                    return;
+                }
+
+                console.log('Found salon:', data.name);
+
+                setSalon({
+                    id: data.slug || data.id,
+                    supabaseId: data.id,
+                    name: data.name,
+                    subdomain: data.subdomain,
+                    city: data.city || '',
+                    address: data.address || '',
+                    description: data.description || 'Welkom bij onze salon!',
+                    rating: 4.5,
+                    reviewCount: 0,
+                    email: data.email,
+                    phone: data.phone,
+                    services: (data.services || []).map((s: any) => ({
+                        id: s.id,
+                        name: s.name,
+                        description: s.description || '',
+                        price: s.price,
+                        duration: s.duration_minutes,
+                        category: 'Nails'
+                    })),
+                    image: data.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'
+                });
+
+                // Fetch deals
+                const { data: dealsData } = await supabase
+                    .from('deals')
+                    .select('*')
+                    .eq('salon_id', data.id);
+
+                if (dealsData) {
+                    setActiveDeals(dealsData.map((d: any) => ({
+                        id: d.id,
+                        salonId: data.slug || data.id,
+                        salonName: data.name,
+                        salonCity: data.city,
+                        serviceName: d.service_name,
+                        originalPrice: d.original_price,
+                        discountPrice: d.discount_price,
+                        date: d.date,
+                        time: d.time,
+                        description: d.description || ''
+                    })));
+                }
+
+                // Load favorites
+                const favorites = JSON.parse(localStorage.getItem('user_favorites') || '[]');
+                setIsFavorite(favorites.includes(data.slug || data.id));
+
+            } catch (err) {
+                console.error('Error fetching salon:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchSalon();
+    }, [salonId]);
 
     const toggleFavorite = () => {
         if (!salon) return;
@@ -84,6 +139,17 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         localStorage.setItem('user_favorites', JSON.stringify(newFavs));
         setIsFavorite(!isFavorite);
     };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
+                    <p className="text-stone-500">Salon laden...</p>
+                </div>
+            </div>
+        );
+    }
 
     if (!salon) {
         return (
