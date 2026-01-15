@@ -354,13 +354,14 @@ CREATE POLICY "Users can update own reviews" ON reviews
 -- ============================================
 -- 9. FIX TEST SALON DATA
 -- ============================================
+-- Force update test salon data (removes the slug IS NULL condition)
 UPDATE salons 
 SET 
     slug = 'beauty-test-studio',
     subdomain = 'beauty-test',
     description = 'Professional beauty salon offering nail services, lashes, and more',
     image_url = COALESCE(image_url, 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800')
-WHERE name = 'Beauty Test Studio' AND slug IS NULL;
+WHERE name = 'Beauty Test Studio';
 
 -- ============================================
 -- 10. TRIGGERS FOR UPDATED_AT
