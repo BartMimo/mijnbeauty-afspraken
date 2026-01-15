@@ -48,26 +48,33 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             try {
                 setLoading(true);
                 
-                // Simple single query - try both slug and UUID
-                const { data, error } = await supabase
+                // Try slug first (for /salon/beauty-test-studio), then fallback to UUID
+                let { data, error } = await supabase
                     .from('salons')
                     .select(`
                         *,
                         services(*)
                     `)
-                    .or(`slug.eq.${salonId},id.eq.${salonId}`)
-                    .single();
+                    .eq('slug', salonId)
+                    .maybeSingle();
+
+                if (!data && !error) {
+                    const result = await supabase
+                        .from('salons')
+                        .select(`
+                            *,
+                            services(*)
+                        `)
+                        .eq('id', salonId)
+                        .maybeSingle();
+                    data = result.data;
+                    error = result.error;
+                }
 
                 console.log('Query result:', { data, error });
 
-                if (error) {
-                    console.error('Supabase error:', error);
-                    setLoading(false);
-                    return;
-                }
-
-                if (!data) {
-                    console.error('No salon found');
+                if (error || !data) {
+                    console.error('No salon found', error);
                     setLoading(false);
                     return;
                 }
