@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS public.salons (
   name text NOT NULL,
   slug text UNIQUE,
   subdomain text UNIQUE,
+  status text DEFAULT 'active' CHECK (status IN ('active', 'pending', 'suspended')),
   description text,
   address text,
   city text,
@@ -207,3 +208,40 @@ CREATE POLICY "Users create own reviews" ON public.reviews
 DROP POLICY IF EXISTS "Users update own reviews" ON public.reviews;
 CREATE POLICY "Users update own reviews" ON public.reviews
   FOR UPDATE USING (auth.uid() = user_id);
+
+-- Admin read access (all data)
+DROP POLICY IF EXISTS "Admins can read profiles" ON public.profiles;
+CREATE POLICY "Admins can read profiles" ON public.profiles
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
+
+DROP POLICY IF EXISTS "Admins can read salons" ON public.salons;
+CREATE POLICY "Admins can read salons" ON public.salons
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
+
+DROP POLICY IF EXISTS "Admins can update salons" ON public.salons;
+CREATE POLICY "Admins can update salons" ON public.salons
+  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
+
+DROP POLICY IF EXISTS "Admins can delete salons" ON public.salons;
+CREATE POLICY "Admins can delete salons" ON public.salons
+  FOR DELETE USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
+
+DROP POLICY IF EXISTS "Admins can read services" ON public.services;
+CREATE POLICY "Admins can read services" ON public.services
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
+
+DROP POLICY IF EXISTS "Admins can read deals" ON public.deals;
+CREATE POLICY "Admins can read deals" ON public.deals
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
+
+DROP POLICY IF EXISTS "Admins can read appointments" ON public.appointments;
+CREATE POLICY "Admins can read appointments" ON public.appointments
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
+
+DROP POLICY IF EXISTS "Admins can read favorites" ON public.favorites;
+CREATE POLICY "Admins can read favorites" ON public.favorites
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
+
+DROP POLICY IF EXISTS "Admins can read reviews" ON public.reviews;
+CREATE POLICY "Admins can read reviews" ON public.reviews
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));

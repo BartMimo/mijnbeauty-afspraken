@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, MoreHorizontal, Edit2, Trash2, CheckCircle, XCircle, ShieldAlert, Check, CreditCard, AlertCircle } from 'lucide-react';
 import { Button, Card, Input, Badge, Modal } from '../../components/UIComponents';
-import { MOCK_SALONS } from '../../services/mockData';
+import { supabase } from '../../lib/supabase';
 
 // Extended interface for Admin management including Subscription details
 interface AdminSalon {
@@ -23,6 +23,7 @@ export const AdminSalons: React.FC = () => {
     // Initialize State with MOCK_SALONS + Some Mock Pending Data
     const [salons, setSalons] = useState<AdminSalon[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [loading, setLoading] = useState(true);
 
     // Modal State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -30,40 +31,44 @@ export const AdminSalons: React.FC = () => {
     const [editForm, setEditForm] = useState({ name: '', city: '', address: '', kvk: '' });
 
     useEffect(() => {
-        // Load salons and simulate Stripe subscription data
-        const activeSalons: AdminSalon[] = MOCK_SALONS.map((s, index) => ({
-            id: s.id,
-            name: s.name,
-            city: s.city,
-            address: s.address,
-            status: 'active',
-            rating: s.rating,
-            kvk: '12345678',
-            // Simulate different subscription states for demo purposes
-            subscription: index === 0 
-                ? { plan: 'Pro', status: 'active', renewsAt: '01-01-2025' } // First one is Pro
-                : index === 1
-                ? { plan: 'Starter', status: 'past_due', renewsAt: '15-12-2023' } // Second one has payment issue
-                : { plan: 'Pro', status: 'active', renewsAt: '20-01-2025' }
-        }));
+        const fetchSalons = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('salons')
+                    .select('id, name, city, address, rating, status')
+                    .order('created_at', { ascending: false });
 
-        const pendingSalons: AdminSalon[] = [
-            { 
-                id: 'p1', name: 'Nieuwe Salon "Bella"', city: 'Rotterdam', address: 'Hoofdstraat 1', status: 'pending', rating: 0, kvk: '88888888',
-                subscription: { plan: 'Pro', status: 'trialing', renewsAt: '14-12-2023' } // New signups often in Trial
-            },
-            { 
-                id: 'p2', name: 'Hair by Fleur', city: 'Utrecht', address: 'Oudegracht 90', status: 'pending', rating: 0, kvk: '99999999',
-                subscription: { plan: 'Geen', status: 'none' } // Hasn't selected plan yet
+                if (error) throw error;
+
+                const mapped: AdminSalon[] = (data || []).map((s: any) => ({
+                    id: s.id,
+                    name: s.name,
+                    city: s.city || '',
+                    address: s.address || '',
+                    status: (s.status || 'active') as AdminSalon['status'],
+                    rating: s.rating || 0,
+                    subscription: { plan: 'Geen', status: 'none' }
+                }));
+
+                setSalons(mapped);
+            } catch (err) {
+                console.error('Error loading salons:', err);
+            } finally {
+                setLoading(false);
             }
-        ];
+        };
 
-        setSalons([...pendingSalons, ...activeSalons]);
+        fetchSalons();
     }, []);
 
     // --- ACTIONS ---
 
-    const handleApprove = (id: string) => {
+    const handleApprove = async (id: string) => {
+        const { error } = await supabase.from('salons').update({ status: 'active' }).eq('id', id);
+        if (error) {
+            console.error('Approve failed:', error);
+            return;
+        }
         setSalons(prev => prev.map(s => s.id === id ? { ...s, status: 'active' } : s));
     };
 
@@ -73,17 +78,25 @@ export const AdminSalons: React.FC = () => {
         }
     };
 
-    const toggleSuspend = (id: string) => {
-        setSalons(prev => prev.map(s => {
-            if (s.id === id) {
-                return { ...s, status: s.status === 'suspended' ? 'active' : 'suspended' };
-            }
-            return s;
-        }));
+    const toggleSuspend = async (id: string) => {
+        const salon = salons.find(s => s.id === id);
+        if (!salon) return;
+        const nextStatus = salon.status === 'suspended' ? 'active' : 'suspended';
+        const { error } = await supabase.from('salons').update({ status: nextStatus }).eq('id', id);
+        if (error) {
+            console.error('Suspend toggle failed:', error);
+            return;
+        }
+        setSalons(prev => prev.map(s => s.id === id ? { ...s, status: nextStatus } : s));
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if(window.confirm('Weet je zeker dat je deze salon definitief wilt verwijderen uit het systeem?')) {
+            const { error } = await supabase.from('salons').delete().eq('id', id);
+            if (error) {
+                console.error('Delete failed:', error);
+                return;
+            }
             setSalons(prev => prev.filter(s => s.id !== id));
         }
     };
@@ -99,14 +112,27 @@ export const AdminSalons: React.FC = () => {
         setIsEditModalOpen(true);
     };
 
-    const saveEdit = () => {
+    const saveEdit = async () => {
         if (editingSalon) {
+            const { error } = await supabase
+                .from('salons')
+                .update({
+                    name: editForm.name,
+                    city: editForm.city,
+                    address: editForm.address
+                })
+                .eq('id', editingSalon.id);
+
+            if (error) {
+                console.error('Update failed:', error);
+                return;
+            }
+
             setSalons(prev => prev.map(s => s.id === editingSalon.id ? {
                 ...s,
                 name: editForm.name,
                 city: editForm.city,
-                address: editForm.address,
-                kvk: editForm.kvk
+                address: editForm.address
             } : s));
             setIsEditModalOpen(false);
             setEditingSalon(null);
@@ -191,7 +217,11 @@ export const AdminSalons: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-stone-100">
-                            {filteredSalons.map(salon => (
+                            {loading ? (
+                                <tr><td colSpan={5} className="px-6 py-8 text-center text-stone-500">Laden...</td></tr>
+                            ) : filteredSalons.length === 0 ? (
+                                <tr><td colSpan={5} className="px-6 py-8 text-center text-stone-500">Geen salons gevonden.</td></tr>
+                            ) : filteredSalons.map(salon => (
                                 <tr key={salon.id} className={`hover:bg-stone-50/50 ${salon.status === 'pending' ? 'bg-amber-50/30' : ''}`}>
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-stone-900">{salon.name}</div>

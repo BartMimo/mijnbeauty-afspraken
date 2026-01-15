@@ -1,29 +1,99 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Check, X, MoreHorizontal, ShieldAlert, CreditCard, ExternalLink } from 'lucide-react';
+import { Check, X, ShieldAlert, CreditCard, Loader2 } from 'lucide-react';
 import { Card, Badge, Button } from '../../components/UIComponents';
+import { supabase } from '../../lib/supabase';
 
 export const AdminDashboard: React.FC = () => {
-    const data = [
-        { name: 'Ma', bookings: 40 },
-        { name: 'Di', bookings: 30 },
-        { name: 'Wo', bookings: 20 },
-        { name: 'Do', bookings: 27 },
-        { name: 'Vr', bookings: 68 },
-        { name: 'Za', bookings: 90 },
-        { name: 'Zo', bookings: 30 },
-    ];
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        revenue: 0,
+        salons: 0,
+        bookings: 0,
+        users: 0
+    });
+    const [bookingsByDay, setBookingsByDay] = useState<{ name: string; bookings: number }[]>([]);
+    const [salonGrowth, setSalonGrowth] = useState<{ m: string; s: number }[]>([]);
+    const [newSalons, setNewSalons] = useState<{ id: string; name: string; city: string; date: string }[]>([]);
+    const [flaggedReviews, setFlaggedReviews] = useState<any[]>([]);
 
-    const newSalons = [
-        { id: 1, name: 'Beauty by Sophie', city: 'Amsterdam', date: '21-11-2023' },
-        { id: 2, name: 'The Man Cave', city: 'Rotterdam', date: '20-11-2023' },
-    ];
-    
-    // Mock Flagged Content
-    const flaggedReviews = [
-        { id: 1, salon: 'Barber Bros', user: 'Ontevreden Klant', text: 'Dit is echt k*t service, nooit heen gaan!', reason: 'Grof taalgebruik', date: 'Vandaag' },
-        { id: 2, salon: 'Zen Massage', user: 'Bot', text: 'Koop nu crypto via...', reason: 'Spam', date: 'Gisteren' }
-    ];
+    useEffect(() => {
+        const fetchAdminData = async () => {
+            try {
+                const [{ data: salonsData }, { data: apptsData }, { data: profilesData }] = await Promise.all([
+                    supabase.from('salons').select('id, name, city, created_at'),
+                    supabase.from('appointments').select('id, date, price'),
+                    supabase.from('profiles').select('id, created_at')
+                ]);
+
+                const salons = salonsData || [];
+                const appointments = apptsData || [];
+                const profiles = profilesData || [];
+
+                const revenue = appointments.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
+                setStats({
+                    revenue,
+                    salons: salons.length,
+                    bookings: appointments.length,
+                    users: profiles.length
+                });
+
+                // New salons (latest 5)
+                const latest = [...salons]
+                    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .slice(0, 5)
+                    .map((s: any) => ({
+                        id: s.id,
+                        name: s.name,
+                        city: s.city || '-',
+                        date: new Date(s.created_at).toLocaleDateString('nl-NL')
+                    }));
+                setNewSalons(latest);
+
+                // Bookings by weekday (Mon..Sun)
+                const dayLabels = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+                const dayCounts = Array(7).fill(0);
+                appointments.forEach((a: any) => {
+                    if (!a.date) return;
+                    const d = new Date(`${a.date}T00:00:00`);
+                    const jsDay = d.getDay(); // 0=Sun..6=Sat
+                    const idx = jsDay === 0 ? 6 : jsDay - 1; // map to Mon..Sun index
+                    dayCounts[idx] += 1;
+                });
+                setBookingsByDay(dayLabels.map((name, i) => ({ name, bookings: dayCounts[i] })));
+
+                // Salon growth last 6 months
+                const now = new Date();
+                const months = [] as { key: string; label: string }[];
+                for (let i = 5; i >= 0; i--) {
+                    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    months.push({
+                        key: `${d.getFullYear()}-${d.getMonth()}`,
+                        label: d.toLocaleDateString('nl-NL', { month: 'short' })
+                    });
+                }
+                const monthCounts = new Map(months.map(m => [m.key, 0]));
+                salons.forEach((s: any) => {
+                    if (!s.created_at) return;
+                    const d = new Date(s.created_at);
+                    const key = `${d.getFullYear()}-${d.getMonth()}`;
+                    if (monthCounts.has(key)) monthCounts.set(key, (monthCounts.get(key) || 0) + 1);
+                });
+                setSalonGrowth(months.map(m => ({ m: m.label, s: monthCounts.get(m.key) || 0 })));
+
+                // Placeholder for moderation queue (no reviews moderation table yet)
+                setFlaggedReviews([]);
+            } catch (err) {
+                console.error('Admin dashboard load failed:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAdminData();
+    }, []);
+
+    const data = useMemo(() => bookingsByDay, [bookingsByDay]);
 
     return (
         <div className="space-y-8">
@@ -49,13 +119,13 @@ export const AdminDashboard: React.FC = () => {
                 </Card>
                  <Card className="p-6">
                     <h3 className="font-bold text-stone-800 mb-2">Totale Omzet (Platform)</h3>
-                    <p className="text-3xl font-bold text-stone-900">€12.450</p>
-                    <p className="text-sm text-green-600 mt-1">+15% t.o.v. vorige maand</p>
+                    <p className="text-3xl font-bold text-stone-900">€{stats.revenue.toFixed(0)}</p>
+                    <p className="text-sm text-stone-500 mt-1">Totaal geboekt: {stats.bookings}</p>
                 </Card>
                  <Card className="p-6">
                     <h3 className="font-bold text-stone-800 mb-2">Actieve Salons</h3>
-                    <p className="text-3xl font-bold text-stone-900">142</p>
-                    <p className="text-sm text-stone-500 mt-1">12 in proefperiode</p>
+                    <p className="text-3xl font-bold text-stone-900">{stats.salons}</p>
+                    <p className="text-sm text-stone-500 mt-1">Gebruikers: {stats.users}</p>
                 </Card>
             </div>
 
@@ -64,6 +134,11 @@ export const AdminDashboard: React.FC = () => {
                 <Card className="p-6">
                     <h3 className="font-bold text-stone-800 mb-6">Boekingen per weekdag</h3>
                     <div className="h-64">
+                        {loading ? (
+                            <div className="h-full flex items-center justify-center text-stone-400">
+                                <Loader2 className="animate-spin" size={24} />
+                            </div>
+                        ) : (
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={data}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
@@ -73,16 +148,19 @@ export const AdminDashboard: React.FC = () => {
                                 <Bar dataKey="bookings" fill="#fb7185" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
+                        )}
                     </div>
                 </Card>
                  <Card className="p-6">
                     <h3 className="font-bold text-stone-800 mb-6">Groei Aantal Salons</h3>
                     <div className="h-64">
+                        {loading ? (
+                            <div className="h-full flex items-center justify-center text-stone-400">
+                                <Loader2 className="animate-spin" size={24} />
+                            </div>
+                        ) : (
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={[
-                                { m: 'Jan', s: 10 }, { m: 'Feb', s: 15 }, { m: 'Mrt', s: 22 }, 
-                                { m: 'Apr', s: 35 }, { m: 'Mei', s: 45 }, { m: 'Jun', s: 60 }
-                            ]}>
+                            <LineChart data={salonGrowth}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
                                 <XAxis dataKey="m" axisLine={false} tickLine={false} />
                                 <YAxis axisLine={false} tickLine={false} />
@@ -90,6 +168,7 @@ export const AdminDashboard: React.FC = () => {
                                 <Line type="monotone" dataKey="s" stroke="#0ea5e9" strokeWidth={3} dot={{r: 4}} />
                             </LineChart>
                         </ResponsiveContainer>
+                        )}
                     </div>
                 </Card>
             </div>
@@ -136,7 +215,9 @@ export const AdminDashboard: React.FC = () => {
                         </h3>
                     </div>
                      <div className="divide-y divide-stone-100">
-                        {flaggedReviews.map((item) => (
+                            {flaggedReviews.length === 0 ? (
+                                <div className="p-4 text-sm text-stone-500">Geen meldingen.</div>
+                            ) : flaggedReviews.map((item) => (
                              <div key={item.id} className="p-4 hover:bg-stone-50 transition-colors">
                                  <div className="flex justify-between items-start mb-1">
                                      <span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded uppercase">{item.reason}</span>
