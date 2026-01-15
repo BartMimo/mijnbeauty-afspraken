@@ -190,12 +190,19 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                             owner_id: data.user.id,
                             name: regSalonName,
                             slug: regSubdomain,
+                            subdomain: regSubdomain,
+                            status: 'active',
                             city: 'Amsterdam', // Default for now, usually form step 2
                             address: 'Kerkstraat 12' // Default
                         }
                     ]);
                 
-                if (salonError) console.error('Salon creation warning:', salonError);
+                if (salonError) {
+                    console.error('Salon creation error:', salonError);
+                    setErrorMsg('Salon aanmaken mislukt. Controleer je rechten en probeer opnieuw.');
+                    setLoading(false);
+                    return;
+                }
             }
 
             alert('Salon account aangemaakt! Welkom.');

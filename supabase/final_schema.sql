@@ -165,6 +165,15 @@ DROP POLICY IF EXISTS "Salons are publicly readable" ON public.salons;
 CREATE POLICY "Salons are publicly readable" ON public.salons
   FOR SELECT USING (true);
 
+-- Salon owners can create/update their own salon
+DROP POLICY IF EXISTS "Owners can create salons" ON public.salons;
+CREATE POLICY "Owners can create salons" ON public.salons
+  FOR INSERT WITH CHECK (auth.uid() = owner_id);
+
+DROP POLICY IF EXISTS "Owners can update own salons" ON public.salons;
+CREATE POLICY "Owners can update own salons" ON public.salons
+  FOR UPDATE USING (auth.uid() = owner_id);
+
 DROP POLICY IF EXISTS "Services are publicly readable" ON public.services;
 CREATE POLICY "Services are publicly readable" ON public.services
   FOR SELECT USING (true);
@@ -172,6 +181,17 @@ CREATE POLICY "Services are publicly readable" ON public.services
 DROP POLICY IF EXISTS "Deals are publicly readable" ON public.deals;
 CREATE POLICY "Deals are publicly readable" ON public.deals
   FOR SELECT USING (true);
+
+-- Salon owners can manage services and deals
+DROP POLICY IF EXISTS "Owners manage services" ON public.services;
+CREATE POLICY "Owners manage services" ON public.services
+  FOR ALL USING (EXISTS (SELECT 1 FROM public.salons s WHERE s.id = services.salon_id AND s.owner_id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.salons s WHERE s.id = services.salon_id AND s.owner_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Owners manage deals" ON public.deals;
+CREATE POLICY "Owners manage deals" ON public.deals
+  FOR ALL USING (EXISTS (SELECT 1 FROM public.salons s WHERE s.id = deals.salon_id AND s.owner_id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.salons s WHERE s.id = deals.salon_id AND s.owner_id = auth.uid()));
 
 -- Profiles
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
