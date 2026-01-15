@@ -220,7 +220,7 @@ export const Home: React.FC = () => {
                      <Button size="lg" className="w-full justify-center" onClick={() => navigate('/register?role=salon')}>
                         Salon aanmelden
                     </Button>
-                    <Button variant="outline" size="lg" className="w-full justify-center">
+                    <Button variant="outline" size="lg" className="w-full justify-center" onClick={() => navigate('/for-partners')}>
                         Meer informatie
                     </Button>
                 </div>
