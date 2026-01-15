@@ -25,27 +25,30 @@ import { StaffDashboard } from './pages/dashboards/StaffDashboard';
 import { StaffProfile } from './pages/dashboards/StaffProfile';
 import { AboutPage, HelpPage, PrivacyPage, TermsPage } from './pages/StaticPages';
 
-// Helper to check for subdomain
+// Helper to check for subdomain - supports multiple domain setups
 const getSubdomain = () => {
-    // Logic: host is usually 'subdomain.domain.com' or 'subdomain.localhost'
     const host = window.location.hostname;
     const parts = host.split('.');
     
     let subdomain = '';
     
-    // For localhost: subdomain.localhost (2 parts) - subdomain is parts[0]
+    // Development: localhost with subdomain (e.g., beauty-test.localhost)
     if (parts.length === 2 && host.includes('localhost') && parts[0] !== 'www') {
          subdomain = parts[0];
     } 
-    // For Vercel domains (*.vercel.app): only detect real subdomains (salons)
-    // mijnbeauty-afspraken.vercel.app has 3 parts, so we don't detect a subdomain
-    // glow.mijnbeauty-afspraken.vercel.app would have 4 parts, where parts[0] = 'glow' is the subdomain
-    else if (parts.length > 3 && parts[0] !== 'www') {
+    // Production: mijnbeautyafspraken.nl with subdomain (e.g., beauty-test.mijnbeautyafspraken.nl)
+    else if (host.includes('mijnbeautyafspraken.nl') && parts.length >= 3 && parts[0] !== 'www') {
+        // beauty-test.mijnbeautyafspraken.nl → beauty-test
         subdomain = parts[0];
     }
-
-    // Uncomment this line to TEST specific subdomain behavior without configuring DNS
-    // return 'glow'; 
+    // Vercel preview domains: beauty-test.mijnbeauty-afspraken.vercel.app
+    else if (host.includes('vercel.app') && parts.length >= 4 && parts[0] !== 'www') {
+        // Only treat as subdomain if not the main vercel domain
+        const mainDomain = parts.slice(-3).join('.');
+        if (mainDomain !== 'mijnbeauty-afspraken.vercel.app') {
+            subdomain = parts[0];
+        }
+    }
     
     return subdomain;
 };
