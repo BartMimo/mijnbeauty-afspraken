@@ -70,7 +70,7 @@ const DashboardRedirect: React.FC = () => {
 
     const role = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
     if (role === 'admin') return <Navigate to="/dashboard/admin" replace />;
-    if (role === 'salon' || role === 'owner') return <Navigate to="/dashboard/salon" replace />;
+    if (role === 'salon') return <Navigate to="/dashboard/salon" replace />;
     if (role === 'staff') return <Navigate to="/dashboard/staff" replace />;
     return <Navigate to="/dashboard/user" replace />;
 };
