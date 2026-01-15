@@ -105,17 +105,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const fetchProfile = async (userId: string, roleMeta?: string, fullNameMeta?: string, emailMeta?: string) => {
+    const normalizedEmail = emailMeta?.toLowerCase().trim();
+    console.log('🔍 fetchProfile called:', { userId, roleMeta, fullNameMeta, email: normalizedEmail });
+    
     try {
       // HARDCODED ADMIN CHECK - dit zorgt ervoor dat admin@bart.nl ALTIJD admin is
       // Ongeacht wat er in de database staat
-      if (emailMeta === 'admin@bart.nl') {
-        console.log('🔐 Admin user detected by email:', emailMeta);
-        setProfile({
+      if (normalizedEmail === 'admin@bart.nl') {
+        console.log('🔐 Admin user detected by email:', normalizedEmail);
+        const adminProfile = {
           id: userId,
           role: 'admin',
           full_name: fullNameMeta || 'Admin',
-          email: emailMeta
-        });
+          email: normalizedEmail
+        };
+        console.log('✅ Setting admin profile:', adminProfile);
+        setProfile(adminProfile);
         setIsLoading(false);
         return;
       }
@@ -130,14 +135,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...data,
           role: finalRole,
           full_name: data.full_name || fullNameMeta || null,
-          email: data.email || emailMeta || null
+          email: data.email || normalizedEmail || null
         });
         setIsLoading(false);
         return;
       }
 
       // Profile not found by ID - check user_metadata for role (works for newly registered users)
-      console.warn('⚠️ Profile not found by ID, using metadata for:', emailMeta);
+      console.warn('⚠️ Profile not found by ID, using metadata for:', normalizedEmail);
       
       // Bepaal role: eerst metadata, dan default naar user
       const finalRole = normalizeRole(roleMeta || 'user');
@@ -147,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { error: insertError } = await supabase.from('profiles').insert({
           id: userId,
-          email: emailMeta || '',
+          email: normalizedEmail || '',
           role: finalRole === 'user' ? 'user' : finalRole,
           full_name: fullNameMeta || null
         });
@@ -162,31 +167,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Set profile in state regardless of DB insert success
-      setProfile({
+      const newProfile = {
         id: userId,
         role: finalRole,
         full_name: fullNameMeta || null,
-        email: emailMeta || null
-      });
+        email: normalizedEmail || null
+      };
+      console.log('📝 Setting profile from metadata:', newProfile);
+      setProfile(newProfile);
       
     } catch (e) {
       console.warn("Profile fetch failed:", e);
       
       // FALLBACK: Check email for admin
-      if (emailMeta === 'admin@bart.nl') {
-        setProfile({
+      if (normalizedEmail === 'admin@bart.nl') {
+        const adminProfile = {
           id: userId,
           role: 'admin',
           full_name: fullNameMeta || 'Admin',
-          email: emailMeta
-        });
+          email: normalizedEmail
+        };
+        console.log('🔐 Fallback: Setting admin profile:', adminProfile);
+        setProfile(adminProfile);
       } else {
         // Set default profile to prevent infinite loading
         setProfile({
           id: userId,
           role: normalizeRole(roleMeta || 'user'),
           full_name: fullNameMeta || null,
-          email: emailMeta || null
+          email: normalizedEmail || null
         });
       }
     } finally {
