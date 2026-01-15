@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, User, Calendar, Settings, LogOut, Scissors, PieChart, Home, ChevronDown, Bell, Tag, Clock, Heart, Users, Mail } from 'lucide-react';
 import { Button } from './UIComponents';
@@ -16,13 +16,36 @@ const HeaderLogo = () => (
 
 const UserDropdown: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
     const { user, profile, signOut } = useAuth();
 
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isOpen]);
+
     const handleLogout = async () => {
-        await signOut();
         setIsOpen(false);
+        await signOut();
         navigate('/');
+    };
+
+    const handleNavigate = (path: string) => {
+        setIsOpen(false);
+        navigate(path);
     };
 
     const normalizeRole = (rawRole: unknown) => {
@@ -44,7 +67,7 @@ const UserDropdown: React.FC = () => {
                 : '/dashboard/user/profile';
 
     return (
-        <div className="relative">
+        <div className="relative" ref={dropdownRef}>
             <button 
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex items-center space-x-2 p-1.5 md:p-2 hover:bg-stone-100 rounded-xl transition-colors focus:outline-none"
@@ -63,28 +86,28 @@ const UserDropdown: React.FC = () => {
                         <p className="text-xs text-stone-500 capitalize">{roleLabel}</p>
                     </div>
                     {role === 'user' && (
-                        <Link to="/dashboard/user" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
+                        <button onClick={() => handleNavigate('/dashboard/user')} className="w-full text-left block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50">
                             Mijn Dashboard
-                        </Link>
+                        </button>
                     )}
                     {role === 'salon' && (
-                         <Link to="/dashboard/salon" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
+                        <button onClick={() => handleNavigate('/dashboard/salon')} className="w-full text-left block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50">
                             Salon Dashboard
-                        </Link>
+                        </button>
                     )}
                     {role === 'staff' && (
-                         <Link to="/dashboard/staff" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
+                        <button onClick={() => handleNavigate('/dashboard/staff')} className="w-full text-left block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50">
                             Mijn Agenda
-                        </Link>
+                        </button>
                     )}
                     {role === 'admin' && (
-                        <Link to="/dashboard/admin" className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
+                        <button onClick={() => handleNavigate('/dashboard/admin')} className="w-full text-left block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50">
                             Admin Dashboard
-                        </Link>
+                        </button>
                     )}
-                    <Link to={profilePath} className="block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50" onClick={() => setIsOpen(false)}>
+                    <button onClick={() => handleNavigate(profilePath)} className="w-full text-left block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50">
                         Profiel
-                    </Link>
+                    </button>
                     <button 
                         onClick={handleLogout}
                         className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
