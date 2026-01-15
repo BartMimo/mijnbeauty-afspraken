@@ -136,28 +136,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           full_name: data.full_name || fullNameMeta || null,
           email: data.email || emailMeta || null
         });
+        setIsLoading(false);
         return;
       }
     } catch (e) {
       console.warn("Profile fetch failed:", e);
     }
 
-    // Fallback: use auth metadata or legacy public.users table
+    // Fallback: try profile by email, then legacy public.users by email
     try {
       let fallbackRole = roleMeta;
       let fallbackName = fullNameMeta;
       let fallbackEmail = emailMeta;
 
-      if (!fallbackRole) {
-        const { data: legacy, error: legacyErr } = await supabase
+      if (emailMeta) {
+        const { data: profileByEmail } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', emailMeta)
+          .maybeSingle();
+        if (profileByEmail) {
+          fallbackRole = profileByEmail.role || fallbackRole;
+          fallbackName = profileByEmail.full_name || fallbackName;
+          fallbackEmail = profileByEmail.email || fallbackEmail;
+        }
+      }
+
+      const { data: legacyById } = await supabase
+        .from('users')
+        .select('role, full_name, email')
+        .eq('id', userId)
+        .maybeSingle();
+      if (legacyById) {
+        fallbackRole = legacyById.role || fallbackRole;
+        fallbackName = legacyById.full_name || fallbackName;
+        fallbackEmail = legacyById.email || fallbackEmail;
+      }
+
+      if (emailMeta) {
+        const { data: legacyByEmail } = await supabase
           .from('users')
           .select('role, full_name, email')
-          .eq('id', userId)
+          .eq('email', emailMeta)
           .maybeSingle();
-        if (!legacyErr && legacy) {
-          fallbackRole = legacy.role;
-          fallbackName = fallbackName || legacy.full_name;
-          fallbackEmail = fallbackEmail || legacy.email;
+        if (legacyByEmail) {
+          fallbackRole = legacyByEmail.role || fallbackRole;
+          fallbackName = legacyByEmail.full_name || fallbackName;
+          fallbackEmail = legacyByEmail.email || fallbackEmail;
         }
       }
 
