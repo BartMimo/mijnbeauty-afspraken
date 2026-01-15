@@ -32,6 +32,18 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
 
     const [paymentMethod, setPaymentMethod] = useState<'ideal' | 'creditcard' | null>(null);
     const [selectedBank, setSelectedBank] = useState<string>('');
+    const [discountCode, setDiscountCode] = useState('');
+    const [discountCodeValid, setDiscountCodeValid] = useState<boolean | null>(null);
+
+    // Valid discount codes (case-insensitive)
+    const VALID_DISCOUNT_CODES = ['gratistest'];
+
+    const checkDiscountCode = (code: string) => {
+        const normalizedCode = code.toLowerCase().trim();
+        const isValid = VALID_DISCOUNT_CODES.includes(normalizedCode);
+        setDiscountCodeValid(isValid);
+        return isValid;
+    };
 
     // Helper to slugify text
     const createSlug = (text: string) => {
@@ -156,10 +168,21 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     };
 
     const handleSalonFinalSubmit = async () => {
+        // Check if payment method is selected OR valid discount code is entered
+        const hasValidDiscount = discountCode && checkDiscountCode(discountCode);
+        
+        if (!hasValidDiscount && !paymentMethod) {
+            setErrorMsg('Selecteer een betaalmethode of voer een geldige kortingscode in.');
+            return;
+        }
+
         setLoading(true);
         setErrorMsg(null);
 
         try {
+            // If using discount code, skip payment (for now)
+            // TODO: Integrate Stripe payment flow when hasValidDiscount is false
+            
             // 1. Create Auth User
             const { data, error } = await supabase.auth.signUp({
                 email: regEmail,
@@ -483,6 +506,53 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                     </ul>
                                                 </div>
 
+                                                {/* Discount Code Section */}
+                                                <div className="border-b border-stone-200 pb-4">
+                                                    <label className="text-sm font-medium text-stone-700 mb-2 block">Heb je een kortingscode?</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Voer kortingscode in"
+                                                            value={discountCode}
+                                                            onChange={(e) => {
+                                                                setDiscountCode(e.target.value);
+                                                                if (e.target.value) {
+                                                                    checkDiscountCode(e.target.value);
+                                                                } else {
+                                                                    setDiscountCodeValid(null);
+                                                                }
+                                                            }}
+                                                            className={`w-full h-11 px-4 pr-10 rounded-xl border text-sm outline-none transition-colors ${
+                                                                discountCodeValid === true 
+                                                                    ? 'border-green-400 bg-green-50 focus:ring-green-400' 
+                                                                    : discountCodeValid === false 
+                                                                        ? 'border-red-300 bg-red-50' 
+                                                                        : 'border-stone-200 focus:ring-brand-400'
+                                                            } focus:ring-2`}
+                                                        />
+                                                        {discountCodeValid === true && (
+                                                            <div className="absolute right-3 top-3 text-green-500">
+                                                                <CheckCircle2 size={18} />
+                                                            </div>
+                                                        )}
+                                                        {discountCodeValid === false && discountCode && (
+                                                            <div className="absolute right-3 top-3 text-red-500">
+                                                                <AlertCircle size={18} />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {discountCodeValid === true && (
+                                                        <p className="text-green-600 text-xs mt-1.5 flex items-center">
+                                                            <CheckCircle2 size={12} className="mr-1" /> Kortingscode geaccepteerd! Je kunt gratis starten.
+                                                        </p>
+                                                    )}
+                                                    {discountCodeValid === false && discountCode && (
+                                                        <p className="text-red-500 text-xs mt-1.5">Ongeldige kortingscode</p>
+                                                    )}
+                                                </div>
+
+                                                {/* Payment Method - Only show if no valid discount code */}
+                                                {!discountCodeValid && (
                                                 <div>
                                                     <label className="text-sm font-medium text-stone-700 mb-2 block">Betaalmethode voor verificatie</label>
                                                     <div className="grid grid-cols-2 gap-3 mb-4">
@@ -503,7 +573,9 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                             Creditcard
                                                         </button>
                                                     </div>
+                                                    <p className="text-xs text-stone-400 text-center">Stripe integratie komt binnenkort</p>
                                                 </div>
+                                                )}
                                                 
                                                 <div className="flex gap-3">
                                                     <Button type="button" variant="outline" onClick={() => setSalonStep(2)}>
@@ -513,9 +585,9 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                         type="submit" 
                                                         className="flex-1"
                                                         isLoading={loading}
-                                                        disabled={!paymentMethod}
+                                                        disabled={!discountCodeValid && !paymentMethod}
                                                     >
-                                                        Registreren & Starten
+                                                        {discountCodeValid ? 'Gratis Starten' : 'Registreren & Starten'}
                                                     </Button>
                                                 </div>
                                             </div>
