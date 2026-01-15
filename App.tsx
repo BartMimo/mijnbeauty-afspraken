@@ -2,7 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { PublicLayout, DashboardLayout } from './components/Layout';
-import { AuthProvider } from './context/AuthContext'; // Import AuthProvider
+import { AuthProvider, useAuth } from './context/AuthContext'; // Import AuthProvider
 import { Home } from './pages/Home';
 import { SearchPage } from './pages/Search';
 import { SalonDetailPage } from './pages/SalonDetailPage';
@@ -53,6 +53,33 @@ const getSubdomain = () => {
     return subdomain;
 };
 
+const DashboardRedirect: React.FC = () => {
+    const { user, profile, isLoading } = useAuth();
+
+    if (isLoading) return null;
+    if (!user) return <Navigate to="/login" replace />;
+
+    const role = profile?.role || 'user';
+    if (role === 'admin') return <Navigate to="/dashboard/admin" replace />;
+    if (role === 'salon') return <Navigate to="/dashboard/salon" replace />;
+    if (role === 'staff') return <Navigate to="/dashboard/staff" replace />;
+    return <Navigate to="/dashboard/user" replace />;
+};
+
+const RequireRole: React.FC<{ role: 'user' | 'salon' | 'admin' | 'staff'; children: React.ReactNode }> = ({ role, children }) => {
+    const { user, profile, isLoading } = useAuth();
+
+    if (isLoading) return null;
+    if (!user) return <Navigate to="/login" replace />;
+
+    const userRole = profile?.role || 'user';
+    if (userRole !== role) {
+        return <DashboardRedirect />;
+    }
+
+    return <>{children}</>;
+};
+
 const App: React.FC = () => {
   const subdomain = getSubdomain();
 
@@ -96,60 +123,69 @@ const App: React.FC = () => {
             {/* Redirect partner login to standard login, potentially could pass a query param to pre-select tab if extended */}
             <Route path="/partner-login" element={<PublicLayout><AuthPage initialMode="login" /></PublicLayout>} />
             
-            {/* Dashboard Routes - In a real app, these would be protected by auth guards */}
+            {/* Dashboard Routes */}
+            <Route path="/dashboard" element={<DashboardRedirect />} />
             <Route 
                 path="/dashboard/user/*" 
                 element={
-                    <DashboardLayout role="user">
-                        <Routes>
-                            <Route path="/" element={<UserDashboard />} />
-                            <Route path="/appointments" element={<UserDashboard />} />
-                            <Route path="/favorites" element={<UserFavorites />} />
-                            <Route path="/profile" element={<UserProfile />} />
-                        </Routes>
-                    </DashboardLayout>
+                    <RequireRole role="user">
+                        <DashboardLayout role="user">
+                            <Routes>
+                                <Route path="/" element={<UserDashboard />} />
+                                <Route path="/appointments" element={<UserDashboard />} />
+                                <Route path="/favorites" element={<UserFavorites />} />
+                                <Route path="/profile" element={<UserProfile />} />
+                            </Routes>
+                        </DashboardLayout>
+                    </RequireRole>
                 } 
             />
             
             <Route 
                 path="/dashboard/salon/*" 
                 element={
-                    <DashboardLayout role="salon">
-                        <Routes>
-                            <Route path="/" element={<SalonDashboard />} />
-                            <Route path="/schedule" element={<SalonSchedule />} />
-                            <Route path="/services" element={<SalonServices />} />
-                            <Route path="/staff" element={<SalonStaff />} />
-                            <Route path="/settings" element={<SalonSettings />} />
-                            <Route path="/deals" element={<SalonDeals />} /> 
-                            <Route path="/clients" element={<SalonClients />} />
-                        </Routes>
-                    </DashboardLayout>
+                    <RequireRole role="salon">
+                        <DashboardLayout role="salon">
+                            <Routes>
+                                <Route path="/" element={<SalonDashboard />} />
+                                <Route path="/schedule" element={<SalonSchedule />} />
+                                <Route path="/services" element={<SalonServices />} />
+                                <Route path="/staff" element={<SalonStaff />} />
+                                <Route path="/settings" element={<SalonSettings />} />
+                                <Route path="/deals" element={<SalonDeals />} /> 
+                                <Route path="/clients" element={<SalonClients />} />
+                            </Routes>
+                        </DashboardLayout>
+                    </RequireRole>
                 } 
             />
             
             <Route 
                 path="/dashboard/staff/*" 
                 element={
-                    <DashboardLayout role="staff">
-                        <Routes>
-                            <Route path="/" element={<StaffDashboard />} />
-                            <Route path="/profile" element={<StaffProfile />} />
-                        </Routes>
-                    </DashboardLayout>
+                    <RequireRole role="staff">
+                        <DashboardLayout role="staff">
+                            <Routes>
+                                <Route path="/" element={<StaffDashboard />} />
+                                <Route path="/profile" element={<StaffProfile />} />
+                            </Routes>
+                        </DashboardLayout>
+                    </RequireRole>
                 } 
             />
             
             <Route 
                 path="/dashboard/admin/*" 
                 element={
-                    <DashboardLayout role="admin">
-                        <Routes>
-                            <Route path="/" element={<AdminDashboard />} />
-                            <Route path="/salons" element={<AdminSalons />} />
-                            <Route path="/users" element={<AdminUsers />} />
-                        </Routes>
-                    </DashboardLayout>
+                    <RequireRole role="admin">
+                        <DashboardLayout role="admin">
+                            <Routes>
+                                <Route path="/" element={<AdminDashboard />} />
+                                <Route path="/salons" element={<AdminSalons />} />
+                                <Route path="/users" element={<AdminUsers />} />
+                            </Routes>
+                        </DashboardLayout>
+                    </RequireRole>
                 } 
             />
             

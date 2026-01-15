@@ -88,8 +88,8 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
             // But we can force redirect based on metadata if needed
             // For now, let AuthContext handle the redirect based on role or simple navigation
             
-            // Simple redirect based on role in profile would be better, but we rely on AuthContext sync
-            navigate('/dashboard/user'); // Default, will redirect if salon owner later
+            // Redirect based on profile role in AuthContext
+            navigate('/dashboard');
             
         } catch (err: any) {
             setErrorMsg(err.message || 'Inloggen mislukt');
@@ -129,7 +129,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
             
             alert('Account aangemaakt! Controleer je e-mail voor bevestiging (of log in als dit een testomgeving is).');
             if (data.session) {
-                navigate('/dashboard/user');
+                navigate('/dashboard');
             } else {
                 setMode('login'); // Require email confirmation flow usually
             }
@@ -201,7 +201,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
 
             alert('Salon account aangemaakt! Welkom.');
             if (data.session) {
-                navigate('/dashboard/salon');
+                navigate('/dashboard');
             } else {
                 setMode('login');
             }
