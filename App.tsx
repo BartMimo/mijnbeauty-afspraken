@@ -113,36 +113,32 @@ const RequireRole: React.FC<{ role: 'user' | 'salon' | 'admin' | 'staff'; childr
 const App: React.FC = () => {
   const subdomain = getSubdomain();
 
-  // If a valid subdomain is detected, we hijack the router to only show that Salon's "Website"
-  if (subdomain) {
-      return (
-        <AuthProvider>
-          <Router>
-              <Routes>
-                  {/* The root path for a subdomain renders that specific salon's page */}
-                  <Route path="/" element={
-                      <ErrorBoundaryRoot>
-                          <PublicLayout>
-                              <SalonDetailPage subdomain={subdomain} />
-                          </PublicLayout>
-                      </ErrorBoundaryRoot>
-                  } />
-
-                  {/* Optionally allow sub-routes if needed, or redirect everything to root of subdomain */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-          </Router>
-        </AuthProvider>
-      );
-  }
+  // NOTE: previously we returned early for subdomains which prevented client routes
+  // like /zoeken from working on preview or custom domains. Instead, we'll keep
+  // the full router and conditionally render the root route.
 
   // Standard Main Platform Routing
   return (
     <AuthProvider>
         <Router>
         <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
+                        {/* Public Routes */}
+                        <Route
+                            path="/"
+                            element={
+                                subdomain ? (
+                                    <PublicLayout>
+                                        <ErrorBoundaryRoot>
+                                            <SalonDetailPage subdomain={subdomain} />
+                                        </ErrorBoundaryRoot>
+                                    </PublicLayout>
+                                ) : (
+                                    <PublicLayout>
+                                        <Home />
+                                    </PublicLayout>
+                                )
+                            }
+                        />
             <Route path="/search" element={<PublicLayout><SearchPage /></PublicLayout>} />
             <Route path="/zoeken" element={<PublicLayout><Zoeken /></PublicLayout>} />
             <Route path="/salon/:id" element={<PublicLayout><SalonDetailPage /></PublicLayout>} />
