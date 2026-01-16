@@ -39,7 +39,7 @@ export const SearchPage: React.FC = () => {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [locationCoords, setLocationCoords] = useState<{lat: number, lng: number} | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [csvLocations, setCsvLocations] = useState<{city:string, postcode:string}[]>([]);
+  const [csvLocations, setCsvLocations] = useState<{city:string, postcode:string, latitude?: number, longitude?: number, province?: string}[]>([]);
 
   // Geocode location
   const geocodeLocation = async (location: string) => {
@@ -79,13 +79,17 @@ export const SearchPage: React.FC = () => {
         if (!res.ok) return;
         const txt = await res.text();
         const lines = txt.split('\n');
-        const parsed: {city:string, postcode:string}[] = [];
+        const parsed: {city:string, postcode:string, latitude?: number, longitude?: number, province?: string}[] = [];
         for (const line of lines) {
           const cols = line.split(',');
-          if (cols.length >= 2) {
+          // Expected format: city, postcode, latitude, longitude, province
+          if (cols.length >= 4) {
             const city = cols[0].trim();
             const postcode = cols[1].trim();
-            if (city && postcode) parsed.push({ city, postcode });
+            const lat = parseFloat(cols[2]);
+            const lon = parseFloat(cols[3]);
+            const province = (cols[4] || '').trim();
+            if (city && postcode) parsed.push({ city, postcode, latitude: isNaN(lat) ? undefined : lat, longitude: isNaN(lon) ? undefined : lon, province });
           }
         }
         setCsvLocations(parsed);
@@ -133,11 +137,20 @@ export const SearchPage: React.FC = () => {
 
     if (selectedLoc) {
       setLocationCoords({ lat: selectedLoc.latitude, lng: selectedLoc.longitude });
-    } else {
-      // Fallback to geocode if not found
-      geocodeLocation(filters.location);
+      return;
     }
-  }, [filters.location, locations]);
+
+    // Try CSV fallback (use pre-bundled lat/lon if available)
+    const csvVal = val.toLowerCase();
+    const csvMatch = csvLocations.find(c => (`${c.postcode} - ${c.city}`.toLowerCase() === csvVal) || (c.city.toLowerCase() === csvVal) || (c.postcode === val) || (c.postcode && c.postcode.startsWith(val)) );
+    if (csvMatch && csvMatch.latitude && csvMatch.longitude) {
+      setLocationCoords({ lat: csvMatch.latitude, lng: csvMatch.longitude });
+      return;
+    }
+
+    // Fallback to geocode if not found anywhere
+    geocodeLocation(filters.location);
+  }, [filters.location, locations, csvLocations]);
 
   // Fetch salons from Supabase - only active (approved) salons
   useEffect(() => {
