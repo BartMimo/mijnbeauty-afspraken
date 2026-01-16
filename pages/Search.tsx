@@ -17,58 +17,179 @@ interface FilterState {
 
 export const SearchPage: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const initialQuery = searchParams.get('q') || '';
+  const initialLoc = searchParams.get('loc') || '';
+  const initialDist = searchParams.get('dist') ? parseInt(searchParams.get('dist')!) : null;
+  const initialDealsFilter = searchParams.get('filter') === 'deals';
 
-  // Local state
-  const [salons, setSalons] = useState<any[]>([]);
-  const [deals, setDeals] = useState<any[]>([]);
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false);
-  const [locationCoords, setLocationCoords] = useState<{lat: number; lng: number} | null>(null);
-
-  const [filters, setFilters] = useState<FilterState>({
-    query: '',
-    location: '',
-    category: 'all',
-    distance: null,
-    showDealsOnly: false,
+  const [filters, setFilters] = useState({
+      query: initialQuery,
+      location: initialLoc,
+      category: 'all' as string,
+      distance: initialDist,
+      showDealsOnly: initialDealsFilter,
   });
 
-  // Haversine helper
-  const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const toRad = (deg: number) => deg * (Math.PI / 180);
+  const [salons, setSalons] = useState<any[]>([]);
+  const [deals, setDeals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [locationCoords, setLocationCoords] = useState<{lat: number, lng: number} | null>(null);
+  const [locations, setLocations] = useState<Location[]>([]);
+
+  // Geocode location
+  const geocodeLocation = async (location: string) => {
+    if (!location.trim()) {
+      setLocationCoords(null);
+      return;
+    }
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location + ', Netherlands')}`);
+      const data = await response.json();
+      if (data.length > 0) {
+        setLocationCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
+      } else {
+        setLocationCoords(null);
+      }
+    } catch (err) {
+      console.error('Geocoding error:', err);
+      setLocationCoords(null);
+    }
+  };
+
+  // Haversine distance calculation
+  const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
     const R = 6371; // km
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng/2) * Math.sin(dLng/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   };
 
-  // Initial data load
+  // Fetch locations
   useEffect(() => {
-    let mounted = true;
-    const fetchData = async () => {
-      setLoading(true);
+    const fetchLocations = async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('*')
+        .order('city', { ascending: true });
+      if (error) {
+        console.error('Error fetching locations:', error);
+      } else {
+        setLocations(data || []);
+      }
+    };
+    fetchLocations();
+  }, []);
+
+  // Set location coords when location changes
+  useEffect(() => {
+    if (filters.location) {
+      const selectedLoc = locations.find(loc => `${loc.postcode} - ${loc.city}` === filters.location);
+      if (selectedLoc) {
+        setLocationCoords({ lat: selectedLoc.latitude, lng: selectedLoc.longitude });
+      } else {
+        // Fallback to geocode if not found
+        geocodeLocation(filters.location);
+      }
+    } else {
+      setLocationCoords(null);
+    }
+  }, [filters.location, locations]);
+
+  // Fetch salons from Supabase - only active (approved) salons
+  useEffect(() => {
+    const fetchSalons = async () => {
       try {
-        const { data: salonsData } = await supabase.from('salons').select('*');
-        const { data: dealsData } = await supabase.from('deals').select('*');
-        if (!mounted) return;
-        setSalons(salonsData || []);
-        setDeals(dealsData || []);
+        const { data, error } = await supabase
+          .from('salons')
+          .select(`
+            *,
+            services(id, name, price),
+            categories,
+            locations(latitude, longitude, city, postcode, province)
+          `)
+          .eq('status', 'active');
+
+        if (error) throw error;
+
+        const transformed = (data || []).map((salon: any) => ({
+          id: salon.slug || salon.id,
+          slug: salon.slug,
+          uuid: salon.id,
+          name: salon.name,
+          city: salon.locations?.city || salon.city || '',
+          address: salon.address || '',
+          zipCode: salon.locations?.postcode || salon.zip_code || '',
+          latitude: salon.locations?.latitude || salon.latitude,
+          longitude: salon.locations?.longitude || salon.longitude,
+          description: salon.description || '',
+          image: salon.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800',
+          rating: 4.5, // TODO: Calculate from reviews
+          reviewCount: 0,
+          categories: salon.categories || [],
+          services: (salon.services || []).map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            price: s.price,
+            category: ServiceCategory.NAILS // Default for now
+          }))
+        }));
+
+        setSalons(transformed);
       } catch (err) {
-        console.error('Error fetching data:', err);
+        console.error('Error fetching salons:', err);
       } finally {
-        if (mounted) setLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchData();
-    return () => { mounted = false };
+    fetchSalons();
   }, []);
 
-  // Fetch favorites when user changes
+  // Fetch deals from Supabase
+  useEffect(() => {
+    const fetchDeals = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('deals')
+          .select(`
+            *,
+            salon:salons(id, name, slug, city, address, image_url)
+          `)
+          .eq('status', 'active');
+
+        if (error) throw error;
+
+        const transformed = (data || []).map((deal: any) => ({
+          id: deal.id,
+          serviceName: deal.service_name,
+          description: deal.description,
+          originalPrice: deal.original_price,
+          discountPrice: deal.discount_price,
+          date: deal.date,
+          time: deal.time,
+          salonName: deal.salon?.name || 'Salon',
+          salonId: deal.salon?.slug || deal.salon?.id,
+          salonCity: deal.salon?.city || '',
+          salonAddress: deal.salon?.address || '',
+          salonImage: deal.salon?.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'
+        }));
+
+        setDeals(transformed);
+      } catch (err) {
+        console.error('Error fetching deals:', err);
+      }
+    };
+
+    fetchDeals();
+  }, []);
+
+  // Fetch favorites from Supabase
   useEffect(() => {
     const fetchFavorites = async () => {
       if (!user) {
@@ -83,14 +204,18 @@ export const SearchPage: React.FC = () => {
           .eq('user_id', user.id);
 
         if (error) throw error;
-
-        const salonIds = (data || []).map((f: any) => f.salon_id);
+        
+        // Map salon UUIDs to slugs for favorites array
+        const salonIds = (data || []).map(f => f.salon_id);
+        
+        // Get corresponding salon slugs
         if (salonIds.length > 0) {
           const { data: salonData } = await supabase
             .from('salons')
             .select('id, slug')
             .in('id', salonIds);
-          const slugs = (salonData || []).map((s: any) => s.slug || s.id);
+          
+          const slugs = (salonData || []).map(s => s.slug || s.id);
           setFavorites(slugs);
         } else {
           setFavorites([]);
@@ -103,8 +228,6 @@ export const SearchPage: React.FC = () => {
 
     fetchFavorites();
   }, [user]);
-
-  // ...andere hooks, functies, useEffect, etc...
 
   const toggleFavorite = useCallback(async (e: React.MouseEvent, salonSlug: string) => {
       e.preventDefault();
@@ -177,7 +300,7 @@ export const SearchPage: React.FC = () => {
     setFilters(prev => ({ ...prev, query: e.target.value }));
   }, []);
 
-  const handleLocationChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLocationChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setFilters(prev => ({ ...prev, location: e.target.value }));
   }, []);
 
@@ -234,13 +357,18 @@ export const SearchPage: React.FC = () => {
         </div>
         <div>
             <label className="text-sm font-medium text-stone-700 mb-1.5 block">Locatie</label>
-            <input
-              type="text"
-              placeholder="Postcode of stad"
-              value={filters.location}
-              onChange={handleLocationChange}
-              className="w-full h-11 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand-400"
-            />
+            <select
+                value={filters.location}
+                onChange={handleLocationChange}
+                className="w-full h-11 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand-400"
+            >
+                <option value="">Selecteer een locatie</option>
+                {locations.map(location => (
+                    <option key={location.id} value={`${location.postcode} - ${location.city}`}>
+                        {location.postcode} - {location.city} ({location.province})
+                    </option>
+                ))}
+            </select>
         </div>
         {!filters.showDealsOnly && (
         <div>
@@ -283,186 +411,183 @@ export const SearchPage: React.FC = () => {
     <div className="container mx-auto px-4 py-6 md:py-8">
       {/* Mobile Filter Toggle */}
       <div className="lg:hidden mb-6 flex gap-3">
-        <Button variant="outline" className="flex-1 flex justify-center items-center" onClick={() => setShowMobileFilters(true)}>
-          <SlidersHorizontal size={18} className="mr-2" /> Filters & Sorteren
-        </Button>
+          <Button variant="outline" className="flex-1 flex justify-center items-center" onClick={() => setShowMobileFilters(true)}>
+              <SlidersHorizontal size={18} className="mr-2" /> Filters & Sorteren
+          </Button>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
-      {/* Sidebar Filters (Desktop) */}
-      <aside className="hidden lg:block w-1/4 space-y-6">
-        <div className="flex items-center gap-2 mb-4">
-          <SlidersHorizontal size={20} className="text-brand-500" />
-          <h2 className="font-bold text-lg text-stone-800">Filters</h2>
-        </div>
-        {filterFormContent}
-      </aside>
-
-      {/* Mobile Filter Drawer (Overlay) */}
-      {showMobileFilters && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm" onClick={() => setShowMobileFilters(false)}></div>
-          <div className="fixed inset-y-0 right-0 w-full max-w-[320px] bg-white shadow-2xl p-6 overflow-y-auto animate-slideRight">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="font-bold text-xl text-stone-900">Filters</h2>
-              <button onClick={() => setShowMobileFilters(false)} className="p-2 bg-stone-100 rounded-full text-stone-500">
-                <X size={20} />
-              </button>
+        
+        {/* Sidebar Filters (Desktop) */}
+        <aside className="hidden lg:block w-1/4 space-y-6">
+            <div className="flex items-center gap-2 mb-4">
+                <SlidersHorizontal size={20} className="text-brand-500" />
+                <h2 className="font-bold text-lg text-stone-800">Filters</h2>
             </div>
             {filterFormContent}
-            <div className="mt-8 pt-4 border-t border-stone-100">
-              <Button className="w-full" onClick={() => setShowMobileFilters(false)}>
-                Toon {filters.showDealsOnly ? filteredDeals.length : filteredSalons.length} resultaten
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+        </aside>
 
-      {/* Results */}
-      <div className="flex-1">
-        <div className="mb-4 md:mb-6 flex justify-between items-center">
-          <h1 className="text-xl md:text-2xl font-bold text-stone-900">
-            {loading ? 'Zoeken...' : filters.showDealsOnly 
-              ? `${filteredDeals.length} deals gevonden`
-              : `${filteredSalons.length} salons gevonden`
-            }
-          </h1>
-          <div className="hidden md:flex items-center gap-2 text-sm text-stone-500">
-            <span>Sorteer op:</span>
-            <select className="bg-transparent font-medium text-stone-800 outline-none">
-              <option>Aanbevolen</option>
-              <option>Prijs: Laag - Hoog</option>
-              <option>Afstand</option>
-            </select>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="animate-spin text-brand-500" size={32} />
-          </div>
-        ) : (
-          filters.showDealsOnly ? (
-            /* Deals View */
-            filteredDeals.length === 0 ? (
-              <Card className="p-12 text-center">
-                <Tag size={48} className="mx-auto text-stone-300 mb-4" />
-                <p className="text-stone-500 mb-4">Geen deals gevonden met de opgegeven filters.</p>
-                <Button onClick={() => setFilters({...filters, query: '', location: '', showDealsOnly: false})}>
-                  Bekijk alle salons
-                </Button>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredDeals.map((deal) => {
-                  const discount = Math.round(((deal.originalPrice - deal.discountPrice) / deal.originalPrice) * 100);
-                  return (
-                    <Card key={deal.id} className="overflow-hidden group hover:shadow-lg transition-all border-brand-100 flex flex-col relative">
-                      <div className="bg-brand-400 text-white px-3 py-1 text-xs font-bold absolute top-3 right-3 rounded-lg shadow-sm z-10">
-                        -{discount}%
-                      </div>
-                      <div className="h-40 bg-stone-200 relative">
-                        <img src={deal.salonImage} alt={deal.salonName} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="p-5 flex flex-col flex-1 justify-between">
-                        <div className="mb-3">
-                          <h3 className="font-bold text-stone-900 text-lg truncate">{deal.serviceName}</h3>
-                          <p className="text-stone-500 text-sm flex items-center mt-1 truncate">
-                            <MapPin size={14} className="mr-1 shrink-0" /> {deal.salonName}
-                          </p>
-                          {deal.salonCity && (
-                            <p className="text-stone-400 text-xs mt-0.5">{deal.salonCity}</p>
-                          )}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-4">
-                            <span className="text-xs font-medium bg-stone-100 text-stone-600 px-2 py-1 rounded flex items-center">
-                              <Clock size={12} className="mr-1" /> {deal.date}, {deal.time}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-end border-t border-dashed border-stone-200 pt-4">
-                            <div>
-                              <span className="text-sm text-stone-400 line-through">€{deal.originalPrice}</span>
-                              <span className="text-xl font-bold text-brand-600 block">€{deal.discountPrice}</span>
-                            </div>
-                            <Button size="sm" onClick={() => navigate(`/salon/${deal.salonId}`)}>
-                              Boek Nu
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            )
-          ) : (
-            /* Salons View */
-            filteredSalons.length === 0 ? (
-              <Card className="p-12 text-center">
-                <p className="text-stone-500 mb-4">Geen salons gevonden met de opgegeven filters.</p>
-                <Button variant="outline" onClick={() => setFilters({query: '', location: '', category: 'all', distance: null, showDealsOnly: false})}>
-                  Reset filters
-                </Button>
-              </Card>
-            ) : (
-              <div className="grid gap-6">
-                {filteredSalons.map(salon => (
-                  <Card key={salon.id} className="flex flex-col md:flex-row overflow-hidden hover:shadow-md transition-shadow">
-                    <div className="w-full md:w-64 h-48 md:h-auto bg-stone-200 relative shrink-0">
-                      <img src={salon.image} alt={salon.name} className="w-full h-full object-cover" />
-                      <button 
-                        onClick={(e) => toggleFavorite(e, salon.id)}
-                        className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-sm shadow-sm transition-transform hover:scale-110 ${favorites.includes(salon.id) ? 'bg-white/90 text-red-500' : 'bg-black/20 text-white hover:bg-black/30'}`}
-                      >
-                        <Heart size={20} className={favorites.includes(salon.id) ? "fill-red-500" : ""} />
-                      </button>
+        {/* Mobile Filter Drawer (Overlay) */}
+        {showMobileFilters && (
+            <div className="fixed inset-0 z-50 lg:hidden">
+                <div className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm" onClick={() => setShowMobileFilters(false)}></div>
+                <div className="fixed inset-y-0 right-0 w-full max-w-[320px] bg-white shadow-2xl p-6 overflow-y-auto animate-slideRight">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="font-bold text-xl text-stone-900">Filters</h2>
+                        <button onClick={() => setShowMobileFilters(false)} className="p-2 bg-stone-100 rounded-full text-stone-500">
+                            <X size={20} />
+                        </button>
                     </div>
-                    <div className="p-4 md:p-6 flex-1 flex flex-col justify-between">
-                      <div>
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="text-lg md:text-xl font-bold text-stone-900">{salon.name}</h3>
-                            <p className="text-stone-500 text-sm flex items-center mt-1">
-                              <MapPin size={14} className="mr-1" /> {salon.address}, {salon.city}
-                            </p>
-                          </div>
-                          <div className="flex flex-col items-end">
-                            <div className="bg-brand-50 text-brand-600 px-2 py-1 rounded-lg text-sm font-bold flex items-center">
-                              <Star size={14} className="fill-brand-600 mr-1" />
-                              {salon.rating}
-                            </div>
-                            <span className="text-xs text-stone-400 mt-1">{salon.reviewCount} reviews</span>
-                          </div>
-                        </div>
-                        <p className="mt-3 text-stone-600 text-sm line-clamp-2 leading-relaxed">
-                          {salon.description}
-                        </p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {salon.services.slice(0, 3).map(s => (
-                            <Badge key={s.id}>{s.name}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-6 flex justify-end">
-                        <Button className="w-full md:w-auto" onClick={() => navigate(`/salon/${salon.id}`)}>
-                          Bekijk & Boek
+                    {filterFormContent}
+                    <div className="mt-8 pt-4 border-t border-stone-100">
+                        <Button className="w-full" onClick={() => setShowMobileFilters(false)}>
+                            Toon {filters.showDealsOnly ? filteredDeals.length : filteredSalons.length} resultaten
                         </Button>
-                      </div>
                     </div>
-                  </Card>
-                ))}
-              </div>
-            )
-          )
+                </div>
+            </div>
         )}
-      </div>
+
+        {/* Results */}
+        <div className="flex-1">
+            <div className="mb-4 md:mb-6 flex justify-between items-center">
+                <h1 className="text-xl md:text-2xl font-bold text-stone-900">
+                    {loading ? 'Zoeken...' : filters.showDealsOnly 
+                        ? `${filteredDeals.length} deals gevonden`
+                        : `${filteredSalons.length} salons gevonden`
+                    }
+                </h1>
+                <div className="hidden md:flex items-center gap-2 text-sm text-stone-500">
+                    <span>Sorteer op:</span>
+                    <select className="bg-transparent font-medium text-stone-800 outline-none">
+                        <option>Aanbevolen</option>
+                        <option>Prijs: Laag - Hoog</option>
+                        <option>Afstand</option>
+                    </select>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="flex justify-center py-12">
+                    <Loader2 className="animate-spin text-brand-500" size={32} />
+                </div>
+            ) : filters.showDealsOnly ? (
+                /* Deals View */
+                filteredDeals.length === 0 ? (
+                    <Card className="p-12 text-center">
+                        <Tag size={48} className="mx-auto text-stone-300 mb-4" />
+                        <p className="text-stone-500 mb-4">Geen deals gevonden met de opgegeven filters.</p>
+                        <Button onClick={() => setFilters({...filters, query: '', location: '', showDealsOnly: false})}>
+                            Bekijk alle salons
+                        </Button>
+                    </Card>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredDeals.map((deal) => {
+                            const discount = Math.round(((deal.originalPrice - deal.discountPrice) / deal.originalPrice) * 100);
+                            return (
+                                <Card key={deal.id} className="overflow-hidden group hover:shadow-lg transition-all border-brand-100 flex flex-col relative">
+                                    <div className="bg-brand-400 text-white px-3 py-1 text-xs font-bold absolute top-3 right-3 rounded-lg shadow-sm z-10">
+                                        -{discount}%
+                                    </div>
+                                    <div className="h-40 bg-stone-200 relative">
+                                        <img src={deal.salonImage} alt={deal.salonName} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="p-5 flex flex-col flex-1 justify-between">
+                                        <div className="mb-3">
+                                            <h3 className="font-bold text-stone-900 text-lg truncate">{deal.serviceName}</h3>
+                                            <p className="text-stone-500 text-sm flex items-center mt-1 truncate">
+                                                <MapPin size={14} className="mr-1 shrink-0" /> {deal.salonName}
+                                            </p>
+                                            {deal.salonCity && (
+                                                <p className="text-stone-400 text-xs mt-0.5">{deal.salonCity}</p>
+                                            )}
+                                        </div>
+                                        
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-4">
+                                                <span className="text-xs font-medium bg-stone-100 text-stone-600 px-2 py-1 rounded flex items-center">
+                                                    <Clock size={12} className="mr-1" /> {deal.date}, {deal.time}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between items-end border-t border-dashed border-stone-200 pt-4">
+                                                <div>
+                                                    <span className="text-sm text-stone-400 line-through">€{deal.originalPrice}</span>
+                                                    <span className="text-xl font-bold text-brand-600 block">€{deal.discountPrice}</span>
+                                                </div>
+                                                <Button size="sm" onClick={() => navigate(`/salon/${deal.salonId}`)}>
+                                                    Boek Nu
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                )
+            ) : (
+                /* Salons View */
+                filteredSalons.length === 0 ? (
+                    <Card className="p-12 text-center">
+                        <p className="text-stone-500 mb-4">Geen salons gevonden met de opgegeven filters.</p>
+                        <Button variant="outline" onClick={() => setFilters({query: '', location: '', category: 'all', distance: null, showDealsOnly: false})}>
+                            Reset filters
+                        </Button>
+                    </Card>
+                ) : (
+                    <div className="grid gap-6">
+                        {filteredSalons.map(salon => (
+                            <Card key={salon.id} className="flex flex-col md:flex-row overflow-hidden hover:shadow-md transition-shadow">
+                                <div className="w-full md:w-64 h-48 md:h-auto bg-stone-200 relative shrink-0">
+                                    <img src={salon.image} alt={salon.name} className="w-full h-full object-cover" />
+                                    <button 
+                                        onClick={(e) => toggleFavorite(e, salon.id)}
+                                        className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-sm shadow-sm transition-transform hover:scale-110 ${favorites.includes(salon.id) ? 'bg-white/90 text-red-500' : 'bg-black/20 text-white hover:bg-black/30'}`}
+                                    >
+                                        <Heart size={20} className={favorites.includes(salon.id) ? "fill-red-500" : ""} />
+                                    </button>
+                                </div>
+                                <div className="p-4 md:p-6 flex-1 flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h3 className="text-lg md:text-xl font-bold text-stone-900">{salon.name}</h3>
+                                                <p className="text-stone-500 text-sm flex items-center mt-1">
+                                                    <MapPin size={14} className="mr-1" /> {salon.address}, {salon.city}
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                                <div className="bg-brand-50 text-brand-600 px-2 py-1 rounded-lg text-sm font-bold flex items-center">
+                                                    <Star size={14} className="fill-brand-600 mr-1" />
+                                                    {salon.rating}
+                                                </div>
+                                                <span className="text-xs text-stone-400 mt-1">{salon.reviewCount} reviews</span>
+                                            </div>
+                                        </div>
+                                        <p className="mt-3 text-stone-600 text-sm line-clamp-2 leading-relaxed">
+                                            {salon.description}
+                                        </p>
+                                        <div className="mt-4 flex flex-wrap gap-2">
+                                            {salon.services.slice(0, 3).map(s => (
+                                                <Badge key={s.id}>{s.name}</Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="mt-6 flex justify-end">
+                                        <Button className="w-full md:w-auto" onClick={() => navigate(`/salon/${salon.id}`)}>
+                                            Bekijk & Boek
+                                        </Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                )
+            )}
+        </div>
       </div>
     </div>
-
   );
 };
-
-
-
