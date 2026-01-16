@@ -9,6 +9,7 @@ export const SalonDeals: React.FC = () => {
     const [salonId, setSalonId] = useState<string | null>(null);
     const [deals, setDeals] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'claimed'>('active');
 
     // Fetch salon and deals on mount
     useEffect(() => {
@@ -33,12 +34,12 @@ export const SalonDeals: React.FC = () => {
 
                 setSalonId(salon.id);
 
-                // Fetch deals for this salon
-                const { data: dealsData, error } = await supabase
-                    .from('deals')
-                    .select('*')
-                    .eq('salon_id', salon.id)
-                    .order('date', { ascending: true });
+                // Fetch deals for this salon (supports optional status filter)
+                let q = supabase.from('deals').select('*').eq('salon_id', salon.id).order('date', { ascending: true });
+                if (filterStatus && filterStatus !== 'all') {
+                    q = q.eq('status', filterStatus);
+                }
+                const { data: dealsData, error } = await q;
 
                 if (error) throw error;
                 
@@ -49,7 +50,7 @@ export const SalonDeals: React.FC = () => {
                     original: d.original_price,
                     time: d.time ? `${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${d.time}` : new Date(d.date).toLocaleDateString('nl-NL'),
                     date: d.date,
-                    status: d.status
+                    status: d.status || 'active'
                 })) || []);
 
             } catch (err) {
@@ -60,7 +61,7 @@ export const SalonDeals: React.FC = () => {
         };
 
         fetchData();
-    }, [user]);
+    }, [user, filterStatus]);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -191,9 +192,16 @@ export const SalonDeals: React.FC = () => {
                     <h1 className="text-2xl font-bold text-stone-900">Mijn Deals</h1>
                     <p className="text-stone-500">Beheer last-minute aanbiedingen en acties</p>
                 </div>
-                <Button onClick={handleCreate}>
-                    <Plus size={18} className="mr-2" /> Nieuwe Deal
-                </Button>
+                <div className="flex items-center gap-3">
+                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm">
+                        <option value="active">Actief</option>
+                        <option value="claimed">Geclaimd</option>
+                        <option value="all">Alles</option>
+                    </select>
+                    <Button onClick={handleCreate}>
+                        <Plus size={18} className="mr-2" /> Nieuwe Deal
+                    </Button>
+                </div>
             </div>
 
             <Card className="overflow-hidden">
