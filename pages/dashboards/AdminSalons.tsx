@@ -71,17 +71,53 @@ export const AdminSalons: React.FC = () => {
     // --- ACTIONS ---
 
     const handleApprove = async (id: string) => {
-        const { error } = await supabase.from('salons').update({ status: 'active' }).eq('id', id);
-        if (error) {
-            console.error('Approve failed:', error);
-            return;
+        console.log('Approving salon:', id);
+        try {
+            const { data, error } = await supabase
+                .from('salons')
+                .update({ status: 'active' })
+                .eq('id', id)
+                .select();
+            
+            console.log('Approve result:', { data, error });
+            
+            if (error) {
+                console.error('Approve failed:', error);
+                alert('Goedkeuren mislukt: ' + error.message);
+                return;
+            }
+            
+            setSalons(prev => prev.map(s => s.id === id ? { ...s, status: 'active' } : s));
+            alert('Salon goedgekeurd!');
+        } catch (err) {
+            console.error('Approve error:', err);
+            alert('Er ging iets mis bij het goedkeuren.');
         }
-        setSalons(prev => prev.map(s => s.id === id ? { ...s, status: 'active' } : s));
     };
 
-    const handleReject = (id: string) => {
-        if(window.confirm('Weet je zeker dat je deze aanmelding wilt afwijzen en verwijderen?')) {
+    const handleReject = async (id: string) => {
+        if(!window.confirm('Weet je zeker dat je deze aanmelding wilt afwijzen en verwijderen?')) {
+            return;
+        }
+        
+        console.log('Rejecting salon:', id);
+        try {
+            const { error } = await supabase
+                .from('salons')
+                .delete()
+                .eq('id', id);
+            
+            if (error) {
+                console.error('Reject failed:', error);
+                alert('Afwijzen mislukt: ' + error.message);
+                return;
+            }
+            
             setSalons(prev => prev.filter(s => s.id !== id));
+            alert('Salon afgewezen en verwijderd.');
+        } catch (err) {
+            console.error('Reject error:', err);
+            alert('Er ging iets mis bij het afwijzen.');
         }
     };
 
