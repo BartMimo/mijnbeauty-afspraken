@@ -276,7 +276,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         if (!selectedDate || !currentService) return allTimeSlots;
 
         const dateStr = selectedDate.toISOString().split('T')[0];
-        const serviceDuration = currentService.duration || 30;
+        const serviceDuration = (currentService?.durationMinutes ?? 30);
         const slotsNeeded = Math.ceil(serviceDuration / 30);
 
         // Get all appointments for the selected date
@@ -291,10 +291,12 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         // Helper to check if a slot overlaps with an appointment
         const isSlotBlocked = (slotTime: string, duration: number) => {
             const slotStart = timeToMinutes(slotTime);
+            if (slotStart < 0) return true; // if slot time invalid, consider blocked
             const slotEnd = slotStart + duration;
 
             return dayAppointments.some(apt => {
                 const aptStart = timeToMinutes(apt.time);
+                if (aptStart < 0) return false; // ignore appointments with invalid time
                 const aptEnd = aptStart + (apt.duration_minutes || 30);
                 
                 // Check for any overlap
