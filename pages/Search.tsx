@@ -41,9 +41,9 @@ export const SearchPage: React.FC = () => {
   const [locations, setLocations] = useState<Location[]>([]);
   const [csvLocations, setCsvLocations] = useState<{city:string, postcode:string, latitude?: number, longitude?: number, province?: string}[]>([]);
 
-  // Geocode location
-  const geocodeLocation = async (location: string) => {
-    if (!location.trim()) {
+  // Geocode location (debounced)
+  const geocodeLocation = useCallback(debounce(async (location: string) => {
+    if (!location.trim() || location.trim().length < 3) {
       setLocationCoords(null);
       return;
     }
@@ -59,7 +59,16 @@ export const SearchPage: React.FC = () => {
       console.error('Geocoding error:', err);
       setLocationCoords(null);
     }
-  };
+  }, 500), []);
+
+  // Debounce helper
+  function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
+    let timeout: NodeJS.Timeout;
+    return ((...args: Parameters<T>) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    }) as T;
+  }
 
   // Haversine distance calculation
   const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
