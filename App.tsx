@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'; // Import AuthPro
 import { Home } from './pages/Home';
 import { SearchPage } from './pages/Search';
 import { SalonDetailPage } from './pages/SalonDetailPage';
+import { ErrorBoundaryRoot } from './components/ErrorBoundary';
 import { ForPartners } from './pages/ForPartners';
 import { SalonTest } from './pages/SalonTest';
 import { UserTest } from './pages/UserTest';
@@ -118,7 +119,11 @@ const App: React.FC = () => {
           <Router>
               <Routes>
                   {/* The root path for a subdomain renders that specific salon's page */}
-                  <Route path="/" element={<SalonDetailPage subdomain={subdomain} />} />
+                  <Route path="/" element={
+                      <ErrorBoundaryRoot>
+                          <SalonDetailPage subdomain={subdomain} />
+                      </ErrorBoundaryRoot>
+                  } />
                   
                   {/* Optionally allow sub-routes if needed, or redirect everything to root of subdomain */}
                   <Route path="*" element={<Navigate to="/" replace />} />
