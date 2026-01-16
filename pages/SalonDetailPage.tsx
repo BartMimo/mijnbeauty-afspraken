@@ -6,6 +6,32 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Service, Deal } from '../types';
 
+class ErrorBoundary extends React.Component<{children?: React.ReactNode}, {error?: any}> {
+    constructor(props: any) {
+        super(props);
+        this.state = { error: undefined };
+    }
+
+    componentDidCatch(error: any, info: any) {
+        console.error('ErrorBoundary caught:', error, info);
+        this.setState({ error });
+    }
+
+    render() {
+        if (this.state.error) {
+            return (
+                <div className="min-h-screen flex items-center justify-center p-8 bg-red-50 text-red-800">
+                    <div>
+                        <h2 className="font-bold mb-2">Er is iets misgegaan</h2>
+                        <pre className="text-xs whitespace-pre-wrap">{this.state.error?.message || String(this.state.error)}</pre>
+                    </div>
+                </div>
+            );
+        }
+        return this.props.children as React.ReactElement;
+    }
+}
+
 interface Appointment {
     date: string;
     time: string;
@@ -26,6 +52,14 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     console.log('Subdomain prop:', subdomain);
     console.log('URL param id:', id);
     console.log('Final salonId:', salonId);
+
+    const [debug] = React.useState(() => {
+        try {
+            return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
+        } catch {
+            return false;
+        }
+    });
     
     const [salon, setSalon] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -286,6 +320,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     };
 
     return (
+        <ErrorBoundary>
         <div className="bg-stone-50 min-h-screen pb-12">
             {/* Header Image */}
             <div className="h-64 md:h-80 w-full overflow-hidden relative">
@@ -635,5 +670,6 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 </div>
             </div>
         </div>
+        </ErrorBoundary>
     );
 };
