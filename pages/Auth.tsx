@@ -136,7 +136,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                     id: data.user.id, 
                                     email: loginEmail, 
                                     full_name: pendingSalon.ownerName, 
-                                    role: 'owner', 
+                                    role: 'salon', 
                                     phone: pendingSalon.phone 
                                 },
                                 { onConflict: 'id' }
@@ -283,7 +283,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 options: {
                     data: {
                         full_name: regName,
-                        role: 'owner',
+                        role: 'salon',
                         phone: regPhone
                     }
                 }
@@ -320,7 +320,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                             id: data.user.id, 
                             email: regEmail, 
                             full_name: regName, 
-                            role: 'owner', 
+                            role: 'salon', 
                             phone: regPhone 
                         },
                         { onConflict: 'id' }

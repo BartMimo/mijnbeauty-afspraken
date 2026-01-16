@@ -1,10 +1,10 @@
 -- FIX: Maak salon aan voor bestaande salon eigenaar
 -- Run dit in Supabase SQL Editor
 
--- 1. Update de role naar 'owner' (consistent met de code)
-UPDATE public.profiles 
-SET role = 'owner' 
-WHERE id = 'c2b4c58b-b30e-4c2e-8487-1dd5270e0161';
+-- 1. Check welke role waarden zijn toegestaan (ENUM)
+-- SELECT unnest(enum_range(NULL::user_role));
+
+-- De role is al 'salon', dat is correct - skip update
 
 -- 2. Maak de salon aan
 INSERT INTO public.salons (
