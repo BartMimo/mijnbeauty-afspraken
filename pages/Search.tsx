@@ -300,7 +300,7 @@ export const SearchPage: React.FC = () => {
     setFilters(prev => ({ ...prev, query: e.target.value }));
   }, []);
 
-  const handleLocationChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleLocationChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setFilters(prev => ({ ...prev, location: e.target.value }));
   }, []);
 
@@ -357,18 +357,19 @@ export const SearchPage: React.FC = () => {
         </div>
         <div>
             <label className="text-sm font-medium text-stone-700 mb-1.5 block">Locatie</label>
-            <select
-                value={filters.location}
-                onChange={handleLocationChange}
-                className="w-full h-11 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand-400"
-            >
-                <option value="">Selecteer een locatie</option>
-                {locations.map(location => (
-                    <option key={location.id} value={`${location.postcode} - ${location.city}`}>
-                        {location.postcode} - {location.city} ({location.province})
-                    </option>
-                ))}
-            </select>
+            <input
+              type="text"
+              placeholder="Postcode of stad"
+              list="locations-list"
+              value={filters.location}
+              onChange={handleLocationChange}
+              className="w-full h-11 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand-400"
+            />
+            <datalist id="locations-list">
+              {locations.map(location => (
+                <option key={location.id} value={`${location.postcode} - ${location.city}`}>{location.postcode} - {location.city} ({location.province})</option>
+              ))}
+            </datalist>
         </div>
         {!filters.showDealsOnly && (
         <div>
