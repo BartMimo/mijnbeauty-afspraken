@@ -30,6 +30,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     
     // Review Modal State
     const [bookedTimes, setBookedTimes] = useState<string[]>([]);
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    const [reviewForm, setReviewForm] = useState({ name: '', rating: 0, text: '' });
 
     // Helper to get local date string (YYYY-MM-DD)
     const toLocalDateString = (date: Date) => {
