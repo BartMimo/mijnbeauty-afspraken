@@ -308,7 +308,7 @@ export const SearchPage: React.FC = () => {
     setFilters(prev => ({ ...prev, category: e.target.value }));
   }, []);
 
-  const handleDistanceChange = useCallback((dist: number) => {
+  const handleDistanceChange = useCallback((dist: number | null) => {
     setFilters(prev => ({ ...prev, distance: dist }));
   }, []);
 
@@ -388,21 +388,27 @@ export const SearchPage: React.FC = () => {
         )}
         <div className="pt-4 border-t border-stone-100">
             <label className="text-sm font-medium text-stone-700 mb-3 block">Afstand</label>
-            <div className="flex gap-2 flex-wrap">
-                {[5, 10, 25, 50].map(dist => (
-                    <button 
-                        key={dist}
-                        type="button"
-                        onClick={() => handleDistanceChange(dist)}
-                        className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                            filters.distance === dist 
-                            ? 'bg-brand-50 border-brand-400 text-brand-600 font-medium' 
-                            : 'border-stone-200 hover:border-brand-400 hover:text-brand-500 text-stone-600'
-                        }`}
-                    >
-                        {dist} km
-                    </button>
-                ))}
+            <div className="mt-2">
+                <div className="flex justify-between items-center text-sm text-stone-600 mb-2">
+                    <span>{filters.distance ? `${filters.distance} km` : 'Alle afstanden'}</span>
+                    <button type="button" onClick={() => handleDistanceChange(null)} className="text-sm text-stone-400 hover:text-stone-600">Wis</button>
+                </div>
+                <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={filters.distance ?? 0}
+                    onChange={(e) => {
+                        const val = Number(e.target.value);
+                        handleDistanceChange(val === 0 ? null : val);
+                    }}
+                    className="w-full h-2 bg-stone-200 rounded-lg appearance-none accent-brand-500"
+                />
+                <div className="flex justify-between text-xs text-stone-400 mt-2">
+                    <span>0 km</span>
+                    <span>100+ km</span>
+                </div>
             </div>
         </div>
       </div>
