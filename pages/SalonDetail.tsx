@@ -652,7 +652,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                         // Use the DB RPC to do an atomic claim + insert server-side
                                                         const { data, error: rpcErr } = await supabase.rpc('claim_and_create_appointment', {
                                                             p_deal_id: selectedDeal.id,
-                                                            p_user_id: null,  // Always null to avoid FK issues
+                                                            p_user_id: user?.id || null,  // Set to user.id if logged in
                                                             p_salon_id: salon.id,
                                                             p_service_id: null,
                                                             p_service_name: selectedDeal.serviceName,
@@ -688,7 +688,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             status: 'confirmed',
                                                             price: currentService?.price || 0,
                                                             customer_name: (await supabase.auth.getUser()).data?.user?.user_metadata?.full_name || 'Gast',
-                                                            user_id: null,  // Always null to avoid FK issues
+                                                            user_id: user?.id || null,  // Set to user.id if logged in
                                                         };
                                                         const { insertAppointmentSafe } = await import('../lib/appointments');
                                                         const { error: insertErr } = await insertAppointmentSafe(insertData);

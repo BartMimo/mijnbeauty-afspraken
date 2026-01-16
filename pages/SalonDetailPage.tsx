@@ -631,7 +631,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                         const serviceDuration = (currentService?.durationMinutes ?? 30);
                                                         // Use a resilient insert helper that can retry without missing columns (eg. service_name)
                                                         const insertData: any = {
-                                                            user_id: null,  // Always null to avoid FK issues
+                                                            user_id: user?.id || null,  // Set to user.id if logged in
                                                             salon_id: salon.supabaseId,
                                                             service_id: selectedService,
                                                             service_name: currentService?.name,
@@ -648,7 +648,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                         if (selectedDeal) {
                                                             const { data, error: rpcErr } = await supabase.rpc('claim_and_create_appointment', {
                                                                 p_deal_id: selectedDeal.id,
-                                                                p_user_id: null,  // Always null to avoid FK issues
+                                                                p_user_id: user?.id || null,  // Set to user.id if logged in
                                                                 p_salon_id: salon.supabaseId,
                                                                 p_service_id: null,
                                                                 p_service_name: selectedDeal.serviceName,
