@@ -75,6 +75,71 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
+    // Derived current service (always compute, even if null)
+    const currentService = salon?.services?.find((s: any) => s.id === selectedService) || null;
+
+    // Generate all possible time slots (30-min intervals from 09:00 to 17:30)
+    const allTimeSlots = useMemo(() => {
+        const slots: string[] = [];
+        for (let hour = 9; hour < 18; hour++) {
+            slots.push(`${hour.toString().padStart(2, '0')}:00`);
+            if (hour < 17 || (hour === 17 && false)) { // Don't add 17:30 if closing at 18:00
+                slots.push(`${hour.toString().padStart(2, '0')}:30`);
+            }
+        }
+        return slots;
+    }, []);
+
+    // Calculate available times based on existing appointments and selected service duration
+    const availableTimes = useMemo(() => {
+        if (!selectedDate || !currentService) return allTimeSlots;
+
+        const dateStr = selectedDate.toISOString().split('T')[0];
+        const serviceDuration = (currentService?.durationMinutes ?? 30);
+        const slotsNeeded = Math.ceil(serviceDuration / 30);
+
+        // Get all appointments for the selected date
+        const dayAppointments = existingAppointments.filter(apt => apt.date === dateStr);
+
+        // Helper to convert time string to minutes from midnight
+        const timeToMinutes = (time?: string) => {
+            if (!time || typeof time !== 'string') return -1;
+            const parts = time.split(':').map(Number);
+            if (parts.length < 2 || parts.some(isNaN)) return -1;
+            const [hours, mins] = parts;
+            return hours * 60 + mins;
+        };
+
+        // Helper to check if a slot overlaps with an appointment
+        const isSlotBlocked = (slotTime: string, duration: number) => {
+            const slotStart = timeToMinutes(slotTime);
+            if (slotStart < 0) return true; // if slot time invalid, consider blocked
+            const slotEnd = slotStart + duration;
+
+            return dayAppointments.some(apt => {
+                const aptStart = timeToMinutes(apt.time);
+                if (aptStart < 0) return false; // ignore appointments with invalid time
+                const aptEnd = aptStart + (apt.duration_minutes || 30);
+
+                // Check for any overlap
+                return (slotStart < aptEnd && slotEnd > aptStart);
+            });
+        };
+
+        // Filter available slots
+        return allTimeSlots.filter(time => {
+            // Check if this slot and all needed subsequent slots are available
+            const startMinutes = timeToMinutes(time);
+            if (startMinutes < 0) return false;
+
+            // Don't allow booking if end time would be after 18:00
+            if (startMinutes + serviceDuration > 18 * 60) return false;
+
+            // Check if any needed slot is blocked
+            return !isSlotBlocked(time, serviceDuration);
+        });
+    }, [selectedDate, currentService, existingAppointments, allTimeSlots]);
+
     // Fetch salon data from Supabase
     useEffect(() => {
         const fetchSalon = async () => {
@@ -233,9 +298,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         }, 100);
     };
 
-    const currentService = salon.services.find(s => s.id === selectedService);
-
-    // --- Calendar Logic ---
+    // Calendar helpers (kept here but defined before early returns to ensure stable hooks order)
     const daysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
     const firstDayOfMonth = (date: Date) => {
         let day = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
@@ -259,63 +322,6 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         return d < today;
     };
 
-    // Generate all possible time slots (30-min intervals from 09:00 to 17:30)
-    const allTimeSlots = useMemo(() => {
-        const slots: string[] = [];
-        for (let hour = 9; hour < 18; hour++) {
-            slots.push(`${hour.toString().padStart(2, '0')}:00`);
-            if (hour < 17 || (hour === 17 && false)) { // Don't add 17:30 if closing at 18:00
-                slots.push(`${hour.toString().padStart(2, '0')}:30`);
-            }
-        }
-        return slots;
-    }, []);
-
-    // Calculate available times based on existing appointments and selected service duration
-    const availableTimes = useMemo(() => {
-        if (!selectedDate || !currentService) return allTimeSlots;
-
-        const dateStr = selectedDate.toISOString().split('T')[0];
-        const serviceDuration = (currentService?.durationMinutes ?? 30);
-        const slotsNeeded = Math.ceil(serviceDuration / 30);
-
-        // Get all appointments for the selected date
-        const dayAppointments = existingAppointments.filter(apt => apt.date === dateStr);
-
-        // Helper to convert time string to minutes from midnight
-        const timeToMinutes = (time: string) => {
-            const [hours, mins] = time.split(':').map(Number);
-            return hours * 60 + mins;
-        };
-
-        // Helper to check if a slot overlaps with an appointment
-        const isSlotBlocked = (slotTime: string, duration: number) => {
-            const slotStart = timeToMinutes(slotTime);
-            if (slotStart < 0) return true; // if slot time invalid, consider blocked
-            const slotEnd = slotStart + duration;
-
-            return dayAppointments.some(apt => {
-                const aptStart = timeToMinutes(apt.time);
-                if (aptStart < 0) return false; // ignore appointments with invalid time
-                const aptEnd = aptStart + (apt.duration_minutes || 30);
-                
-                // Check for any overlap
-                return (slotStart < aptEnd && slotEnd > aptStart);
-            });
-        };
-
-        // Filter available slots
-        return allTimeSlots.filter(time => {
-            // Check if this slot and all needed subsequent slots are available
-            const startMinutes = timeToMinutes(time);
-            
-            // Don't allow booking if end time would be after 18:00
-            if (startMinutes + serviceDuration > 18 * 60) return false;
-
-            // Check if any needed slot is blocked
-            return !isSlotBlocked(time, serviceDuration);
-        });
-    }, [selectedDate, currentService, existingAppointments, allTimeSlots]);
 
     const formatDateDutch = (date: Date) => {
         return new Intl.DateTimeFormat('nl-NL', { weekday: 'short', day: 'numeric', month: 'long' }).format(date);
