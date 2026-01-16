@@ -79,6 +79,11 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     // Derived current service (always compute, even if null)
     const currentService = salon?.services?.find((s: any) => s.id === selectedService) || null;
 
+    // Helper to get local date string (YYYY-MM-DD)
+    const toLocalDateString = (date: Date) => {
+        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+    };
+
     // Generate all possible time slots (30-min intervals from 09:00 to 17:30)
     const allTimeSlots = useMemo(() => {
         const slots: string[] = [];
@@ -95,7 +100,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const availableTimes = useMemo(() => {
         if (!selectedDate || !currentService) return allTimeSlots;
 
-        const dateStr = selectedDate.toISOString().split('T')[0];
+        const dateStr = toLocalDateString(selectedDate);
         const serviceDuration = (currentService?.durationMinutes ?? 30);
         const slotsNeeded = Math.ceil(serviceDuration / 30);
 
@@ -630,7 +635,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             salon_id: salon.supabaseId,
                                                             service_id: selectedService,
                                                             service_name: currentService?.name,
-                                                            date: selectedDate?.toISOString().split('T')[0],
+                                                            date: selectedDate ? toLocalDateString(selectedDate) : null,
                                                             time: selectedDeal ? selectedDeal.time : selectedTime,
                                                             duration_minutes: serviceDuration,
                                                             price: selectedDeal ? selectedDeal.discountPrice : currentService?.price,

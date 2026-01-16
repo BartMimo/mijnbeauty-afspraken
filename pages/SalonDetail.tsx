@@ -29,8 +29,23 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const [bookingStep, setBookingStep] = useState<'service' | 'time' | 'confirm'>('service');
     
     // Review Modal State
-    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
-    const [reviewForm, setReviewForm] = useState({ name: '', rating: 0, text: '' });
+    const [bookedTimes, setBookedTimes] = useState<string[]>([]);
+
+    // Helper to get local date string (YYYY-MM-DD)
+    const toLocalDateString = (date: Date) => {
+        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+    };
+
+    // Fetch booked times for a date
+    const fetchBookedTimes = async (date: Date) => {
+        const dateStr = toLocalDateString(date);
+        const { data } = await supabase
+            .from('appointments')
+            .select('time')
+            .eq('salon_id', salon.supabaseId)
+            .eq('date', dateStr);
+        setBookedTimes(data?.map(a => a.time) || []);
+    };
     const [hoverRating, setHoverRating] = useState(0);
 
     // Favorite State
@@ -554,7 +569,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                         <button 
                                                             key={d}
                                                             disabled={isPastDate}
-                                                            onClick={() => { setSelectedDate(dateObj); setSelectedTime(null); }}
+                                                                onClick={() => { setSelectedDate(dateObj); setSelectedTime(null); fetchBookedTimes(dateObj); }}
                                                             className={`h-9 w-9 rounded-full flex items-center justify-center text-sm transition-all ${isSelected ? 'bg-brand-500 text-white font-bold shadow-md' : isPastDate ? 'text-stone-300 cursor-not-allowed' : 'text-stone-700 hover:bg-brand-50 hover:text-brand-600'}`}
                                                         >
                                                             {d}
@@ -568,7 +583,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                 <div className="border-t border-stone-100 pt-4 animate-fadeIn">
                                                     <p className="text-sm font-medium text-stone-700 mb-3">Tijdstip:</p>
                                                     <div className="grid grid-cols-3 gap-2">
-                                                        {availableTimes.map(time => (
+                                                        {availableTimes.filter(time => !bookedTimes.includes(time)).map(time => (
                                                             <button 
                                                                 key={time} 
                                                                 onClick={() => setSelectedTime(time)}
@@ -668,7 +683,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             salon_name: salon.name,
                                                             service_id: currentService?.id || null,
                                                             service_name: currentService?.name || '',
-                                                            date: selectedDate ? selectedDate.toISOString().split('T')[0] : null,
+                                                            date: selectedDate ? toLocalDateString(selectedDate) : null,
                                                             time: selectedTime,
                                                             status: 'confirmed',
                                                             price: currentService?.price || 0,
@@ -680,6 +695,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                         if (insertErr) throw insertErr;
 
                                                         alert('Boeking succesvol!');
+                                                        setBookedTimes(prev => [...prev, selectedTime]);
                                                     }
                                                 } catch (err: any) {
                                                     console.error('Booking error:', err);
