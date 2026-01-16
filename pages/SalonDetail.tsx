@@ -5,6 +5,7 @@ import { Button, Card, Badge, Modal, Input } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Service, Deal } from '../types';
+import { insertAppointmentSafe } from '../lib/appointments';
 
 interface SalonDetailPageProps {
     subdomain?: string; // Optional prop to support direct subdomain routing
@@ -633,14 +634,32 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             user_id: user?.id || null,
                                                         };
                                                         const { insertAppointmentSafe } = await import('../lib/appointments');
+                                                        // Attempt to claim the deal atomically (only if status === 'active')
+                                                        const { data: claimed, error: claimErr } = await supabase
+                                                            .from('deals')
+                                                            .update({ status: 'claimed' })
+                                                            .eq('id', selectedDeal.id)
+                                                            .eq('status', 'active')
+                                                            .select()
+                                                            .maybeSingle();
+                                                        if (claimErr) throw claimErr;
+                                                        if (!claimed) {
+                                                            alert('Deze deal is helaas al geclaimd. Ververs de pagina en probeer een andere deal.');
+                                                            setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
+                                                            setSelectedDeal(null);
+                                                            return;
+                                                        }
+
+                                                        // Insert appointment for claimed deal
                                                         const { error: insertErr } = await insertAppointmentSafe(insertData);
-                                                        if (insertErr) throw insertErr;
+                                                        if (insertErr) {
+                                                            // revert claim if insert failed
+                                                            const { error: revertErr } = await supabase.from('deals').update({ status: 'active' }).eq('id', selectedDeal.id);
+                                                            if (revertErr) console.error('Failed to revert deal status after failed insert:', revertErr.message);
+                                                            throw insertErr;
+                                                        }
 
-                                                        // Mark deal as claimed (single-use)
-                                                        const { error: dealErr } = await supabase.from('deals').update({ status: 'claimed' }).eq('id', selectedDeal.id);
-                                                        if (dealErr) console.warn('Could not mark deal claimed:', dealErr.message);
-
-                                                        // Remove from local state so UI updates immediately
+                                                        // Remove from local state and notify
                                                         setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
                                                         setSelectedDeal(null);
                                                         alert('Boeking succesvol! De deal is geclaimd.');

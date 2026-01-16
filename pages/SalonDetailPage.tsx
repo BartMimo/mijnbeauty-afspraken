@@ -5,6 +5,7 @@ import { Button, Card, Badge } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Service, Deal } from '../types';
+import { insertAppointmentSafe } from '../lib/appointments';
 
 class ErrorBoundary extends React.Component<{children?: React.ReactNode}, {error?: any}> {
     constructor(props: any) {
@@ -638,14 +639,41 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
 
                                                         // lazy import to avoid circular deps during module init
                                                         const { insertAppointmentSafe } = await import('../lib/appointments');
-                                                        const { error } = await insertAppointmentSafe(insertData);
-                                                        if (error) throw error;
-
-                                                        // If this was a deal booking, mark the deal as claimed so it cannot be booked again
+                                                        // If this is a deal booking, attempt to atomically claim the deal first
                                                         if (selectedDeal) {
-                                                            const { error: dealErr } = await supabase.from('deals').update({ status: 'claimed' }).eq('id', selectedDeal.id);
-                                                            if (dealErr) console.warn('Failed to update deal status:', dealErr.message);
+                                                            const { data: claimedDeal, error: claimErr } = await supabase
+                                                                .from('deals')
+                                                                .update({ status: 'claimed' })
+                                                                .eq('id', selectedDeal.id)
+                                                                .eq('status', 'active')
+                                                                .select()
+                                                                .maybeSingle();
+
+                                                            if (claimErr) throw claimErr;
+                                                            if (!claimedDeal) {
+                                                                alert('Deze deal is helaas net geclaimd door iemand anders. Probeer een andere deal of ververs de pagina.');
+                                                                setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
+                                                                setSelectedDeal(null);
+                                                                setBookingLoading(false);
+                                                                return;
+                                                            }
+                                                        }
+
+                                                        // Insert appointment using shared helper
+                                                        const { error } = await insertAppointmentSafe(insertData);
+                                                        if (error) {
+                                                            // If we claimed the deal but inserting the appointment failed, try to revert the deal to active
+                                                            if (selectedDeal) {
+                                                                const { error: revertErr } = await supabase.from('deals').update({ status: 'active' }).eq('id', selectedDeal.id);
+                                                                if (revertErr) console.error('Failed to revert deal status after failed appointment insert:', revertErr.message);
+                                                            }
+                                                            throw error;
+                                                        }
+
+                                                        // Remove from local state if deal was claimed
+                                                        if (selectedDeal) {
                                                             setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
+                                                            setSelectedDeal(null);
                                                         }
 
                                                         alert('Boeking succesvol!');
