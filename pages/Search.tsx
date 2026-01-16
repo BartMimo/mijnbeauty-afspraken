@@ -37,6 +37,42 @@ export const SearchPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [locationCoords, setLocationCoords] = useState<{lat: number, lng: number} | null>(null);
+
+  // Geocode location
+  const geocodeLocation = async (location: string) => {
+    if (!location.trim()) {
+      setLocationCoords(null);
+      return;
+    }
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location + ', Netherlands')}`);
+      const data = await response.json();
+      if (data.length > 0) {
+        setLocationCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
+      } else {
+        setLocationCoords(null);
+      }
+    } catch (err) {
+      console.error('Geocoding error:', err);
+      setLocationCoords(null);
+    }
+  };
+
+  // Haversine distance calculation
+  const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // Geocode when location changes
+  useEffect(() => {
+    geocodeLocation(filters.location);
+  }, [filters.location]);
 
   // Fetch salons from Supabase - only active (approved) salons
   useEffect(() => {
@@ -212,8 +248,10 @@ export const SearchPage: React.FC = () => {
       const matchesLoc = salon.city.toLowerCase().includes(filters.location.toLowerCase()) ||
                          salon.zipCode.toLowerCase().includes(filters.location.toLowerCase());
       const matchesCat = filters.category === 'all' || salon.services.some((s: any) => s.category === filters.category);
+      const matchesDistance = !filters.distance || !locationCoords || !salon.latitude || !salon.longitude || 
+                              haversineDistance(locationCoords.lat, locationCoords.lng, salon.latitude, salon.longitude) <= filters.distance;
       
-      return matchesQuery && matchesLoc && matchesCat;
+      return matchesQuery && matchesLoc && matchesCat && matchesDistance;
   });
 
   // Filter deals
