@@ -103,21 +103,36 @@ export const UserDashboard: React.FC = () => {
     };
 
     const handleCancel = async (id: string) => {
+        if (!user) {
+            alert('Je moet ingelogd zijn om een afspraak te annuleren.');
+            return;
+        }
+
         if (window.confirm('Weet je zeker dat je deze afspraak wilt annuleren? Dit kan niet ongedaan gemaakt worden.')) {
             try {
-                const { error } = await supabase
+                // Ensure we only update the appointment that belongs to the current user
+                const { data, error } = await supabase
                     .from('appointments')
                     .update({ status: 'cancelled' })
-                    .eq('id', id);
+                    .eq('id', id)
+                    .eq('user_id', user.id)
+                    .select('id');
 
                 if (error) throw error;
+
+                // If no rows were returned, the update didn't apply (not found / no permission)
+                if (!data || data.length === 0) {
+                    console.error('Cancel returned no rows for id:', id);
+                    alert('Kon afspraak niet annuleren: afspraak niet gevonden of geen toestemming.');
+                    return;
+                }
 
                 // Update local state
                 setAppointments((prev: any[]) => prev.filter((a: any) => a.id !== id));
                 setNotification(null);
-            } catch (err) {
+            } catch (err: any) {
                 console.error('Error cancelling appointment:', err);
-                alert('Kon afspraak niet annuleren. Probeer opnieuw.');
+                alert('Kon afspraak niet annuleren: ' + (err?.message || 'Probeer opnieuw.'));
             }
         }
     };
