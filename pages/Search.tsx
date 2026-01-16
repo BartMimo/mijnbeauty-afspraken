@@ -112,6 +112,7 @@ export const SearchPage: React.FC = () => {
       if (error) {
         console.error('Error fetching locations:', error);
       } else {
+        console.log(`Fetched ${data?.length || 0} locations from DB`);
         setLocations(data || []);
       }
     };
@@ -126,14 +127,16 @@ export const SearchPage: React.FC = () => {
       return;
     }
 
+    const valLower = val.toLowerCase();
+
     // Try exact "postcode - city" match (case-insensitive)
-    let selectedLoc = locations.find(loc => `${loc.postcode} - ${loc.city}`.toLowerCase() === val.toLowerCase());
+    let selectedLoc = locations.find(loc => `${loc.postcode} - ${loc.city}`.toLowerCase() === valLower);
 
     // Try exact city match
-    if (!selectedLoc) selectedLoc = locations.find(loc => loc.city.toLowerCase() === val.toLowerCase());
+    if (!selectedLoc) selectedLoc = locations.find(loc => loc.city.toLowerCase() === valLower);
 
-    // Try postcode match (exact or startsWith)
-    if (!selectedLoc) selectedLoc = locations.find(loc => loc.postcode === val || loc.postcode.startsWith(val));
+    // Try postcode match (exact or startsWith, case-insensitive)
+    if (!selectedLoc) selectedLoc = locations.find(loc => loc.postcode.toLowerCase() === valLower || loc.postcode.toLowerCase().startsWith(valLower));
 
     if (selectedLoc) {
       setLocationCoords({ lat: selectedLoc.latitude, lng: selectedLoc.longitude });
@@ -141,8 +144,7 @@ export const SearchPage: React.FC = () => {
     }
 
     // Try CSV fallback (use pre-bundled lat/lon if available)
-    const csvVal = val.toLowerCase();
-    const csvMatch = csvLocations.find(c => (`${c.postcode} - ${c.city}`.toLowerCase() === csvVal) || (c.city.toLowerCase() === csvVal) || (c.postcode === val) || (c.postcode && c.postcode.startsWith(val)) );
+    const csvMatch = csvLocations.find(c => (`${c.postcode} - ${c.city}`.toLowerCase() === valLower) || (c.city.toLowerCase() === valLower) || (c.postcode.toLowerCase() === valLower) || (c.postcode && c.postcode.toLowerCase().startsWith(valLower)) );
     if (csvMatch && csvMatch.latitude && csvMatch.longitude) {
       setLocationCoords({ lat: csvMatch.latitude, lng: csvMatch.longitude });
       return;
