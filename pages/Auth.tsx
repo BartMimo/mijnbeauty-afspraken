@@ -154,23 +154,29 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                         
                         if (!existingSalon) {
                             // Create the salon
-                            const { error: salonError } = await supabase
+                            console.log('Creating pending salon for user:', data.user.id);
+                            const { data: newSalon, error: salonError } = await supabase
                                 .from('salons')
                                 .insert({
                                     owner_id: data.user.id,
                                     name: pendingSalon.salonName,
                                     slug: pendingSalon.subdomain,
                                     subdomain: pendingSalon.subdomain,
-                                    status: 'active',
+                                    status: 'pending',
                                     city: pendingSalon.city,
                                     address: pendingSalon.address,
                                     phone: pendingSalon.phone
-                                });
+                                })
+                                .select()
+                                .single();
                             
                             if (salonError) {
                                 console.error('Pending salon creation error:', salonError);
+                                console.error('Error details:', JSON.stringify(salonError, null, 2));
+                                alert('Let op: Je salon kon niet worden aangemaakt. Neem contact op met support. Error: ' + salonError.message);
                             } else {
-                                console.log('Pending salon created successfully');
+                                console.log('Pending salon created successfully:', newSalon);
+                                alert('Je salon is aangemaakt en wacht op goedkeuring van de admin.');
                             }
                         }
                         
