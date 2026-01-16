@@ -121,10 +121,12 @@ const App: React.FC = () => {
                   {/* The root path for a subdomain renders that specific salon's page */}
                   <Route path="/" element={
                       <ErrorBoundaryRoot>
-                          <SalonDetailPage subdomain={subdomain} />
+                          <PublicLayout>
+                              <SalonDetailPage subdomain={subdomain} />
+                          </PublicLayout>
                       </ErrorBoundaryRoot>
                   } />
-                  
+
                   {/* Optionally allow sub-routes if needed, or redirect everything to root of subdomain */}
                   <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

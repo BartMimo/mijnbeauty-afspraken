@@ -5,14 +5,42 @@ import { Button } from './UIComponents';
 import { useAuth } from '../context/AuthContext';
 
 // --- Shared Header Component ---
-const HeaderLogo = () => (
-    <Link to="/" className="flex items-center space-x-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-400 text-white shrink-0">
-            <Scissors size={20} />
-        </div>
-        <span className="text-lg md:text-xl font-bold text-stone-800 tracking-tight truncate">Mijn Beauty Afspraken</span>
-    </Link>
-);
+const HeaderLogo: React.FC = () => {
+    // Detect if we're on a subdomain so we can link back to the main site instead of staying on the subdomain
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    const parts = host.split('.');
+    const isSubdomain = (
+        (parts.length === 2 && host.includes('localhost') && parts[0] !== 'www') ||
+        (host.includes('mijnbeautyafspraken.nl') && parts.length >= 3 && parts[0] !== 'www') ||
+        (host.includes('vercel.app') && parts.length >= 4 && parts[0] !== 'www')
+    );
+
+    const mainOrigin = (() => {
+        if (host.includes('localhost')) return `${location.protocol}//localhost:5173`;
+        if (host.includes('vercel.app')) return `https://mijnbeauty-afspraken.vercel.app`;
+        return 'https://mijnbeautyafspraken.nl';
+    })();
+
+    const href = isSubdomain ? mainOrigin : '/';
+
+    return (
+        isSubdomain ? (
+            <a href={href} className="flex items-center space-x-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-400 text-white shrink-0">
+                    <Scissors size={20} />
+                </div>
+                <span className="text-lg md:text-xl font-bold text-stone-800 tracking-tight truncate">Mijn Beauty Afspraken</span>
+            </a>
+        ) : (
+            <Link to="/" className="flex items-center space-x-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-400 text-white shrink-0">
+                    <Scissors size={20} />
+                </div>
+                <span className="text-lg md:text-xl font-bold text-stone-800 tracking-tight truncate">Mijn Beauty Afspraken</span>
+            </Link>
+        )
+    );
+};
 
 const UserDropdown: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -125,6 +153,16 @@ export const PublicLayout: React.FC<{ children: React.ReactNode }> = ({ children
   const { user, session } = useAuth();
   const isAuthenticated = !!user && !!session;
 
+  // Subdomain detection used to route header links back to the main site
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const parts = host.split('.');
+  const isSubdomain = (
+      (parts.length === 2 && host.includes('localhost') && parts[0] !== 'www') ||
+      (host.includes('mijnbeautyafspraken.nl') && parts.length >= 3 && parts[0] !== 'www') ||
+      (host.includes('vercel.app') && parts.length >= 4 && parts[0] !== 'www')
+  );
+  const mainOrigin = isSubdomain ? (host.includes('localhost') ? `${location.protocol}//localhost:5173` : (host.includes('vercel.app') ? `https://mijnbeauty-afspraken.vercel.app` : 'https://mijnbeautyafspraken.nl')) : '';
+
   return (
     <div className="flex min-h-screen flex-col bg-stone-50">
       {/* Navigation */}
@@ -134,8 +172,31 @@ export const PublicLayout: React.FC<{ children: React.ReactNode }> = ({ children
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link to="/search" className="text-sm font-medium text-stone-600 hover:text-brand-400">Salons zoeken</Link>
-            <Link to="/for-partners" className="text-sm font-medium text-stone-600 hover:text-brand-400">Voor salons</Link>
+            {(() => {
+                const host = typeof window !== 'undefined' ? window.location.hostname : '';
+                const parts = host.split('.');
+                const isSub = (
+                    (parts.length === 2 && host.includes('localhost') && parts[0] !== 'www') ||
+                    (host.includes('mijnbeautyafspraken.nl') && parts.length >= 3 && parts[0] !== 'www') ||
+                    (host.includes('vercel.app') && parts.length >= 4 && parts[0] !== 'www')
+                );
+                const mainOrigin = isSub ? (host.includes('localhost') ? `${location.protocol}//localhost:5173` : (host.includes('vercel.app') ? `https://mijnbeauty-afspraken.vercel.app` : 'https://mijnbeautyafspraken.nl')) : '';
+                return (
+                    <>
+                        {isSub ? (
+                            <>
+                                <a href={`${mainOrigin}/search`} className="text-sm font-medium text-stone-600 hover:text-brand-400">Salons zoeken</a>
+                                <a href={`${mainOrigin}/for-partners`} className="text-sm font-medium text-stone-600 hover:text-brand-400">Voor salons</a>
+                            </>
+                        ) : (
+                            <>
+                                <Link to="/search" className="text-sm font-medium text-stone-600 hover:text-brand-400">Salons zoeken</Link>
+                                <Link to="/for-partners" className="text-sm font-medium text-stone-600 hover:text-brand-400">Voor salons</Link>
+                            </>
+                        )}
+                    </>
+                );
+            })()}
             
             {isAuthenticated ? (
                 <div className="pl-4 border-l border-stone-200">
@@ -143,12 +204,37 @@ export const PublicLayout: React.FC<{ children: React.ReactNode }> = ({ children
                 </div>
             ) : (
                 <div className="flex items-center space-x-4">
-                <Link to="/login">
-                    <Button variant="ghost" size="sm">Inloggen</Button>
-                </Link>
-                <Link to="/register">
-                    <Button size="sm">Aanmelden</Button>
-                </Link>
+                {(() => {
+                    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+                    const parts = host.split('.');
+                    const isSub = (
+                        (parts.length === 2 && host.includes('localhost') && parts[0] !== 'www') ||
+                        (host.includes('mijnbeautyafspraken.nl') && parts.length >= 3 && parts[0] !== 'www') ||
+                        (host.includes('vercel.app') && parts.length >= 4 && parts[0] !== 'www')
+                    );
+                    const mainOrigin = isSub ? (host.includes('localhost') ? `${location.protocol}//localhost:5173` : (host.includes('vercel.app') ? `https://mijnbeauty-afspraken.vercel.app` : 'https://mijnbeautyafspraken.nl')) : '';
+                    return (
+                        isSub ? (
+                            <>
+                                <a href={`${mainOrigin}/login`}>
+                                    <Button variant="ghost" size="sm">Inloggen</Button>
+                                </a>
+                                <a href={`${mainOrigin}/register`}>
+                                    <Button size="sm">Aanmelden</Button>
+                                </a>
+                            </>
+                        ) : (
+                            <>
+                                <Link to="/login">
+                                    <Button variant="ghost" size="sm">Inloggen</Button>
+                                </Link>
+                                <Link to="/register">
+                                    <Button size="sm">Aanmelden</Button>
+                                </Link>
+                            </>
+                        )
+                    );
+                })()}
                 </div>
             )}
           </nav>
@@ -162,8 +248,17 @@ export const PublicLayout: React.FC<{ children: React.ReactNode }> = ({ children
         {/* Mobile Nav */}
         {isMenuOpen && (
           <div className="md:hidden absolute top-16 left-0 w-full border-b border-stone-100 bg-white px-4 py-6 space-y-4 shadow-lg animate-fadeIn z-40">
-            <Link to="/search" className="block py-2 text-lg text-stone-700 font-medium border-b border-stone-50" onClick={() => setIsMenuOpen(false)}>Salons zoeken</Link>
-            <Link to="/for-partners" className="block py-2 text-lg text-stone-700 font-medium border-b border-stone-50" onClick={() => setIsMenuOpen(false)}>Voor salons</Link>
+            {isSubdomain ? (
+                <>
+                    <a href={`${mainOrigin}/search`} className="block py-2 text-lg text-stone-700 font-medium border-b border-stone-50" onClick={() => setIsMenuOpen(false)}>Salons zoeken</a>
+                    <a href={`${mainOrigin}/for-partners`} className="block py-2 text-lg text-stone-700 font-medium border-b border-stone-50" onClick={() => setIsMenuOpen(false)}>Voor salons</a>
+                </>
+            ) : (
+                <>
+                    <Link to="/search" className="block py-2 text-lg text-stone-700 font-medium border-b border-stone-50" onClick={() => setIsMenuOpen(false)}>Salons zoeken</Link>
+                    <Link to="/for-partners" className="block py-2 text-lg text-stone-700 font-medium border-b border-stone-50" onClick={() => setIsMenuOpen(false)}>Voor salons</Link>
+                </>
+            )}
             <div className="pt-4 flex flex-col gap-3">
                 {isAuthenticated ? (
                     <div className="flex flex-col gap-2">
@@ -174,12 +269,25 @@ export const PublicLayout: React.FC<{ children: React.ReactNode }> = ({ children
                     </div>
                 ) : (
                     <>
-                    <Link to="/login" onClick={() => setIsMenuOpen(false)}>
-                        <Button variant="outline" className="w-full justify-center h-12 text-base">Inloggen</Button>
-                    </Link>
-                    <Link to="/register" onClick={() => setIsMenuOpen(false)}>
-                        <Button className="w-full justify-center h-12 text-base">Aanmelden</Button>
-                    </Link>
+                    {isSubdomain ? (
+                        <>
+                            <a href={`${mainOrigin}/login`} onClick={() => setIsMenuOpen(false)}>
+                                <Button variant="outline" className="w-full justify-center h-12 text-base">Inloggen</Button>
+                            </a>
+                            <a href={`${mainOrigin}/register`} onClick={() => setIsMenuOpen(false)}>
+                                <Button className="w-full justify-center h-12 text-base">Aanmelden</Button>
+                            </a>
+                        </>
+                    ) : (
+                        <>
+                        <Link to="/login" onClick={() => setIsMenuOpen(false)}>
+                            <Button variant="outline" className="w-full justify-center h-12 text-base">Inloggen</Button>
+                        </Link>
+                        <Link to="/register" onClick={() => setIsMenuOpen(false)}>
+                            <Button className="w-full justify-center h-12 text-base">Aanmelden</Button>
+                        </Link>
+                        </>
+                    )}
                     </>
                 )}
             </div>
