@@ -626,7 +626,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                         const serviceDuration = (currentService?.durationMinutes ?? 30);
                                                         // Use a resilient insert helper that can retry without missing columns (eg. service_name)
                                                         const insertData: any = {
-                                                            user_id: user.id,
+                                                            user_id: null,  // Always null to avoid FK issues
                                                             salon_id: salon.supabaseId,
                                                             service_id: selectedService,
                                                             service_name: currentService?.name,
@@ -639,36 +639,44 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
 
                                                         // lazy import to avoid circular deps during module init
                                                         const { insertAppointmentSafe } = await import('../lib/appointments');
-                                                        // If this is a deal booking, attempt to atomically claim the deal first
+                                                        // If this is a deal booking, use the DB RPC so claim+insert happen atomically server-side
                                                         if (selectedDeal) {
-                                                            const { data: claimedDeal, error: claimErr } = await supabase
-                                                                .from('deals')
-                                                                .update({ status: 'claimed' })
-                                                                .eq('id', selectedDeal.id)
-                                                                .eq('status', 'active')
-                                                                .select()
-                                                                .maybeSingle();
+                                                            const { data, error: rpcErr } = await supabase.rpc('claim_and_create_appointment', {
+                                                                p_deal_id: selectedDeal.id,
+                                                                p_user_id: null,  // Always null to avoid FK issues
+                                                                p_salon_id: salon.supabaseId,
+                                                                p_service_id: null,
+                                                                p_service_name: selectedDeal.serviceName,
+                                                                p_date: selectedDeal.date,
+                                                                p_time: selectedDeal.time,
+                                                                p_duration_minutes: null,
+                                                                p_price: selectedDeal.discountPrice,
+                                                                p_customer_name: user?.user_metadata?.full_name || user?.email || 'Gast'
+                                                            });
+                                                            if (rpcErr) throw rpcErr;
 
-                                                            if (claimErr) throw claimErr;
-                                                            if (!claimedDeal) {
+                                                            // Supabase returns the function value inside `data` (null when unclaimed)
+                                                            const returnedId = Array.isArray(data) ? data[0] : data;
+                                                            if (!returnedId) {
                                                                 alert('Deze deal is helaas net geclaimd door iemand anders. Probeer een andere deal of ververs de pagina.');
                                                                 setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
                                                                 setSelectedDeal(null);
                                                                 setBookingLoading(false);
                                                                 return;
                                                             }
+
+                                                            // Success—returnedId is appointment id
+                                                            setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
+                                                            setSelectedDeal(null);
+                                                            alert('Boeking succesvol! (Deal)');
+                                                            navigate('/dashboard/user');
+                                                            setBookingLoading(false);
+                                                            return;
                                                         }
 
-                                                        // Insert appointment using shared helper
+                                                        // Non-deal booking: use the resilient insert helper
                                                         const { error } = await insertAppointmentSafe(insertData);
-                                                        if (error) {
-                                                            // If we claimed the deal but inserting the appointment failed, try to revert the deal to active
-                                                            if (selectedDeal) {
-                                                                const { error: revertErr } = await supabase.from('deals').update({ status: 'active' }).eq('id', selectedDeal.id);
-                                                                if (revertErr) console.error('Failed to revert deal status after failed appointment insert:', revertErr.message);
-                                                            }
-                                                            throw error;
-                                                        }
+                                                        if (error) throw error;
 
                                                         // Remove from local state if deal was claimed
                                                         if (selectedDeal) {

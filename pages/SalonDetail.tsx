@@ -634,32 +634,30 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             user_id: user?.id || null,
                                                         };
                                                         const { insertAppointmentSafe } = await import('../lib/appointments');
-                                                        // Attempt to claim the deal atomically (only if status === 'active')
-                                                        const { data: claimed, error: claimErr } = await supabase
-                                                            .from('deals')
-                                                            .update({ status: 'claimed' })
-                                                            .eq('id', selectedDeal.id)
-                                                            .eq('status', 'active')
-                                                            .select()
-                                                            .maybeSingle();
-                                                        if (claimErr) throw claimErr;
-                                                        if (!claimed) {
+                                                        // Use the DB RPC to do an atomic claim + insert server-side
+                                                        const { data, error: rpcErr } = await supabase.rpc('claim_and_create_appointment', {
+                                                            p_deal_id: selectedDeal.id,
+                                                            p_user_id: null,  // Always null to avoid FK issues
+                                                            p_salon_id: salon.id,
+                                                            p_service_id: null,
+                                                            p_service_name: selectedDeal.serviceName,
+                                                            p_date: selectedDeal.date,
+                                                            p_time: selectedDeal.time,
+                                                            p_duration_minutes: null,
+                                                            p_price: selectedDeal.discountPrice,
+                                                            p_customer_name: user?.user_metadata?.full_name || (user?.email || 'Gast')
+                                                        });
+                                                        if (rpcErr) throw rpcErr;
+
+                                                        const returnedId = Array.isArray(data) ? data[0] : data;
+                                                        if (!returnedId) {
                                                             alert('Deze deal is helaas al geclaimd. Ververs de pagina en probeer een andere deal.');
                                                             setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
                                                             setSelectedDeal(null);
                                                             return;
                                                         }
 
-                                                        // Insert appointment for claimed deal
-                                                        const { error: insertErr } = await insertAppointmentSafe(insertData);
-                                                        if (insertErr) {
-                                                            // revert claim if insert failed
-                                                            const { error: revertErr } = await supabase.from('deals').update({ status: 'active' }).eq('id', selectedDeal.id);
-                                                            if (revertErr) console.error('Failed to revert deal status after failed insert:', revertErr.message);
-                                                            throw insertErr;
-                                                        }
-
-                                                        // Remove from local state and notify
+                                                        // Success
                                                         setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
                                                         setSelectedDeal(null);
                                                         alert('Boeking succesvol! De deal is geclaimd.');
@@ -675,7 +673,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             status: 'confirmed',
                                                             price: currentService?.price || 0,
                                                             customer_name: (await supabase.auth.getUser()).data?.user?.user_metadata?.full_name || 'Gast',
-                                                            user_id: (await supabase.auth.getUser()).data?.user?.id || null,
+                                                            user_id: null,  // Always null to avoid FK issues
                                                         };
                                                         const { insertAppointmentSafe } = await import('../lib/appointments');
                                                         const { error: insertErr } = await insertAppointmentSafe(insertData);
