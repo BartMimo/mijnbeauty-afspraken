@@ -22,6 +22,20 @@ const SALON_CATEGORIES = [
     { value: 'Overig', label: 'Overig', icon: '🏪' },
 ];
 
+// Geocode function
+const geocodeAddress = async (address: string) => {
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Netherlands')}`);
+        const data = await response.json();
+        if (data.length > 0) {
+            return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        }
+    } catch (err) {
+        console.error('Geocoding error:', err);
+    }
+    return null;
+};
+
 // Service duration options (30-min blocks)
 const DURATION_OPTIONS = [
     { value: 30, label: '30 minuten' },
@@ -526,6 +540,17 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 }
 
                 console.log('Salon created successfully:', salonData);
+
+                // Geocode the salon address for accurate distance filtering
+                if (salonData) {
+                    const coords = await geocodeAddress(`${fullAddress}, ${regCity}, Netherlands`);
+                    if (coords) {
+                        await supabase
+                            .from('salons')
+                            .update({ latitude: coords.lat, longitude: coords.lng })
+                            .eq('id', salonData.id);
+                    }
+                }
 
                 // Create initial services
                 const validServices = initialServices.filter(s => s.name && s.price > 0);
