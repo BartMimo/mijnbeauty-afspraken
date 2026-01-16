@@ -87,23 +87,27 @@ export const Select: React.FC<SelectProps> = ({ label, className = '', children,
 };
 
 // --- Card ---
-export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => {
+export const Card: React.FC<{ children: React.ReactNode; className?: string; onClick?: () => void }> = ({ children, className = '', onClick }) => {
   return (
-    <div className={`rounded-3xl border border-stone-100 bg-white shadow-sm ${className}`}>
+    <div 
+      className={`rounded-3xl border border-stone-100 bg-white shadow-sm ${className} ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
       {children}
     </div>
   );
 };
 
 // --- Badge ---
-export const Badge: React.FC<{ children: React.ReactNode; variant?: 'default' | 'success' | 'warning' }> = ({ children, variant = 'default' }) => {
+export const Badge: React.FC<{ children: React.ReactNode; variant?: 'default' | 'success' | 'warning' | 'error'; className?: string }> = ({ children, variant = 'default', className = '' }) => {
     const variants = {
         default: "bg-stone-100 text-stone-800",
         success: "bg-green-100 text-green-800",
-        warning: "bg-yellow-100 text-yellow-800"
+        warning: "bg-yellow-100 text-yellow-800",
+        error: "bg-red-100 text-red-800"
     };
     return (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${variants[variant]}`}>
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${variants[variant]} ${className}`}>
             {children}
         </span>
     );

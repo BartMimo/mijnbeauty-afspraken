@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Scissors, User, Store, Briefcase, ShieldCheck, ArrowRight, ArrowLeft, Check, Landmark, CreditCard, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Scissors, User, Store, Briefcase, ShieldCheck, ArrowRight, ArrowLeft, Check, Landmark, CreditCard, AlertCircle, CheckCircle2, Loader2, Upload, Image, Clock, Euro, Plus, Trash2 } from 'lucide-react';
 import { Button, Input, Card } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 
@@ -9,6 +9,34 @@ import { supabase } from '../lib/supabase';
 // ============================================================
 const PAYMENT_REQUIRED = false; // Zet op true wanneer Stripe klaar is
 // ============================================================
+
+// Salon categories
+const SALON_CATEGORIES = [
+    { value: 'kapper', label: 'Kapsalon', icon: '💇' },
+    { value: 'nagels', label: 'Nagelsalon', icon: '💅' },
+    { value: 'schoonheid', label: 'Schoonheidssalon', icon: '✨' },
+    { value: 'massage', label: 'Massagesalon', icon: '💆' },
+    { value: 'barbershop', label: 'Barbershop', icon: '💈' },
+    { value: 'wimpers', label: 'Wimper & Brow Studio', icon: '👁️' },
+    { value: 'overig', label: 'Overig', icon: '🏪' },
+];
+
+// Service duration options (30-min blocks)
+const DURATION_OPTIONS = [
+    { value: 30, label: '30 minuten' },
+    { value: 60, label: '1 uur' },
+    { value: 90, label: '1,5 uur' },
+    { value: 120, label: '2 uur' },
+    { value: 150, label: '2,5 uur' },
+    { value: 180, label: '3 uur' },
+];
+
+interface InitialService {
+    name: string;
+    price: number;
+    duration: number;
+    category: string;
+}
 
 export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ initialMode = 'login' }) => {
     const [mode, setMode] = useState<'login' | 'register'>(initialMode);
@@ -47,6 +75,17 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     const [discountCode, setDiscountCode] = useState('');
     const [discountCodeValid, setDiscountCodeValid] = useState<boolean | null>(null);
 
+    // Step 3: Salon Profile (NEW)
+    const [salonCategory, setSalonCategory] = useState<string>('');
+    const [salonDescription, setSalonDescription] = useState('');
+    const [salonImageUrl, setSalonImageUrl] = useState('');
+    const [imageUploading, setImageUploading] = useState(false);
+
+    // Step 4: Initial Service (NEW)
+    const [initialServices, setInitialServices] = useState<InitialService[]>([
+        { name: '', price: 0, duration: 30, category: 'Overig' }
+    ]);
+
     // Valid discount codes (case-insensitive)
     const VALID_DISCOUNT_CODES = ['gratistest'];
 
@@ -69,11 +108,15 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
             .replace(/-+$/, '');           
     };
 
+    // Auto-generate subdomain when salon name changes
     useEffect(() => {
-        if (regSalonName && subdomainStatus === 'idle') {
+        if (regSalonName) {
             const slug = createSlug(regSalonName);
             setRegSubdomain(slug);
             checkAvailability(slug);
+        } else {
+            setRegSubdomain('');
+            setSubdomainStatus('idle');
         }
     }, [regSalonName]);
 
@@ -266,7 +309,102 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 return;
             }
         }
+        if (salonStep === 3) {
+            // Validate salon profile
+            if (!salonCategory) {
+                alert("Selecteer een categorie voor je salon.");
+                return;
+            }
+            if (!salonDescription || salonDescription.length < 20) {
+                alert("Voeg een beschrijving toe (minimaal 20 karakters).");
+                return;
+            }
+        }
+        if (salonStep === 4) {
+            // Validate at least one service
+            const validServices = initialServices.filter(s => s.name && s.price > 0);
+            if (validServices.length === 0) {
+                alert("Voeg minimaal 1 dienst toe met naam en prijs.");
+                return;
+            }
+        }
         setSalonStep(prev => prev + 1);
+    };
+
+    // Handle image upload to Supabase Storage
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Selecteer een afbeelding (JPG, PNG, etc.)');
+            return;
+        }
+
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Afbeelding mag maximaal 5MB zijn');
+            return;
+        }
+
+        setImageUploading(true);
+        try {
+            // Generate unique filename
+            const fileExt = file.name.split('.').pop();
+            const fileName = `salon-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const filePath = `salon-images/${fileName}`;
+
+            // Upload to Supabase Storage
+            const { error: uploadError } = await supabase.storage
+                .from('public')
+                .upload(filePath, file);
+
+            if (uploadError) {
+                // If bucket doesn't exist, use a placeholder
+                console.error('Upload error:', uploadError);
+                // Use a default image URL instead
+                setSalonImageUrl(`https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800`);
+                return;
+            }
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('public')
+                .getPublicUrl(filePath);
+
+            setSalonImageUrl(publicUrl);
+        } catch (err) {
+            console.error('Upload error:', err);
+            alert('Upload mislukt. Probeer het opnieuw.');
+        } finally {
+            setImageUploading(false);
+        }
+    };
+
+    // Add a new service to the list
+    const addService = () => {
+        if (initialServices.length >= 5) {
+            alert('Je kunt maximaal 5 diensten toevoegen tijdens registratie. Meer diensten kun je later toevoegen.');
+            return;
+        }
+        setInitialServices([...initialServices, { name: '', price: 0, duration: 30, category: 'Overig' }]);
+    };
+
+    // Remove a service from the list
+    const removeService = (index: number) => {
+        if (initialServices.length <= 1) {
+            alert('Je moet minimaal 1 dienst toevoegen.');
+            return;
+        }
+        setInitialServices(initialServices.filter((_, i) => i !== index));
+    };
+
+    // Update a service in the list
+    const updateService = (index: number, field: keyof InitialService, value: string | number) => {
+        const updated = [...initialServices];
+        updated[index] = { ...updated[index], [field]: value };
+        setInitialServices(updated);
     };
 
     const handleSalonFinalSubmit = async () => {
@@ -351,7 +489,10 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                         status: 'pending',
                         city: regCity,
                         address: fullAddress,
-                        phone: regPhone
+                        phone: regPhone,
+                        description: salonDescription,
+                        category: salonCategory,
+                        image_url: salonImageUrl || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'
                     })
                     .select()
                     .single();
@@ -367,6 +508,31 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 }
 
                 console.log('Salon created successfully:', salonData);
+
+                // Create initial services
+                const validServices = initialServices.filter(s => s.name && s.price > 0);
+                if (validServices.length > 0 && salonData?.id) {
+                    const servicesToInsert = validServices.map(s => ({
+                        salon_id: salonData.id,
+                        name: s.name,
+                        price: s.price,
+                        duration_minutes: s.duration,
+                        category: s.category || salonCategory || 'Overig',
+                        active: true
+                    }));
+
+                    const { error: servicesError } = await supabase
+                        .from('services')
+                        .insert(servicesToInsert);
+
+                    if (servicesError) {
+                        console.error('Services creation error:', servicesError);
+                        // Don't fail the whole registration, just log it
+                    } else {
+                        console.log('Services created successfully');
+                    }
+                }
+
                 alert('Salon account aangemaakt! Je salon wordt gecontroleerd door de admin en is daarna zichtbaar.');
                 navigate('/dashboard');
             } else {
@@ -379,7 +545,11 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                     city: regCity,
                     address: fullAddress,
                     phone: regPhone,
-                    ownerName: regName
+                    ownerName: regName,
+                    description: salonDescription,
+                    category: salonCategory,
+                    imageUrl: salonImageUrl,
+                    services: initialServices.filter(s => s.name && s.price > 0)
                 }));
                 
                 alert('Check je email om je account te bevestigen. Daarna kun je inloggen en wordt je salon automatisch aangemaakt.');
@@ -394,13 +564,14 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         }
     };
 
-    // Helper to render the step indicator for salons
+    // Helper to render the step indicator for salons (5 steps now)
+    const TOTAL_STEPS = 5;
     const StepIndicator = () => (
-        <div className="flex items-center justify-center mb-8 space-x-2">
-            {[1, 2, 3].map(step => (
+        <div className="flex items-center justify-center mb-8 space-x-1">
+            {[1, 2, 3, 4, 5].map(step => (
                 <div key={step} className="flex items-center">
                     <div className={`h-2.5 w-2.5 rounded-full transition-colors ${salonStep >= step ? 'bg-brand-400' : 'bg-stone-200'}`} />
-                    {step < 3 && <div className={`h-0.5 w-8 mx-1 ${salonStep > step ? 'bg-brand-400' : 'bg-stone-200'}`} />}
+                    {step < TOTAL_STEPS && <div className={`h-0.5 w-6 mx-0.5 ${salonStep > step ? 'bg-brand-400' : 'bg-stone-200'}`} />}
                 </div>
             ))}
         </div>
@@ -532,14 +703,14 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                             {role === 'salon' && (
                                 <div>
                                     <StepIndicator />
-                                    <form onSubmit={salonStep === 3 ? (e) => { e.preventDefault(); handleSalonFinalSubmit(); } : handleSalonNextStep}>
+                                    <form onSubmit={salonStep === 5 ? (e) => { e.preventDefault(); handleSalonFinalSubmit(); } : handleSalonNextStep}>
                                         
                                         {/* STEP 1: Account */}
                                         {salonStep === 1 && (
                                             <div className="space-y-5 animate-fadeIn">
                                                 <div className="text-center mb-4">
                                                     <h3 className="text-lg font-bold text-stone-900">Maak je account</h3>
-                                                    <p className="text-sm text-stone-500">Stap 1 van 3</p>
+                                                    <p className="text-sm text-stone-500">Stap 1 van 5</p>
                                                 </div>
                                                 <Input 
                                                     label="Jouw Naam" 
@@ -604,12 +775,12 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                             </div>
                                         )}
 
-                                        {/* STEP 2: Details */}
+                                        {/* STEP 2: Address */}
                                         {salonStep === 2 && (
                                             <div className="space-y-5 animate-fadeIn">
                                                  <div className="text-center mb-4">
-                                                    <h3 className="text-lg font-bold text-stone-900">Salon Gegevens</h3>
-                                                    <p className="text-sm text-stone-500">Waar kunnen klanten je vinden?</p>
+                                                    <h3 className="text-lg font-bold text-stone-900">Salon Locatie</h3>
+                                                    <p className="text-sm text-stone-500">Stap 2 van 5 - Waar kunnen klanten je vinden?</p>
                                                 </div>
                                                 <div className="grid grid-cols-3 gap-4">
                                                     <div className="col-span-2">
@@ -670,13 +841,234 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                             </div>
                                         )}
 
-                                        {/* STEP 3: Subscription / Confirmation */}
+                                        {/* STEP 3: Salon Profile (NEW) */}
                                         {salonStep === 3 && (
+                                            <div className="space-y-5 animate-fadeIn">
+                                                <div className="text-center mb-4">
+                                                    <h3 className="text-lg font-bold text-stone-900">Salon Profiel</h3>
+                                                    <p className="text-sm text-stone-500">Stap 3 van 5 - Laat je salon zien!</p>
+                                                </div>
+
+                                                {/* Category Selection */}
+                                                <div>
+                                                    <label className="block text-sm font-medium text-stone-700 mb-2">Type Salon *</label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {SALON_CATEGORIES.map(cat => (
+                                                            <button
+                                                                key={cat.value}
+                                                                type="button"
+                                                                onClick={() => setSalonCategory(cat.value)}
+                                                                className={`p-3 rounded-xl border-2 text-left transition-all ${
+                                                                    salonCategory === cat.value 
+                                                                        ? 'border-brand-400 bg-brand-50 text-brand-700' 
+                                                                        : 'border-stone-200 hover:border-brand-200 text-stone-600'
+                                                                }`}
+                                                            >
+                                                                <span className="text-lg mr-2">{cat.icon}</span>
+                                                                <span className="text-sm font-medium">{cat.label}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Description */}
+                                                <div>
+                                                    <label className="block text-sm font-medium text-stone-700 mb-2">Beschrijving *</label>
+                                                    <textarea
+                                                        placeholder="Vertel iets over je salon... Wat maakt jouw salon uniek? Welke sfeer kunnen klanten verwachten?"
+                                                        value={salonDescription}
+                                                        onChange={e => setSalonDescription(e.target.value)}
+                                                        rows={4}
+                                                        className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm outline-none focus:ring-2 focus:ring-brand-400 resize-none"
+                                                    />
+                                                    <p className="text-xs text-stone-400 mt-1">{salonDescription.length}/500 karakters (min. 20)</p>
+                                                </div>
+
+                                                {/* Image Upload */}
+                                                <div>
+                                                    <label className="block text-sm font-medium text-stone-700 mb-2">Salon Afbeelding</label>
+                                                    <div className="border-2 border-dashed border-stone-200 rounded-xl p-4 text-center hover:border-brand-300 transition-colors">
+                                                        {salonImageUrl ? (
+                                                            <div className="relative">
+                                                                <img 
+                                                                    src={salonImageUrl} 
+                                                                    alt="Salon preview" 
+                                                                    className="w-full h-32 object-cover rounded-lg"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setSalonImageUrl('')}
+                                                                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <label className="cursor-pointer block">
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    onChange={handleImageUpload}
+                                                                    className="hidden"
+                                                                    disabled={imageUploading}
+                                                                />
+                                                                {imageUploading ? (
+                                                                    <div className="py-4">
+                                                                        <Loader2 className="mx-auto animate-spin text-brand-400" size={32} />
+                                                                        <p className="text-sm text-stone-500 mt-2">Uploaden...</p>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="py-4">
+                                                                        <Image className="mx-auto text-stone-300" size={40} />
+                                                                        <p className="text-sm text-stone-500 mt-2">Klik om een afbeelding te uploaden</p>
+                                                                        <p className="text-xs text-stone-400">JPG, PNG (max 5MB)</p>
+                                                                    </div>
+                                                                )}
+                                                            </label>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-stone-400 mt-1">Optioneel - Je kunt dit later toevoegen</p>
+                                                </div>
+
+                                                <div className="flex gap-3 mt-6">
+                                                    <Button type="button" variant="outline" onClick={() => setSalonStep(2)}>
+                                                        <ArrowLeft size={16} />
+                                                    </Button>
+                                                    <Button type="submit" className="flex-1">
+                                                        Volgende <ArrowRight size={16} className="ml-2" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* STEP 4: Initial Services (NEW) */}
+                                        {salonStep === 4 && (
+                                            <div className="space-y-5 animate-fadeIn">
+                                                <div className="text-center mb-4">
+                                                    <h3 className="text-lg font-bold text-stone-900">Je Diensten</h3>
+                                                    <p className="text-sm text-stone-500">Stap 4 van 5 - Voeg minimaal 1 dienst toe</p>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    {initialServices.map((service, index) => (
+                                                        <div key={index} className="p-4 bg-stone-50 rounded-xl border border-stone-200">
+                                                            <div className="flex justify-between items-center mb-3">
+                                                                <span className="text-sm font-medium text-stone-700">Dienst {index + 1}</span>
+                                                                {initialServices.length > 1 && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => removeService(index)}
+                                                                        className="p-1 text-red-500 hover:bg-red-50 rounded"
+                                                                    >
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            
+                                                            <div className="space-y-3">
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Naam van dienst (bv. Knippen)"
+                                                                    value={service.name}
+                                                                    onChange={e => updateService(index, 'name', e.target.value)}
+                                                                    className="w-full h-10 px-3 rounded-lg border border-stone-200 text-sm outline-none focus:ring-2 focus:ring-brand-400"
+                                                                />
+                                                                
+                                                                <div className="grid grid-cols-2 gap-3">
+                                                                    <div className="relative">
+                                                                        <Euro size={14} className="absolute left-3 top-3 text-stone-400" />
+                                                                        <input
+                                                                            type="number"
+                                                                            placeholder="Prijs"
+                                                                            value={service.price || ''}
+                                                                            onChange={e => updateService(index, 'price', Number(e.target.value))}
+                                                                            className="w-full h-10 pl-8 pr-3 rounded-lg border border-stone-200 text-sm outline-none focus:ring-2 focus:ring-brand-400"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="relative">
+                                                                        <Clock size={14} className="absolute left-3 top-3 text-stone-400" />
+                                                                        <select
+                                                                            value={service.duration}
+                                                                            onChange={e => updateService(index, 'duration', Number(e.target.value))}
+                                                                            className="w-full h-10 pl-8 pr-3 rounded-lg border border-stone-200 text-sm outline-none focus:ring-2 focus:ring-brand-400 bg-white"
+                                                                        >
+                                                                            {DURATION_OPTIONS.map(opt => (
+                                                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {initialServices.length < 5 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={addService}
+                                                        className="w-full py-3 border-2 border-dashed border-stone-200 rounded-xl text-stone-500 hover:border-brand-300 hover:text-brand-500 transition-colors flex items-center justify-center gap-2"
+                                                    >
+                                                        <Plus size={18} /> Nog een dienst toevoegen
+                                                    </button>
+                                                )}
+
+                                                <p className="text-xs text-stone-400 text-center">
+                                                    Je kunt later meer diensten toevoegen in je dashboard
+                                                </p>
+
+                                                <div className="flex gap-3 mt-6">
+                                                    <Button type="button" variant="outline" onClick={() => setSalonStep(3)}>
+                                                        <ArrowLeft size={16} />
+                                                    </Button>
+                                                    <Button type="submit" className="flex-1">
+                                                        Volgende <ArrowRight size={16} className="ml-2" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* STEP 5: Confirmation */}
+                                        {salonStep === 5 && (
                                             <div className="space-y-6 animate-fadeIn">
                                                  <div className="text-center mb-2">
                                                     <h3 className="text-lg font-bold text-stone-900">
                                                         {PAYMENT_REQUIRED ? 'Activeer Abonnement' : 'Bevestig Registratie'}
                                                     </h3>
+                                                    <p className="text-sm text-stone-500">Stap 5 van 5 - Controleer je gegevens</p>
+                                                </div>
+
+                                                {/* Summary Card */}
+                                                <div className="bg-stone-50 rounded-xl p-4 space-y-3">
+                                                    <div className="flex items-center gap-3 pb-3 border-b border-stone-200">
+                                                        {salonImageUrl ? (
+                                                            <img src={salonImageUrl} alt="Salon" className="w-12 h-12 rounded-lg object-cover" />
+                                                        ) : (
+                                                            <div className="w-12 h-12 rounded-lg bg-brand-100 flex items-center justify-center text-2xl">
+                                                                {SALON_CATEGORIES.find(c => c.value === salonCategory)?.icon || '✨'}
+                                                            </div>
+                                                        )}
+                                                        <div>
+                                                            <p className="font-semibold text-stone-900">{regSalonName}</p>
+                                                            <p className="text-xs text-stone-500">{SALON_CATEGORIES.find(c => c.value === salonCategory)?.label}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-sm text-stone-600 space-y-1">
+                                                        <p>📍 {regStreet} {regHouseNumber}, {regPostalCode} {regCity}</p>
+                                                        <p>📧 {regEmail}</p>
+                                                        <p>📞 {regPhone}</p>
+                                                        <p>🌐 {regSubdomain}.mijnbeautyafspraken.nl</p>
+                                                    </div>
+                                                    <div className="pt-2 border-t border-stone-200">
+                                                        <p className="text-xs font-medium text-stone-500 mb-1">{initialServices.length} dienst{initialServices.length !== 1 ? 'en' : ''} toegevoegd:</p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {initialServices.map((s, i) => (
+                                                                <span key={i} className="text-xs bg-white px-2 py-1 rounded border border-stone-200">
+                                                                    {s.name} • €{s.price}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 
                                                 {/* Only show pricing when payment is required */}
@@ -777,7 +1169,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                 )}
                                                 
                                                 <div className="flex gap-3">
-                                                    <Button type="button" variant="outline" onClick={() => setSalonStep(2)}>
+                                                    <Button type="button" variant="outline" onClick={() => setSalonStep(4)}>
                                                         <ArrowLeft size={16} />
                                                     </Button>
                                                     <Button 
