@@ -113,6 +113,7 @@ export const SearchPage: React.FC = () => {
 
   // Fetch locations
   useEffect(() => {
+    console.log('Starting to fetch locations...');
     const fetchLocations = async () => {
       const { data, error } = await supabase
         .from('locations')
@@ -120,6 +121,7 @@ export const SearchPage: React.FC = () => {
         .order('city', { ascending: true });
       if (error) {
         console.error('Error fetching locations:', error);
+        console.error('Error details:', error.message, error.details, error.hint);
       } else {
         console.log(`Fetched ${data?.length || 0} locations from DB`);
         setLocations(data || []);
