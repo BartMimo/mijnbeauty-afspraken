@@ -4,6 +4,8 @@
 
 # Mijn Beauty Afspraken
 
+<!-- Deploy trigger: 2026-01-16 12:00 UTC -->
+
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/import/project?template=https://github.com/BartMimo/mijnbeauty-afspraken)
 
 The complete beauty salon booking platform. Manage appointments, handle client bookings, and grow your beauty business.
