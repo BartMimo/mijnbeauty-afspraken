@@ -33,7 +33,7 @@ export const SearchPage: React.FC = () => {
   const [query, setQuery] = useState(() => searchParams.get('q') || '');
   const [location, setLocation] = useState(() => searchParams.get('loc') || '');
   const [category, setCategory] = useState<string>(() => 'all');
-  const [distance, setDistance] = useState<number | null>(() => (searchParams.get('dist') ? parseInt(searchParams.get('dist')!) : null));
+  // afstandsfilter verwijderd
   const [showDealsOnly, setShowDealsOnly] = useState<boolean>(() => searchParams.get('filter') === 'deals');
 
   const [salons, setSalons] = useState<SalonVM[]>([]);
@@ -167,14 +167,7 @@ export const SearchPage: React.FC = () => {
   }, [location, locations, csvLocations, geocode]);
 
   // Haversine
-  const distanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
+  // afstandsfilter verwijderd
 
   // Filtering logic
   const filtered = useMemo(() => {
@@ -183,17 +176,10 @@ export const SearchPage: React.FC = () => {
       if (showDealsOnly) return true; // deals are handled separately in the UI (we'll fetch deals later if needed)
       const matchQuery = !q || s.name.toLowerCase().includes(q) || (s.services || []).some(svc => svc.name.toLowerCase().includes(q));
       const matchCategory = category === 'all' || (s.categories || []).includes(category);
-      let matchDist = true;
-
-      if (distance && locationCoords && s.latitude && s.longitude) {
-        matchDist = distanceKm(locationCoords.lat, locationCoords.lng, s.latitude, s.longitude) <= distance;
-      }
-
       const matchLocationText = !location || s.city.toLowerCase().includes(location.toLowerCase()) || (s.zipCode || '').startsWith(location);
-
-      return matchQuery && matchCategory && matchDist && matchLocationText;
+      return matchQuery && matchCategory && matchLocationText;
     });
-  }, [salons, query, category, distance, location, locationCoords, showDealsOnly]);
+  }, [salons, query, category, location, locationCoords, showDealsOnly]);
 
   // Pagination
   const total = filtered.length;
@@ -211,7 +197,7 @@ export const SearchPage: React.FC = () => {
 
   // Handlers
   const onSearch = () => { setPage(1); /* url sync could be added here */ };
-  const resetFilters = () => { setQuery(''); setLocation(''); setCategory('all'); setDistance(null); setShowDealsOnly(false); setPage(1); };
+  const resetFilters = () => { setQuery(''); setLocation(''); setCategory('all'); setShowDealsOnly(false); setPage(1); };
 
   // Simple UI render
   return (
@@ -230,10 +216,7 @@ export const SearchPage: React.FC = () => {
             {Object.values(ServiceCategory).map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
-        <div className="w-48">
-          <input type="range" min={0} max={100} value={distance ?? 0} onChange={e => setDistance(Number(e.target.value) || null)} />
-          <div className="text-xs text-stone-500 mt-1">{distance ? `${distance} km` : 'Alle afstanden'}</div>
-        </div>
+        {/* Afstand/slider verwijderd */}
         <div className="flex items-center gap-2">
           <Button onClick={onSearch}>Zoek</Button>
           <Button variant="outline" onClick={resetFilters}>Reset</Button>
@@ -256,11 +239,7 @@ export const SearchPage: React.FC = () => {
                 {Object.values(ServiceCategory).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div>
-              <label className="text-sm">Afstand</label>
-              <input type="range" min={0} max={100} value={distance ?? 0} onChange={e => setDistance(Number(e.target.value) || null)} className="w-full" />
-              <div className="text-xs text-stone-500">{distance ? `${distance} km` : 'Alle afstanden'}</div>
-            </div>
+            {/* Afstand/slider verwijderd */}
           </div>
         </aside>
 
