@@ -623,20 +623,22 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                     setBookingLoading(true);
                                                     try {
                                                         const serviceDuration = (currentService?.durationMinutes ?? 30);
-                                                        const { error } = await supabase
-                                                            .from('appointments')
-                                                            .insert([{
-                                                                user_id: user.id,
-                                                                salon_id: salon.supabaseId,
-                                                                service_id: selectedService,
-                                                                service_name: currentService?.name,
-                                                                date: selectedDate?.toISOString().split('T')[0],
-                                                                time: selectedDeal ? selectedDeal.time : selectedTime,
-                                                                duration_minutes: serviceDuration,
-                                                                price: selectedDeal ? selectedDeal.discountPrice : currentService?.price,
-                                                                status: 'confirmed'
-                                                            }]);
-                                                        
+                                                        // Use a resilient insert helper that can retry without missing columns (eg. service_name)
+                                                        const insertData: any = {
+                                                            user_id: user.id,
+                                                            salon_id: salon.supabaseId,
+                                                            service_id: selectedService,
+                                                            service_name: currentService?.name,
+                                                            date: selectedDate?.toISOString().split('T')[0],
+                                                            time: selectedDeal ? selectedDeal.time : selectedTime,
+                                                            duration_minutes: serviceDuration,
+                                                            price: selectedDeal ? selectedDeal.discountPrice : currentService?.price,
+                                                            status: 'confirmed'
+                                                        };
+
+                                                        // lazy import to avoid circular deps during module init
+                                                        const { insertAppointmentSafe } = await import('../lib/appointments');
+                                                        const { error } = await insertAppointmentSafe(insertData);
                                                         if (error) throw error;
 
                                                         // If this was a deal booking, mark the deal as claimed so it cannot be booked again

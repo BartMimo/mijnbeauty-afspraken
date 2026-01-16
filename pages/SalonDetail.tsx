@@ -632,7 +632,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             customer_name: user?.user_metadata?.full_name || (user?.email || 'Gast'),
                                                             user_id: user?.id || null,
                                                         };
-                                                        const { error: insertErr } = await supabase.from('appointments').insert(insertData);
+                                                        const { insertAppointmentSafe } = await import('../lib/appointments');
+                                                        const { error: insertErr } = await insertAppointmentSafe(insertData);
                                                         if (insertErr) throw insertErr;
 
                                                         // Mark deal as claimed (single-use)
@@ -657,7 +658,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             customer_name: (await supabase.auth.getUser()).data?.user?.user_metadata?.full_name || 'Gast',
                                                             user_id: (await supabase.auth.getUser()).data?.user?.id || null,
                                                         };
-                                                        const { error: insertErr } = await supabase.from('appointments').insert(insertData);
+                                                        const { insertAppointmentSafe } = await import('../lib/appointments');
+                                                        const { error: insertErr } = await insertAppointmentSafe(insertData);
                                                         if (insertErr) throw insertErr;
 
                                                         alert('Boeking succesvol!');
