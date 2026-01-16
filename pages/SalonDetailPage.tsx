@@ -507,7 +507,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                         <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 flex justify-between items-start animate-fadeIn">
                                             <div>
                                                 <h4 className="font-medium text-stone-900">{currentService?.name}</h4>
-                                                <p className="text-xs text-stone-500 mt-1">{currentService?.duration} min</p>
+                                                <p className="text-xs text-stone-500 mt-1">{currentService?.durationMinutes} min</p>
                                             </div>
                                             <span className="font-bold text-stone-700">€{currentService?.price}</span>
                                         </div>
@@ -614,7 +614,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                     
                                                     setBookingLoading(true);
                                                     try {
-                                                        const serviceDuration = currentService?.duration || 30;
+                                                        const serviceDuration = (currentService?.durationMinutes ?? 30);
                                                         const { error } = await supabase
                                                             .from('appointments')
                                                             .insert([{
