@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Plus, User, MoreVertical, Trash2, Filter, Coffee } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Plus, User, MoreVertical, Trash2, Filter, Coffee, AlertCircle } from 'lucide-react';
 import { Button, Card, Modal, Input, Select } from '../../components/UIComponents';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -10,11 +10,19 @@ interface ScheduleAppointment {
     type: 'appointment' | 'block';
     client: string;
     service: string;
+    serviceId?: string;
     date: string; // YYYY-MM-DD
     time: string;
     duration: number;
     staff: string;
     color: string;
+}
+
+interface Service {
+    id: string;
+    name: string;
+    duration: number;
+    price: number;
 }
 
 export const SalonSchedule: React.FC = () => {
@@ -24,6 +32,7 @@ export const SalonSchedule: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingApt, setEditingApt] = useState<ScheduleAppointment | null>(null);
     const [loading, setLoading] = useState(true);
+    const [services, setServices] = useState<Service[]>([]);
     
     // Filter State
     const [staffFilter, setStaffFilter] = useState<string>('all');
@@ -34,7 +43,7 @@ export const SalonSchedule: React.FC = () => {
     // State for appointments
     const [appointments, setAppointments] = useState<ScheduleAppointment[]>([]);
 
-    // Fetch salon and appointments on mount
+    // Fetch salon, services and appointments on mount
     useEffect(() => {
         const fetchData = async () => {
             if (!user) {
@@ -57,13 +66,28 @@ export const SalonSchedule: React.FC = () => {
 
                 setSalonId(salon.id);
 
+                // Fetch services for this salon
+                const { data: servicesData } = await supabase
+                    .from('services')
+                    .select('id, name, duration_minutes, price')
+                    .eq('salon_id', salon.id)
+                    .eq('active', true)
+                    .order('name');
+
+                setServices(servicesData?.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    duration: s.duration_minutes || 30,
+                    price: s.price || 0
+                })) || []);
+
                 // Fetch appointments for this salon
                 const { data: appointmentsData, error } = await supabase
                     .from('appointments')
                     .select(`
                         *,
                         profiles:user_id (full_name),
-                        services:service_id (name)
+                        services:service_id (name, duration_minutes)
                     `)
                     .eq('salon_id', salon.id)
                     .order('date', { ascending: true })
@@ -75,12 +99,13 @@ export const SalonSchedule: React.FC = () => {
                     id: a.id,
                     type: 'appointment' as const,
                     client: a.profiles?.full_name || 'Onbekend',
-                    service: a.services?.name || 'Dienst',
+                    service: a.services?.name || a.service_name || 'Dienst',
+                    serviceId: a.service_id,
                     date: a.date,
                     time: a.time,
-                    duration: 60, // Default duration
+                    duration: a.duration_minutes || a.services?.duration_minutes || 30,
                     staff: a.staff_name || 'Medewerker',
-                    color: 'bg-stone-100 border-stone-200 text-stone-700'
+                    color: 'bg-brand-50 border-brand-300 text-brand-800'
                 })) || []);
 
             } catch (err) {
@@ -97,10 +122,11 @@ export const SalonSchedule: React.FC = () => {
     const [formData, setFormData] = useState({
         type: 'appointment' as 'appointment' | 'block',
         client: '',
+        serviceId: '',
         service: '',
         time: '09:00',
-        duration: 60,
-        staff: 'Sarah'
+        duration: 30,
+        staff: 'Medewerker'
     });
 
     // Reset form when opening modal
@@ -109,22 +135,38 @@ export const SalonSchedule: React.FC = () => {
             setFormData({
                 type: editingApt.type,
                 client: editingApt.client,
+                serviceId: editingApt.serviceId || '',
                 service: editingApt.service,
                 time: editingApt.time,
                 duration: editingApt.duration,
                 staff: editingApt.staff
             });
         } else {
+            const defaultService = services[0];
             setFormData({
                 type: 'appointment',
                 client: '',
-                service: 'Knippen & Drogen',
+                serviceId: defaultService?.id || '',
+                service: defaultService?.name || '',
                 time: '09:00',
-                duration: 60,
-                staff: 'Sarah'
+                duration: defaultService?.duration || 30,
+                staff: 'Medewerker'
             });
         }
-    }, [editingApt, isModalOpen]);
+    }, [editingApt, isModalOpen, services]);
+
+    // When service changes, update duration automatically
+    const handleServiceChange = (serviceId: string) => {
+        const selectedService = services.find(s => s.id === serviceId);
+        if (selectedService) {
+            setFormData({
+                ...formData,
+                serviceId: selectedService.id,
+                service: selectedService.name,
+                duration: selectedService.duration
+            });
+        }
+    };
 
     const changeDate = (days: number) => {
         const newDate = new Date(currentDate);
@@ -148,11 +190,12 @@ export const SalonSchedule: React.FC = () => {
         const aptData = {
             client: isBlock ? (formData.client || 'Pauze') : formData.client,
             service: isBlock ? '' : formData.service,
+            serviceId: isBlock ? undefined : formData.serviceId,
             time: formData.time,
             duration: Number(formData.duration),
             staff: formData.staff,
             type: formData.type,
-            color: isBlock ? 'bg-stone-200 border-stone-300 text-stone-600' : 'bg-stone-100 border-stone-200 text-stone-700'
+            color: isBlock ? 'bg-stone-200 border-stone-300 text-stone-600' : 'bg-brand-50 border-brand-300 text-brand-800'
         };
 
         if (editingApt) {
@@ -162,7 +205,9 @@ export const SalonSchedule: React.FC = () => {
                     .from('appointments')
                     .update({
                         time: formData.time,
-                        staff_name: formData.staff
+                        duration_minutes: Number(formData.duration),
+                        staff_name: formData.staff,
+                        service_id: formData.serviceId || null
                     })
                     .eq('id', editingApt.id);
             }
@@ -352,17 +397,27 @@ export const SalonSchedule: React.FC = () => {
                                 value={formData.client} 
                                 onChange={e => setFormData({...formData, client: e.target.value})}
                             />
-                            <Select 
-                                label="Behandeling"
-                                value={formData.service}
-                                onChange={e => setFormData({...formData, service: e.target.value})}
-                            >
-                                <option>Knippen & Drogen</option>
-                                <option>Biab Nagels</option>
-                                <option>Wimperlift</option>
-                                <option>Kleurbehandeling</option>
-                                <option>Massage</option>
-                            </Select>
+                            <div>
+                                <label className="block text-sm font-medium text-stone-700 mb-1.5">Behandeling</label>
+                                {services.length > 0 ? (
+                                    <select 
+                                        className="w-full h-11 px-4 rounded-xl border border-stone-200 bg-white text-sm outline-none focus:ring-2 focus:ring-brand-400"
+                                        value={formData.serviceId}
+                                        onChange={e => handleServiceChange(e.target.value)}
+                                    >
+                                        {services.map(s => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.name} ({s.duration} min - €{s.price})
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
+                                        <AlertCircle size={16} />
+                                        <span>Voeg eerst diensten toe in het menu "Diensten"</span>
+                                    </div>
+                                )}
+                            </div>
                         </>
                     ) : (
                         <Input 
@@ -374,24 +429,37 @@ export const SalonSchedule: React.FC = () => {
                     )}
                     
                     <div className="grid grid-cols-2 gap-4">
-                        <Input 
-                            label="Tijd" 
-                            type="time" 
-                            value={formData.time}
-                            onChange={e => setFormData({...formData, time: e.target.value})}
-                        />
-                         <Select 
-                            label="Duur"
-                            value={formData.duration}
-                            onChange={e => setFormData({...formData, duration: Number(e.target.value)})}
-                        >
-                            <option value={15}>15 min</option>
-                            <option value={30}>30 min</option>
-                            <option value={45}>45 min</option>
-                            <option value={60}>60 min</option>
-                            <option value={90}>90 min</option>
-                            <option value={120}>120 min</option>
-                        </Select>
+                        <div>
+                            <label className="block text-sm font-medium text-stone-700 mb-1.5">Starttijd</label>
+                            <select 
+                                className="w-full h-11 px-4 rounded-xl border border-stone-200 bg-white text-sm outline-none focus:ring-2 focus:ring-brand-400"
+                                value={formData.time}
+                                onChange={e => setFormData({...formData, time: e.target.value})}
+                            >
+                                {timeSlots.map(time => (
+                                    <option key={time} value={time}>{time}</option>
+                                ))}
+                            </select>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-stone-700 mb-1.5">Duur</label>
+                            <select 
+                                className="w-full h-11 px-4 rounded-xl border border-stone-200 bg-white text-sm outline-none focus:ring-2 focus:ring-brand-400"
+                                value={formData.duration}
+                                onChange={e => setFormData({...formData, duration: Number(e.target.value)})}
+                                disabled={formData.type === 'appointment' && formData.serviceId !== ''}
+                            >
+                                <option value={30}>30 min</option>
+                                <option value={60}>1 uur</option>
+                                <option value={90}>1,5 uur</option>
+                                <option value={120}>2 uur</option>
+                                <option value={150}>2,5 uur</option>
+                                <option value={180}>3 uur</option>
+                            </select>
+                            {formData.type === 'appointment' && formData.serviceId && (
+                                <p className="text-xs text-stone-400 mt-1">Duur bepaald door geselecteerde dienst</p>
+                            )}
+                        </div>
                     </div>
 
                     <Select 

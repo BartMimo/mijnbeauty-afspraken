@@ -235,12 +235,21 @@ export const SalonServices: React.FC = () => {
                         <option>Overig</option>
                     </Select>
                     <div className="grid grid-cols-2 gap-4">
-                        <Input 
-                            label="Duur (min)" 
-                            type="number" 
-                            value={form.duration} 
-                            onChange={e => setForm({...form, duration: Number(e.target.value)})} 
-                        />
+                        <div>
+                            <label className="block text-sm font-medium text-stone-700 mb-1.5">Duur</label>
+                            <select 
+                                className="w-full h-11 px-4 rounded-xl border border-stone-200 bg-white text-sm outline-none focus:ring-2 focus:ring-brand-400"
+                                value={form.duration} 
+                                onChange={e => setForm({...form, duration: Number(e.target.value)})}
+                            >
+                                <option value={30}>30 minuten</option>
+                                <option value={60}>1 uur</option>
+                                <option value={90}>1,5 uur</option>
+                                <option value={120}>2 uur</option>
+                                <option value={150}>2,5 uur</option>
+                                <option value={180}>3 uur</option>
+                            </select>
+                        </div>
                         <Input 
                             label="Prijs (€)" 
                             type="number" 

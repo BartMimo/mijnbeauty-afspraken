@@ -1,10 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Tag, Zap, Phone, Mail, MessageCircle, Loader2 } from 'lucide-react';
 import { Button, Card, Badge } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Service, Deal } from '../types';
+
+interface Appointment {
+    date: string;
+    time: string;
+    duration_minutes: number;
+}
 
 interface SalonDetailPageProps {
     subdomain?: string;
@@ -28,6 +34,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const [selectedService, setSelectedService] = useState<string | null>(null);
     const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
     const [bookingStep, setBookingStep] = useState<'service' | 'time' | 'confirm'>('service');
+    const [existingAppointments, setExistingAppointments] = useState<Appointment[]>([]);
     
     // Calendar State
     const [currentDate, setCurrentDate] = useState(new Date()); 
@@ -123,6 +130,21 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         description: d.description || ''
                     })));
                 }
+
+                // Fetch existing appointments for this salon
+                const { data: appointmentsData } = await supabase
+                    .from('appointments')
+                    .select('date, time, duration_minutes')
+                    .eq('salon_id', data.id)
+                    .neq('status', 'cancelled');
+
+                if (appointmentsData) {
+                    setExistingAppointments(appointmentsData.map(a => ({
+                        date: a.date,
+                        time: a.time,
+                        duration_minutes: a.duration_minutes || 30
+                    })));
+                }
             } catch (err) {
                 console.error('Error in fetchSalon:', err);
             } finally {
@@ -203,7 +225,61 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         return d < today;
     };
 
-    const availableTimes = ['09:00', '09:30', '10:00', '11:15', '13:00', '14:30', '16:00', '16:45'];
+    // Generate all possible time slots (30-min intervals from 09:00 to 17:30)
+    const allTimeSlots = useMemo(() => {
+        const slots: string[] = [];
+        for (let hour = 9; hour < 18; hour++) {
+            slots.push(`${hour.toString().padStart(2, '0')}:00`);
+            if (hour < 17 || (hour === 17 && false)) { // Don't add 17:30 if closing at 18:00
+                slots.push(`${hour.toString().padStart(2, '0')}:30`);
+            }
+        }
+        return slots;
+    }, []);
+
+    // Calculate available times based on existing appointments and selected service duration
+    const availableTimes = useMemo(() => {
+        if (!selectedDate || !currentService) return allTimeSlots;
+
+        const dateStr = selectedDate.toISOString().split('T')[0];
+        const serviceDuration = currentService.duration || 30;
+        const slotsNeeded = Math.ceil(serviceDuration / 30);
+
+        // Get all appointments for the selected date
+        const dayAppointments = existingAppointments.filter(apt => apt.date === dateStr);
+
+        // Helper to convert time string to minutes from midnight
+        const timeToMinutes = (time: string) => {
+            const [hours, mins] = time.split(':').map(Number);
+            return hours * 60 + mins;
+        };
+
+        // Helper to check if a slot overlaps with an appointment
+        const isSlotBlocked = (slotTime: string, duration: number) => {
+            const slotStart = timeToMinutes(slotTime);
+            const slotEnd = slotStart + duration;
+
+            return dayAppointments.some(apt => {
+                const aptStart = timeToMinutes(apt.time);
+                const aptEnd = aptStart + (apt.duration_minutes || 30);
+                
+                // Check for any overlap
+                return (slotStart < aptEnd && slotEnd > aptStart);
+            });
+        };
+
+        // Filter available slots
+        return allTimeSlots.filter(time => {
+            // Check if this slot and all needed subsequent slots are available
+            const startMinutes = timeToMinutes(time);
+            
+            // Don't allow booking if end time would be after 18:00
+            if (startMinutes + serviceDuration > 18 * 60) return false;
+
+            // Check if any needed slot is blocked
+            return !isSlotBlocked(time, serviceDuration);
+        });
+    }, [selectedDate, currentService, existingAppointments, allTimeSlots]);
 
     const formatDateDutch = (date: Date) => {
         return new Intl.DateTimeFormat('nl-NL', { weekday: 'short', day: 'numeric', month: 'long' }).format(date);
@@ -394,7 +470,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                         <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 flex justify-between items-start animate-fadeIn">
                                             <div>
                                                 <h4 className="font-medium text-stone-900">{currentService?.name}</h4>
-                                                <p className="text-xs text-stone-500 mt-1">{currentService?.durationMinutes} min</p>
+                                                <p className="text-xs text-stone-500 mt-1">{currentService?.duration} min</p>
                                             </div>
                                             <span className="font-bold text-stone-700">€{currentService?.price}</span>
                                         </div>
@@ -501,14 +577,17 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                     
                                                     setBookingLoading(true);
                                                     try {
+                                                        const serviceDuration = currentService?.duration || 30;
                                                         const { error } = await supabase
                                                             .from('appointments')
                                                             .insert([{
                                                                 user_id: user.id,
                                                                 salon_id: salon.supabaseId,
                                                                 service_id: selectedService,
+                                                                service_name: currentService?.name,
                                                                 date: selectedDate?.toISOString().split('T')[0],
                                                                 time: selectedDeal ? selectedDeal.time : selectedTime,
+                                                                duration_minutes: serviceDuration,
                                                                 price: selectedDeal ? selectedDeal.discountPrice : currentService?.price,
                                                                 status: 'confirmed'
                                                             }]);
