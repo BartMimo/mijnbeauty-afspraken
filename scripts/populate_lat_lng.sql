@@ -11,7 +11,7 @@ UPDATE salons SET latitude = 51.9225, longitude = 4.4792 WHERE city ILIKE '%rott
 UPDATE salons SET latitude = 52.0907, longitude = 5.1214 WHERE city ILIKE '%utrecht%';
 
 -- Den Haag
-UPDATE salons SET latitude = 52.0705, longitude = 4.3007 WHERE city ILIKE '%den haag%' OR city ILIKE '%%s-gravenhage%';
+UPDATE salons SET latitude = 52.0705, longitude = 4.3007 WHERE city ILIKE '%den haag%' OR city ILIKE '%s-gravenhage%';
 
 -- Eindhoven
 UPDATE salons SET latitude = 51.4416, longitude = 5.4697 WHERE city ILIKE '%eindhoven%';
@@ -37,5 +37,20 @@ UPDATE salons SET latitude = 52.2215, longitude = 6.8937 WHERE city ILIKE '%ensc
 -- Haarlem
 UPDATE salons SET latitude = 52.3874, longitude = 4.6462 WHERE city ILIKE '%haarlem%';
 
--- Default for others (Amsterdam if not matched)
+-- Uden
+UPDATE salons SET latitude = 51.6667, longitude = 5.6167 WHERE city ILIKE '%uden%';
+
+-- Zwolle
+UPDATE salons SET latitude = 52.5168, longitude = 6.0830 WHERE city ILIKE '%zwolle%';
+
+-- Arnhem
+UPDATE salons SET latitude = 51.9851, longitude = 5.8987 WHERE city ILIKE '%arnhem%';
+
+-- Maastricht
+UPDATE salons SET latitude = 50.8514, longitude = 5.6910 WHERE city ILIKE '%maastricht%';
+
+-- Leiden
+UPDATE salons SET latitude = 52.1601, longitude = 4.4970 WHERE city ILIKE '%leiden%';
+
+-- Default for others (use a central location, e.g., Amsterdam)
 UPDATE salons SET latitude = 52.3676, longitude = 4.9041 WHERE latitude IS NULL;
