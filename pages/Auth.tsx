@@ -281,12 +281,17 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
             // Ensure a profile row exists regardless of DB hooks
             // Upsert profile only if we have a session (auth.uid available under RLS)
             if (data.user && data.session) {
-                await supabase
-                    .from('profiles')
-                    .upsert(
-                        { id: data.user.id, email: regEmail, full_name: regName, role: 'consumer', phone: regUserPhone, allow_contact_email: regAllowContact },
-                        { onConflict: 'id' }
-                    );
+                try {
+                    await supabase
+                        .from('profiles')
+                        .upsert(
+                            { id: data.user.id, email: regEmail, full_name: regName, role: 'consumer', phone: regUserPhone, allow_contact_email: regAllowContact },
+                            { onConflict: 'id' }
+                        );
+                } catch (err) {
+                    // If DB schema doesn't include allow_contact_email yet, don't block registration
+                    console.warn('Profile upsert warning:', err);
+                }
             }
             
             if (data.session) {
