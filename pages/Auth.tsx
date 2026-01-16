@@ -58,6 +58,9 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     const [regSalonName, setRegSalonName] = useState('');
     const [regEmail, setRegEmail] = useState('');
     const [regPassword, setRegPassword] = useState('');
+    // Consumer-specific registration fields
+    const [regUserPhone, setRegUserPhone] = useState('');
+    const [regAllowContact, setRegAllowContact] = useState(false);
     
     // Subdomain Logic
     const [regSubdomain, setRegSubdomain] = useState('');
@@ -253,6 +256,13 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         setLoading(true);
         setErrorMsg(null);
 
+        // Require phone number
+        if (!regUserPhone || regUserPhone.trim().length === 0) {
+            setErrorMsg('Vul je telefoonnummer in');
+            setLoading(false);
+            return;
+        }
+
         try {
             const { data, error } = await supabase.auth.signUp({
                 email: regEmail,
@@ -260,7 +270,9 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 options: {
                     data: {
                         full_name: regName,
-                        role: 'consumer'
+                        role: 'consumer',
+                        phone: regUserPhone,
+                        allow_contact_email: regAllowContact
                     }
                 }
             });
@@ -272,7 +284,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 await supabase
                     .from('profiles')
                     .upsert(
-                        { id: data.user.id, email: regEmail, full_name: regName, role: 'consumer' },
+                        { id: data.user.id, email: regEmail, full_name: regName, role: 'consumer', phone: regUserPhone, allow_contact_email: regAllowContact },
                         { onConflict: 'id' }
                     );
             }
@@ -685,6 +697,18 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                         value={regEmail}
                                         onChange={e => setRegEmail(e.target.value)}
                                     />
+                                    <Input 
+                                        label="Telefoonnummer" 
+                                        type="tel" 
+                                        placeholder="06 1234 5678" 
+                                        required 
+                                        value={regUserPhone}
+                                        onChange={e => setRegUserPhone(e.target.value)}
+                                    />
+                                    <div className="flex items-center gap-2">
+                                        <input id="allow-contact" type="checkbox" checked={regAllowContact} onChange={e => setRegAllowContact(e.target.checked)} className="w-4 h-4 rounded border-stone-200" />
+                                        <label htmlFor="allow-contact" className="text-sm text-stone-600">Ik geef toestemming dat salons mij per e-mail mogen contacteren (aanbiedingen / afspraakherinneringen)</label>
+                                    </div>
                                     <Input 
                                         label="Wachtwoord" 
                                         type="password" 

@@ -213,7 +213,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 const { data: dealsData } = await supabase
                     .from('deals')
                     .select('*')
-                    .eq('salon_id', data.id);
+                    .eq('salon_id', data.id)
+                    .eq('status', 'active');
 
                 if (dealsData) {
                     setActiveDeals(dealsData.map((d: any) => ({
@@ -226,7 +227,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         discountPrice: d.discount_price,
                         date: d.date,
                         time: d.time,
-                        description: d.description || ''
+                        description: d.description || '',
+                        status: d.status
                     })));
                 }
 
@@ -636,7 +638,14 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             }]);
                                                         
                                                         if (error) throw error;
-                                                        
+
+                                                        // If this was a deal booking, mark the deal as claimed so it cannot be booked again
+                                                        if (selectedDeal) {
+                                                            const { error: dealErr } = await supabase.from('deals').update({ status: 'claimed' }).eq('id', selectedDeal.id);
+                                                            if (dealErr) console.warn('Failed to update deal status:', dealErr.message);
+                                                            setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
+                                                        }
+
                                                         alert('Boeking succesvol!');
                                                         navigate('/dashboard/user');
                                                     } catch (err: any) {

@@ -27,6 +27,8 @@ export interface User {
   email: string;
   role: UserRole;
   avatar?: string;
+  phone?: string;
+  allowContactEmail?: boolean; // consent: salons may contact user by email
 }
 
 export interface Service {
@@ -79,6 +81,7 @@ export interface Deal {
   date: string;
   time: string;
   description: string;
+  status?: string; // e.g., 'active', 'claimed', 'expired'
 }
 
 export interface DashboardStats {

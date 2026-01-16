@@ -112,7 +112,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 const { data: dealsData } = await supabase
                     .from('deals')
                     .select('*')
-                    .eq('salon_id', data.id);
+                    .eq('salon_id', data.id)
+                    .eq('status', 'active');
 
                 if (dealsData) {
                     setActiveDeals(dealsData.map((d: any) => ({
@@ -125,7 +126,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         discountPrice: d.discount_price,
                         date: d.date,
                         time: d.time,
-                        description: d.description || ''
+                        description: d.description || '',
+                        status: d.status
                     })));
                 }
 
@@ -612,7 +614,59 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                 </div>
                                             </div>
                                             
-                                            <Button className="w-full" onClick={() => alert('Boeking succesvol! (Demo)')}>
+                                            <Button className="w-full" onClick={async () => {
+                                                try {
+                                                    // If user is not logged in, we still allow demo booking but prefer to attach user if present
+                                                    const { data: authUser } = await supabase.auth.getUser();
+                                                    const user = authUser?.user || null;
+                                                    if (selectedDeal) {
+                                                        // Create appointment for the deal
+                                                        const insertData: any = {
+                                                            salon_id: salon.id,
+                                                            salon_name: salon.name,
+                                                            service_name: selectedDeal.serviceName,
+                                                            date: selectedDeal.date,
+                                                            time: selectedDeal.time,
+                                                            status: 'confirmed',
+                                                            price: selectedDeal.discountPrice,
+                                                            customer_name: user?.user_metadata?.full_name || (user?.email || 'Gast'),
+                                                            user_id: user?.id || null,
+                                                        };
+                                                        const { error: insertErr } = await supabase.from('appointments').insert(insertData);
+                                                        if (insertErr) throw insertErr;
+
+                                                        // Mark deal as claimed (single-use)
+                                                        const { error: dealErr } = await supabase.from('deals').update({ status: 'claimed' }).eq('id', selectedDeal.id);
+                                                        if (dealErr) console.warn('Could not mark deal claimed:', dealErr.message);
+
+                                                        // Remove from local state so UI updates immediately
+                                                        setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
+                                                        setSelectedDeal(null);
+                                                        alert('Boeking succesvol! De deal is geclaimd.');
+                                                    } else {
+                                                        // For regular service booking, insert a normal appointment
+                                                        const insertData: any = {
+                                                            salon_id: salon.id,
+                                                            salon_name: salon.name,
+                                                            service_id: currentService?.id || null,
+                                                            service_name: currentService?.name || '',
+                                                            date: selectedDate ? selectedDate.toISOString().split('T')[0] : null,
+                                                            time: selectedTime,
+                                                            status: 'confirmed',
+                                                            price: currentService?.price || 0,
+                                                            customer_name: (await supabase.auth.getUser()).data?.user?.user_metadata?.full_name || 'Gast',
+                                                            user_id: (await supabase.auth.getUser()).data?.user?.id || null,
+                                                        };
+                                                        const { error: insertErr } = await supabase.from('appointments').insert(insertData);
+                                                        if (insertErr) throw insertErr;
+
+                                                        alert('Boeking succesvol!');
+                                                    }
+                                                } catch (err: any) {
+                                                    console.error('Booking error:', err);
+                                                    alert('Boeking mislukt: ' + (err.message || 'Onbekende fout'));
+                                                }
+                                            }}>
                                                 {selectedDeal ? 'Deal Claimen & Boeken' : 'Bevestig Boeking'}
                                             </Button>
                                             
