@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { MapPin, Star, Filter, SlidersHorizontal, Heart, X, Loader2, Tag, Clock } from 'lucide-react';
 import { Button, Card, Input, Badge } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
-import { ServiceCategory } from '../types';
+import { ServiceCategory, Location } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 // Filter state type
@@ -38,6 +38,7 @@ export const SearchPage: React.FC = () => {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [locationCoords, setLocationCoords] = useState<{lat: number, lng: number} | null>(null);
+  const [locations, setLocations] = useState<Location[]>([]);
 
   // Geocode location
   const geocodeLocation = async (location: string) => {
@@ -69,10 +70,36 @@ export const SearchPage: React.FC = () => {
     return R * c;
   };
 
-  // Geocode when location changes
+  // Fetch locations
   useEffect(() => {
-    geocodeLocation(filters.location);
-  }, [filters.location]);
+    const fetchLocations = async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('*')
+        .order('city', { ascending: true });
+      if (error) {
+        console.error('Error fetching locations:', error);
+      } else {
+        setLocations(data || []);
+      }
+    };
+    fetchLocations();
+  }, []);
+
+  // Set location coords when location changes
+  useEffect(() => {
+    if (filters.location) {
+      const selectedLoc = locations.find(loc => `${loc.postcode} - ${loc.city}` === filters.location);
+      if (selectedLoc) {
+        setLocationCoords({ lat: selectedLoc.latitude, lng: selectedLoc.longitude });
+      } else {
+        // Fallback to geocode if not found
+        geocodeLocation(filters.location);
+      }
+    } else {
+      setLocationCoords(null);
+    }
+  }, [filters.location, locations]);
 
   // Fetch salons from Supabase - only active (approved) salons
   useEffect(() => {
@@ -83,7 +110,8 @@ export const SearchPage: React.FC = () => {
           .select(`
             *,
             services(id, name, price),
-            categories
+            categories,
+            locations(latitude, longitude, city, postcode, province)
           `)
           .eq('status', 'active');
 
@@ -94,9 +122,11 @@ export const SearchPage: React.FC = () => {
           slug: salon.slug,
           uuid: salon.id,
           name: salon.name,
-          city: salon.city || '',
+          city: salon.locations?.city || salon.city || '',
           address: salon.address || '',
-          zipCode: salon.zip_code || '',
+          zipCode: salon.locations?.postcode || salon.zip_code || '',
+          latitude: salon.locations?.latitude || salon.latitude,
+          longitude: salon.locations?.longitude || salon.longitude,
           description: salon.description || '',
           image: salon.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800',
           rating: 4.5, // TODO: Calculate from reviews
@@ -270,7 +300,7 @@ export const SearchPage: React.FC = () => {
     setFilters(prev => ({ ...prev, query: e.target.value }));
   }, []);
 
-  const handleLocationChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLocationChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setFilters(prev => ({ ...prev, location: e.target.value }));
   }, []);
 
@@ -327,13 +357,18 @@ export const SearchPage: React.FC = () => {
         </div>
         <div>
             <label className="text-sm font-medium text-stone-700 mb-1.5 block">Locatie</label>
-            <input
-                type="text"
-                placeholder="Postcode of stad" 
+            <select
                 value={filters.location}
                 onChange={handleLocationChange}
                 className="w-full h-11 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand-400"
-            />
+            >
+                <option value="">Selecteer een locatie</option>
+                {locations.map(location => (
+                    <option key={location.id} value={`${location.postcode} - ${location.city}`}>
+                        {location.postcode} - {location.city} ({location.province})
+                    </option>
+                ))}
+            </select>
         </div>
         {!filters.showDealsOnly && (
         <div>

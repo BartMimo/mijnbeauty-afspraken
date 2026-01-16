@@ -40,6 +40,15 @@ export interface Service {
   category: ServiceCategory;
 }
 
+export interface Location {
+  id: number;
+  city: string;
+  postcode: string;
+  latitude: number;
+  longitude: number;
+  province: string;
+}
+
 export interface Salon {
   id: string;
   subdomain: string; // Unique identifier for subdomain routing (e.g., 'glow' for glow.mijnbeautyafspraken.nl)
@@ -49,6 +58,7 @@ export interface Salon {
   city: string;
   zipCode: string;
   categories: ServiceCategory[]; // Salon types
+  location_id?: number; // Reference to locations table
   image?: string;
   rating?: number;
   reviewCount?: number;

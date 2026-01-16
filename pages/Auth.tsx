@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Scissors, User, Store, Briefcase, ShieldCheck, ArrowRight, ArrowLeft, Check, Landmark, CreditCard, AlertCircle, CheckCircle2, Loader2, Upload, Image, Clock, Euro, Plus, Trash2 } from 'lucide-react';
 import { Button, Input, Card } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
+import { Location } from '../types';
 
 // ============================================================
 // CONFIGURATIE: Zet op 'true' om betaalmodule te activeren
@@ -84,8 +85,8 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     // Step 2: Address fields
     const [regStreet, setRegStreet] = useState('');
     const [regHouseNumber, setRegHouseNumber] = useState('');
-    const [regPostalCode, setRegPostalCode] = useState('');
-    const [regCity, setRegCity] = useState('');
+    const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+    const [locations, setLocations] = useState<Location[]>([]);
     const [regPhone, setRegPhone] = useState('');
     
     const [paymentMethod, setPaymentMethod] = useState<'ideal' | 'creditcard' | null>(null);
@@ -106,6 +107,24 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
 
     // Valid discount codes (case-insensitive)
     const VALID_DISCOUNT_CODES = ['gratistest'];
+
+    // Fetch locations for the select
+    useEffect(() => {
+        const fetchLocations = async () => {
+            const { data, error } = await supabase
+                .from('locations')
+                .select('*')
+                .order('city', { ascending: true });
+            if (error) {
+                console.error('Error fetching locations:', error);
+            } else {
+                setLocations(data || []);
+            }
+        };
+        fetchLocations();
+    }, []);
+
+    const selectedLocation = locations.find(loc => loc.id === selectedLocationId);
 
     const checkDiscountCode = (code: string) => {
         const normalizedCode = code.toLowerCase().trim();
@@ -231,7 +250,9 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                     subdomain: pendingSalon.subdomain,
                                     status: 'pending',
                                     city: pendingSalon.city,
+                                    zipCode: pendingSalon.zipCode,
                                     address: pendingSalon.address,
+                                    location_id: pendingSalon.location_id,
                                     phone: pendingSalon.phone
                                 })
                                 .select()
@@ -336,7 +357,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         }
         if (salonStep === 2) {
             // Validate step 2 fields
-            if (!regStreet || !regHouseNumber || !regPostalCode || !regCity || !regPhone) {
+            if (!regStreet || !regHouseNumber || !selectedLocationId || !regPhone) {
                 alert("Vul alle adresgegevens in.");
                 return;
             }
@@ -479,8 +500,14 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 throw new Error('Gebruiker kon niet worden aangemaakt');
             }
 
+            // Get selected location details
+            const selectedLocation = locations.find(loc => loc.id === selectedLocationId);
+            if (!selectedLocation) {
+                throw new Error('Selecteer een geldige locatie');
+            }
+
             // Build full address from form fields
-            const fullAddress = `${regStreet} ${regHouseNumber}, ${regPostalCode} ${regCity}`;
+            const fullAddress = `${regStreet} ${regHouseNumber}, ${selectedLocation.postcode} ${selectedLocation.city}`;
             
             // 2. Wait for the database trigger to create the profile
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -519,8 +546,10 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                         slug: regSubdomain,
                         subdomain: regSubdomain,
                         status: 'pending',
-                        city: regCity,
+                        city: selectedLocation.city,
+                        zipCode: selectedLocation.postcode,
                         address: fullAddress,
+                        location_id: selectedLocation.id,
                         phone: regPhone,
                         description: salonDescription,
                         categories: salonCategories,
@@ -540,17 +569,6 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 }
 
                 console.log('Salon created successfully:', salonData);
-
-                // Geocode the salon address for accurate distance filtering
-                if (salonData) {
-                    const coords = await geocodeAddress(`${fullAddress}, ${regCity}, Netherlands`);
-                    if (coords) {
-                        await supabase
-                            .from('salons')
-                            .update({ latitude: coords.lat, longitude: coords.lng })
-                            .eq('id', salonData.id);
-                    }
-                }
 
                 // Create initial services
                 const validServices = initialServices.filter(s => s.name && s.price > 0);
@@ -585,8 +603,10 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                     userId: data.user.id,
                     salonName: regSalonName,
                     subdomain: regSubdomain,
-                    city: regCity,
+                    city: selectedLocation.city,
+                    zipCode: selectedLocation.postcode,
                     address: fullAddress,
+                    location_id: selectedLocation.id,
                     phone: regPhone,
                     ownerName: regName,
                     description: salonDescription,
@@ -857,25 +877,23 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                         />
                                                     </div>
                                                 </div>
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    <div>
-                                                        <Input 
-                                                            label="Postcode" 
-                                                            placeholder="1234 AB" 
-                                                            required 
-                                                            value={regPostalCode}
-                                                            onChange={e => setRegPostalCode(e.target.value)}
-                                                        />
-                                                    </div>
-                                                    <div className="col-span-2">
-                                                        <Input 
-                                                            label="Plaats" 
-                                                            placeholder="Amsterdam" 
-                                                            required 
-                                                            value={regCity}
-                                                            onChange={e => setRegCity(e.target.value)}
-                                                        />
-                                                    </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                        Locatie (Postcode + Plaats) *
+                                                    </label>
+                                                    <select
+                                                        value={selectedLocationId || ''}
+                                                        onChange={e => setSelectedLocationId(e.target.value ? parseInt(e.target.value) : null)}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        required
+                                                    >
+                                                        <option value="">Selecteer een locatie</option>
+                                                        {locations.map(location => (
+                                                            <option key={location.id} value={location.id}>
+                                                                {location.postcode} - {location.city} ({location.province})
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                                 <Input 
                                                     label="Telefoonnummer (Zakelijk)" 
@@ -1119,7 +1137,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                         </div>
                                                     </div>
                                                     <div className="text-sm text-stone-600 space-y-1">
-                                                        <p>📍 {regStreet} {regHouseNumber}, {regPostalCode} {regCity}</p>
+                                                        <p>📍 {regStreet} {regHouseNumber}, {selectedLocation ? `${selectedLocation.postcode} ${selectedLocation.city}` : ''}</p>
                                                         <p>📧 {regEmail}</p>
                                                         <p>📞 {regPhone}</p>
                                                         <p>🌐 {regSubdomain}.mijnbeautyafspraken.nl</p>
