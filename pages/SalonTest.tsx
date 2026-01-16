@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Calendar, Clock, User, Euro, Star, Plus, Edit2, Trash2, Check, X, Users, Settings, Tag, TrendingUp, CalendarDays } from 'lucide-react';
+import { Calendar, Clock, User, Euro, Star, Plus, Edit2, Trash2, Check, X, Users, Settings, Tag, TrendingUp, CalendarDays, ChevronLeft, ChevronRight, Filter, Coffee } from 'lucide-react';
 import { DashboardLayout } from '../components/Layout';
 import { Card, Badge, Button } from '../components/UIComponents';
 
@@ -190,47 +190,162 @@ const MockSalonDashboard: React.FC = () => {
 // MOCK SALON SCHEDULE
 // ===========================================
 const MockSalonSchedule: React.FC = () => {
-    const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [staffFilter, setStaffFilter] = useState('all');
+
+    const changeDate = (days: number) => {
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() + days);
+        setCurrentDate(newDate);
+    };
+
+    const isToday = (date: Date) => {
+        const today = new Date();
+        return date.getDate() === today.getDate() &&
+               date.getMonth() === today.getMonth() &&
+               date.getFullYear() === today.getFullYear();
+    };
+
+    const getPosition = (time: string, duration: number) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        const startMinutes = (hours - 8) * 60 + minutes; 
+        const top = startMinutes * 2; 
+        const height = duration * 2;
+        return { top: `${top}px`, height: `${height}px` };
+    };
+
+    const timeSlots = [];
+    for (let i = 8; i < 18; i++) {
+        timeSlots.push(`${i.toString().padStart(2, '0')}:00`);
+        timeSlots.push(`${i.toString().padStart(2, '0')}:30`);
+    }
+
+    const uniqueStaff = ['Sarah', 'Kim', 'Mark'];
+
+    // Mock appointments with colors
+    const mockAppointments = MOCK_TODAY_APPOINTMENTS.map((apt, i) => ({
+        ...apt,
+        staff: i % 2 === 0 ? 'Sarah' : 'Kim',
+        color: apt.status === 'pending' ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-brand-50 border-brand-300 text-brand-800'
+    }));
+
+    // Add a break block
+    const appointmentsWithBreak = [
+        ...mockAppointments,
+        { id: 'break', time: '12:00', duration: 60, client: 'Lunch Pauze', service: '', price: 0, status: 'block', staff: 'Sarah', color: 'bg-stone-200 border-stone-300 text-stone-600' }
+    ];
+
+    const filteredAppointments = appointmentsWithBreak.filter(a => 
+        staffFilter === 'all' || a.staff === staffFilter
+    );
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="flex flex-col h-[calc(100vh-8rem)]">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-stone-900">Agenda</h1>
                     <Badge variant="warning">TEST DATA</Badge>
                 </div>
-                <Button onClick={() => alert('Demo: Nieuwe afspraak')}>
-                    <Plus size={16} className="mr-2" /> Nieuwe Afspraak
-                </Button>
+                
+                <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3 w-full lg:w-auto">
+                     <div className="relative w-full sm:w-auto">
+                        <Filter size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-stone-400" />
+                        <select 
+                            className="h-10 w-full pl-9 pr-4 rounded-xl border border-stone-200 bg-white text-sm font-medium text-stone-700 outline-none focus:ring-2 focus:ring-brand-400 cursor-pointer hover:bg-stone-50"
+                            value={staffFilter}
+                            onChange={(e) => setStaffFilter(e.target.value)}
+                        >
+                            <option value="all">Alle medewerkers</option>
+                            {uniqueStaff.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                     </div>
+
+                     <div className="flex gap-2 w-full sm:w-auto justify-between">
+                         <div className="flex items-center bg-white rounded-xl shadow-sm border border-stone-200 p-1 flex-1 sm:flex-none justify-between">
+                            <button onClick={() => changeDate(-1)} className="p-2 hover:bg-stone-50 rounded-lg text-stone-600 transition-colors">
+                                <ChevronLeft size={20} />
+                            </button>
+                            <div className="flex items-center px-4 font-semibold text-stone-800 text-sm md:text-base whitespace-nowrap">
+                                <Calendar size={18} className="mr-2 text-stone-400 hidden sm:inline" />
+                                {currentDate.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'long' })}
+                            </div>
+                            <button onClick={() => changeDate(1)} className="p-2 hover:bg-stone-50 rounded-lg text-stone-600 transition-colors">
+                                <ChevronRight size={20} />
+                            </button>
+                        </div>
+                        
+                        <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} disabled={isToday(currentDate)} className="h-full">
+                            Vandaag
+                        </Button>
+                     </div>
+
+                    <Button onClick={() => alert('Demo: Nieuwe afspraak')}>
+                        <Plus size={18} className="md:mr-2" /> <span className="inline">Afspraak</span>
+                    </Button>
+                </div>
             </div>
 
-            <Card className="p-5">
-                <div className="flex items-center gap-2 mb-4">
-                    <Calendar size={18} className="text-brand-500" />
-                    <span className="font-medium">Vandaag - {new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-                </div>
-
-                <div className="space-y-2">
-                    {MOCK_TODAY_APPOINTMENTS.map((apt) => (
-                        <div key={apt.id} className="flex items-center gap-4 p-4 bg-stone-50 rounded-xl hover:bg-stone-100 transition-colors">
-                            <div className="w-16 text-center">
-                                <p className="text-lg font-bold text-brand-600">{apt.time}</p>
-                            </div>
-                            <div className="flex-1">
-                                <p className="font-medium text-stone-900">{apt.client}</p>
-                                <p className="text-sm text-stone-500">{apt.service} • {apt.duration} min</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="font-medium">€{apt.price}</p>
-                                <Badge variant={apt.status === 'confirmed' ? 'success' : 'warning'} className="mt-1">
-                                    {apt.status === 'confirmed' ? 'Bevestigd' : 'Wachtend'}
-                                </Badge>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={() => alert('Demo: Bewerken')}>
-                                <Edit2 size={16} />
-                            </Button>
+            <Card className="flex-1 flex overflow-hidden border-stone-200 shadow-sm relative bg-white rounded-2xl">
+                {/* Time column */}
+                <div className="w-16 flex-shrink-0 border-r border-stone-100 bg-stone-50 overflow-y-hidden text-xs text-stone-400 font-medium select-none">
+                    {timeSlots.map((time, i) => (
+                        <div key={i} className="h-[60px] flex items-start justify-center pt-2 relative">
+                           <span className={time.endsWith('00') ? 'font-bold text-stone-600' : ''}>{time}</span>
                         </div>
                     ))}
+                </div>
+
+                {/* Main schedule area */}
+                <div className="flex-1 relative overflow-y-auto">
+                    {/* Grid lines */}
+                    {timeSlots.map((time, i) => (
+                        <div key={i} className={`h-[60px] w-full border-b ${time.endsWith('30') ? 'border-stone-100 border-dashed' : 'border-stone-200'}`} />
+                    ))}
+
+                    {/* Current time indicator */}
+                    {isToday(currentDate) && (
+                         <div className="absolute left-0 right-0 border-t-2 border-brand-400 z-10 pointer-events-none opacity-50" style={{ top: '300px' }}>
+                            <div className="absolute -top-1.5 -left-1 w-3 h-3 rounded-full bg-brand-400"></div>
+                         </div>
+                    )}
+
+                    {/* Appointments */}
+                    <div className="absolute inset-0 w-full">
+                        {filteredAppointments.map(apt => {
+                            const style = getPosition(apt.time, apt.duration);
+                            const isBlock = apt.status === 'block';
+                            return (
+                                <div 
+                                    key={apt.id}
+                                    className={`absolute left-2 right-2 md:left-4 md:right-4 md:w-[95%] rounded-lg border-l-4 p-2 md:p-3 text-xs cursor-pointer shadow-sm hover:shadow-md transition-all group overflow-hidden ${apt.color}`}
+                                    style={style}
+                                    onClick={() => alert(`Demo: ${isBlock ? 'Pauze' : apt.client} bewerken`)}
+                                >
+                                    {isBlock ? (
+                                        <div className="flex items-center h-full text-stone-500">
+                                            <Coffee size={16} className="mr-2 opacity-70" />
+                                            <span className="font-bold italic uppercase tracking-wider">{apt.client}</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className="font-bold text-sm mb-0.5">{apt.client}</div>
+                                                    <div className="opacity-90 font-medium mb-1 truncate">{apt.service}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3 opacity-75 mt-1">
+                                                <span className="flex items-center"><Clock size={12} className="mr-1"/> {apt.time} ({apt.duration} min)</span>
+                                                <span className="flex items-center hidden sm:flex"><User size={12} className="mr-1"/> {apt.staff}</span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </Card>
         </div>
