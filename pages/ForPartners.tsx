@@ -88,7 +88,7 @@ export const ForPartners: React.FC = () => {
                 
                 <Card className="relative overflow-hidden bg-white border-2 border-brand-100 shadow-xl rounded-3xl">
                     <div className="absolute top-0 right-0 bg-brand-400 text-white text-xs font-bold px-3 py-1 rounded-bl-xl">
-                        EERSTE MAAND GRATIS
+                        EERSTE 2 MAANDEN GRATIS
                     </div>
                     <div className="grid md:grid-cols-2">
                         <div className="p-8 md:p-12 flex flex-col justify-center bg-stone-900 text-white">
@@ -98,7 +98,7 @@ export const ForPartners: React.FC = () => {
                                 <span className="text-stone-400">/maand</span>
                             </div>
                             <p className="text-stone-300 mb-8">
-                                Start vandaag nog en betaal de eerste maand helemaal niets. Daarna maandelijks opzegbaar.
+                                Start vandaag nog en betaal de eerste 2 maanden helemaal niets. Daarna maandelijks opzegbaar.
                             </p>
                             <Button size="lg" className="w-full bg-brand-400 hover:bg-brand-500 text-white border-none" onClick={() => navigate('/register?role=salon')}>
                                 Start nu gratis

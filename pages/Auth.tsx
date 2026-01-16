@@ -1160,7 +1160,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                         <div className="text-sm font-semibold text-brand-600 mb-1">PRO SALON ABONNEMENT</div>
                                                         <div className="text-3xl font-bold text-stone-900 mb-1">€10<span className="text-sm text-stone-500 font-normal">/maand</span></div>
                                                         <div className="inline-block bg-white text-brand-600 text-xs font-bold px-2 py-1 rounded shadow-sm mb-3">
-                                                            EERSTE MAAND GRATIS
+                                                            EERSTE 2 MAANDEN GRATIS
                                                         </div>
                                                         <ul className="text-sm text-stone-600 space-y-1 text-left px-4">
                                                             <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Maandelijks opzegbaar</li>
