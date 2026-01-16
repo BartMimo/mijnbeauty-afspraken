@@ -39,6 +39,7 @@ export const SearchPage: React.FC = () => {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [locationCoords, setLocationCoords] = useState<{lat: number, lng: number} | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [csvLocations, setCsvLocations] = useState<{city:string, postcode:string}[]>([]);
 
   // Geocode location
   const geocodeLocation = async (location: string) => {
@@ -69,6 +70,33 @@ export const SearchPage: React.FC = () => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   };
+
+  // Try to load a static CSV of locations (bundled in repo) to improve suggestions if DB is missing entries
+  useEffect(() => {
+    const fetchCsv = async () => {
+      try {
+        const res = await fetch('/locations.csv');
+        if (!res.ok) return;
+        const txt = await res.text();
+        const lines = txt.split('\n');
+        const parsed: {city:string, postcode:string}[] = [];
+        for (const line of lines) {
+          const cols = line.split(',');
+          if (cols.length >= 2) {
+            const city = cols[0].trim();
+            const postcode = cols[1].trim();
+            if (city && postcode) parsed.push({ city, postcode });
+          }
+        }
+        setCsvLocations(parsed);
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    fetchCsv();
+  }, []);
+
 
   // Fetch locations
   useEffect(() => {
@@ -339,8 +367,14 @@ export const SearchPage: React.FC = () => {
     });
     // also include cities from salons dataset
     salons.forEach(salon => { if (salon.city) s.add(salon.city); });
+    // include static CSV fallback (if DB lacks entries like Uden)
+    csvLocations.forEach(loc => {
+      if (loc.postcode && loc.city) s.add(`${loc.postcode} - ${loc.city}`);
+      if (loc.city) s.add(loc.city);
+      if (loc.postcode) s.add(loc.postcode);
+    });
     return Array.from(s).slice(0, 2000);
-  }, [locations, salons]);
+  }, [locations, salons, csvLocations]);
 
   // Filter Form as JSX element (not a component) to prevent focus loss
   const filterFormContent = (
