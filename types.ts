@@ -48,6 +48,14 @@ export interface Salon {
   address: string;
   city: string;
   zipCode: string;
+  categories: ServiceCategory[]; // Salon types
+  image?: string;
+  rating?: number;
+  reviewCount?: number;
+  services: Service[];
+  email?: string;
+  phone?: string;
+}
   image: string;
   rating: number;
   reviewCount: number;

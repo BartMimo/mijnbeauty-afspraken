@@ -10,15 +10,16 @@ import { supabase } from '../lib/supabase';
 const PAYMENT_REQUIRED = false; // Zet op true wanneer Stripe klaar is
 // ============================================================
 
-// Salon categories
+// Salon categories - matches ServiceCategory enum
 const SALON_CATEGORIES = [
-    { value: 'kapper', label: 'Kapsalon', icon: '💇' },
-    { value: 'nagels', label: 'Nagelsalon', icon: '💅' },
-    { value: 'schoonheid', label: 'Schoonheidssalon', icon: '✨' },
-    { value: 'massage', label: 'Massagesalon', icon: '💆' },
-    { value: 'barbershop', label: 'Barbershop', icon: '💈' },
-    { value: 'wimpers', label: 'Wimper & Brow Studio', icon: '👁️' },
-    { value: 'overig', label: 'Overig', icon: '🏪' },
+    { value: 'Kapper', label: 'Kapsalon', icon: '💇' },
+    { value: 'Nagels', label: 'Nagelsalon', icon: '💅' },
+    { value: 'Wimpers', label: 'Wimper & Brow Studio', icon: '👁️' },
+    { value: 'Massage', label: 'Massagesalon', icon: '💆' },
+    { value: 'Gezichtsbehandeling', label: 'Gezichtssalon', icon: '✨' },
+    { value: 'Huidverzorging', label: 'Huidverzorging', icon: '🧴' },
+    { value: 'Make-up', label: 'Make-up Salon', icon: '💄' },
+    { value: 'Overig', label: 'Overig', icon: '🏪' },
 ];
 
 // Service duration options (30-min blocks)
@@ -79,7 +80,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     const [discountCodeValid, setDiscountCodeValid] = useState<boolean | null>(null);
 
     // Step 3: Salon Profile (NEW)
-    const [salonCategory, setSalonCategory] = useState<string>('');
+    const [salonCategories, setSalonCategories] = useState<string[]>([]);
     const [salonDescription, setSalonDescription] = useState('');
     const [salonImageUrl, setSalonImageUrl] = useState('');
     const [imageUploading, setImageUploading] = useState(false);
@@ -328,7 +329,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         }
         if (salonStep === 3) {
             // Validate salon profile
-            if (!salonCategory) {
+            if (salonCategories.length === 0) {
                 alert("Selecteer een categorie voor je salon.");
                 return;
             }
@@ -508,7 +509,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                         address: fullAddress,
                         phone: regPhone,
                         description: salonDescription,
-                        category: salonCategory,
+                        categories: salonCategories,
                         image_url: salonImageUrl || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'
                     })
                     .select()
@@ -534,7 +535,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                         name: s.name,
                         price: s.price,
                         duration_minutes: s.duration,
-                        category: s.category || salonCategory || 'Overig',
+                        category: s.category || salonCategories[0] || 'Overig',
                         active: true
                     }));
 
@@ -564,7 +565,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                     phone: regPhone,
                     ownerName: regName,
                     description: salonDescription,
-                    category: salonCategory,
+                    categories: salonCategories,
                     imageUrl: salonImageUrl,
                     services: initialServices.filter(s => s.name && s.price > 0)
                 }));
@@ -880,22 +881,32 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
 
                                                 {/* Category Selection */}
                                                 <div>
-                                                    <label className="block text-sm font-medium text-stone-700 mb-2">Type Salon *</label>
+                                                    <label className="block text-sm font-medium text-stone-700 mb-2">Type Salon * (meerdere mogelijk)</label>
                                                     <div className="grid grid-cols-2 gap-2">
                                                         {SALON_CATEGORIES.map(cat => (
-                                                            <button
+                                                            <label
                                                                 key={cat.value}
-                                                                type="button"
-                                                                onClick={() => setSalonCategory(cat.value)}
-                                                                className={`p-3 rounded-xl border-2 text-left transition-all ${
-                                                                    salonCategory === cat.value 
+                                                                className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex items-center ${
+                                                                    salonCategories.includes(cat.value) 
                                                                         ? 'border-brand-400 bg-brand-50 text-brand-700' 
                                                                         : 'border-stone-200 hover:border-brand-200 text-stone-600'
                                                                 }`}
                                                             >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={salonCategories.includes(cat.value)}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) {
+                                                                            setSalonCategories(prev => [...prev, cat.value]);
+                                                                        } else {
+                                                                            setSalonCategories(prev => prev.filter(c => c !== cat.value));
+                                                                        }
+                                                                    }}
+                                                                    className="mr-2"
+                                                                />
                                                                 <span className="text-lg mr-2">{cat.icon}</span>
                                                                 <span className="text-sm font-medium">{cat.label}</span>
-                                                            </button>
+                                                            </label>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -1074,12 +1085,12 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                             <img src={salonImageUrl} alt="Salon" className="w-12 h-12 rounded-lg object-cover" />
                                                         ) : (
                                                             <div className="w-12 h-12 rounded-lg bg-brand-100 flex items-center justify-center text-2xl">
-                                                                {SALON_CATEGORIES.find(c => c.value === salonCategory)?.icon || '✨'}
+                                                                {SALON_CATEGORIES.filter(c => salonCategories.includes(c.value)).map(c => c.icon).join(' ') || '✨'}
                                                             </div>
                                                         )}
                                                         <div>
                                                             <p className="font-semibold text-stone-900">{regSalonName}</p>
-                                                            <p className="text-xs text-stone-500">{SALON_CATEGORIES.find(c => c.value === salonCategory)?.label}</p>
+                                                            <p className="text-xs text-stone-500">{SALON_CATEGORIES.filter(c => salonCategories.includes(c.value)).map(c => c.label).join(', ')}</p>
                                                         </div>
                                                     </div>
                                                     <div className="text-sm text-stone-600 space-y-1">

@@ -82,7 +82,8 @@ export const SearchPage: React.FC = () => {
           .from('salons')
           .select(`
             *,
-            services(id, name, price)
+            services(id, name, price),
+            categories
           `)
           .eq('status', 'active');
 
@@ -100,6 +101,7 @@ export const SearchPage: React.FC = () => {
           image: salon.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800',
           rating: 4.5, // TODO: Calculate from reviews
           reviewCount: 0,
+          categories: salon.categories || [],
           services: (salon.services || []).map((s: any) => ({
             id: s.id,
             name: s.name,
@@ -247,7 +249,7 @@ export const SearchPage: React.FC = () => {
                            salon.services.some((s: any) => s.name.toLowerCase().includes(filters.query.toLowerCase()));
       const matchesLoc = salon.city.toLowerCase().includes(filters.location.toLowerCase()) ||
                          salon.zipCode.toLowerCase().includes(filters.location.toLowerCase());
-      const matchesCat = filters.category === 'all' || salon.services.some((s: any) => s.category === filters.category);
+      const matchesCat = filters.category === 'all' || (salon.categories && salon.categories.includes(filters.category));
       const matchesDistance = !filters.distance || !locationCoords || !salon.latitude || !salon.longitude || 
                               haversineDistance(locationCoords.lat, locationCoords.lng, salon.latitude, salon.longitude) <= filters.distance;
       
