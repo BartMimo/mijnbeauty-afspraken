@@ -1,10 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { MapPin, Star, Filter, SlidersHorizontal, Heart, X, Loader2, Tag, Clock } from 'lucide-react';
 import { Button, Card, Input, Badge } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 import { ServiceCategory } from '../types';
 import { useAuth } from '../context/AuthContext';
+
+// Filter state type
+interface FilterState {
+  query: string;
+  location: string;
+  category: string;
+  distance: number | null;
+  showDealsOnly: boolean;
+}
 
 export const SearchPage: React.FC = () => {
   const { user } = useAuth();
@@ -152,13 +161,13 @@ export const SearchPage: React.FC = () => {
     fetchFavorites();
   }, [user]);
 
-  const toggleFavorite = async (e: React.MouseEvent, salonSlug: string) => {
+  const toggleFavorite = useCallback(async (e: React.MouseEvent, salonSlug: string) => {
       e.preventDefault();
       e.stopPropagation();
       
       if (!user) {
-        // Redirect to login if not authenticated
-        navigate('/auth?redirect=/search');
+        // Show alert instead of redirecting
+        alert('Log in om salons aan je favorieten toe te voegen');
         return;
       }
 
@@ -189,12 +198,12 @@ export const SearchPage: React.FC = () => {
             .from('favorites')
             .insert({ user_id: user.id, salon_id: salonData.id });
           
-          setFavorites([...favorites, salonSlug]);
+          setFavorites(prev => [...prev, salonSlug]);
         }
       } catch (err) {
         console.error('Error toggling favorite:', err);
       }
-  };
+  }, [user, favorites]);
 
   // Filter Logic
   const filteredSalons = salons.filter(salon => {
@@ -216,13 +225,38 @@ export const SearchPage: React.FC = () => {
       return matchesQuery && matchesLoc;
   });
 
-  // Reusable Filter Form Component
-  const FilterForm = () => (
+  // Filter update handlers - use callbacks to prevent re-renders
+  const handleQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFilters(prev => ({ ...prev, query: e.target.value }));
+  }, []);
+
+  const handleLocationChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFilters(prev => ({ ...prev, location: e.target.value }));
+  }, []);
+
+  const handleCategoryChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilters(prev => ({ ...prev, category: e.target.value }));
+  }, []);
+
+  const handleDistanceChange = useCallback((dist: number) => {
+    setFilters(prev => ({ ...prev, distance: dist }));
+  }, []);
+
+  const handleDealsToggle = useCallback(() => {
+    setFilters(prev => ({ ...prev, showDealsOnly: !prev.showDealsOnly }));
+  }, []);
+
+  // Memoized category options
+  const categoryOptions = useMemo(() => Object.values(ServiceCategory), []);
+
+  // Filter Form as JSX element (not a component) to prevent focus loss
+  const filterFormContent = (
       <div className="space-y-4">
         {/* Deals Toggle */}
         <div className="pb-4 border-b border-stone-100">
             <button
-                onClick={() => setFilters({...filters, showDealsOnly: !filters.showDealsOnly})}
+                type="button"
+                onClick={handleDealsToggle}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${
                     filters.showDealsOnly 
                     ? 'border-brand-400 bg-brand-50 text-brand-700' 
@@ -243,18 +277,22 @@ export const SearchPage: React.FC = () => {
 
         <div>
             <label className="text-sm font-medium text-stone-700 mb-1.5 block">Zoeken</label>
-            <Input 
+            <input
+                type="text"
                 placeholder="Salon naam of behandeling" 
                 value={filters.query}
-                onChange={(e) => setFilters({...filters, query: e.target.value})}
+                onChange={handleQueryChange}
+                className="w-full h-11 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand-400"
             />
         </div>
         <div>
             <label className="text-sm font-medium text-stone-700 mb-1.5 block">Locatie</label>
-            <Input 
+            <input
+                type="text"
                 placeholder="Postcode of stad" 
                 value={filters.location}
-                onChange={(e) => setFilters({...filters, location: e.target.value})}
+                onChange={handleLocationChange}
+                className="w-full h-11 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand-400"
             />
         </div>
         {!filters.showDealsOnly && (
@@ -263,10 +301,10 @@ export const SearchPage: React.FC = () => {
             <select 
                 className="w-full h-11 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand-400"
                 value={filters.category}
-                onChange={(e) => setFilters({...filters, category: e.target.value})}
+                onChange={handleCategoryChange}
             >
                 <option value="all">Alle categorieën</option>
-                {Object.values(ServiceCategory).map(cat => (
+                {categoryOptions.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                 ))}
             </select>
@@ -277,8 +315,9 @@ export const SearchPage: React.FC = () => {
             <div className="flex gap-2 flex-wrap">
                 {[5, 10, 25, 50].map(dist => (
                     <button 
-                        key={dist} 
-                        onClick={() => setFilters({...filters, distance: dist})}
+                        key={dist}
+                        type="button"
+                        onClick={() => handleDistanceChange(dist)}
                         className={`px-3 py-1 text-xs rounded-full border transition-colors ${
                             filters.distance === dist 
                             ? 'bg-brand-50 border-brand-400 text-brand-600 font-medium' 
@@ -310,7 +349,7 @@ export const SearchPage: React.FC = () => {
                 <SlidersHorizontal size={20} className="text-brand-500" />
                 <h2 className="font-bold text-lg text-stone-800">Filters</h2>
             </div>
-            <FilterForm />
+            {filterFormContent}
         </aside>
 
         {/* Mobile Filter Drawer (Overlay) */}
@@ -324,7 +363,7 @@ export const SearchPage: React.FC = () => {
                             <X size={20} />
                         </button>
                     </div>
-                    <FilterForm />
+                    {filterFormContent}
                     <div className="mt-8 pt-4 border-t border-stone-100">
                         <Button className="w-full" onClick={() => setShowMobileFilters(false)}>
                             Toon {filters.showDealsOnly ? filteredDeals.length : filteredSalons.length} resultaten

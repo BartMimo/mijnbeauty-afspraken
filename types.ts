@@ -11,6 +11,13 @@ export enum ServiceCategory {
   NAILS = 'Nagels',
   LASHES = 'Wimpers',
   MASSAGE = 'Massage',
+  FACIAL = 'Gezichtsbehandeling',
+  WAXING = 'Waxen / Ontharen',
+  MAKEUP = 'Make-up',
+  BROWS = 'Wenkbrauwen',
+  SKINCARE = 'Huidverzorging',
+  TANNING = 'Spray Tan',
+  WELLNESS = 'Wellness',
   OTHER = 'Overig'
 }
 
