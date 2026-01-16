@@ -118,12 +118,48 @@ export const UserDashboard: React.FC = () => {
                     .eq('user_id', user.id)
                     .select('id');
 
-                if (error) throw error;
+                if (error) {
+                    // Try to fetch the appointment for diagnostics
+                    try {
+                        const { data: appt, error: apptErr } = await supabase
+                            .from('appointments')
+                            .select('id, user_id, salon_id, status')
+                            .eq('id', id)
+                            .single();
+
+                        console.error('Cancel error, appointment fetched for diagnostics:', appt, apptErr);
+                    } catch (fetchErr) {
+                        console.error('Error fetching appointment for diagnostics:', fetchErr);
+                    }
+
+                    throw error;
+                }
 
                 // If no rows were returned, the update didn't apply (not found / no permission)
                 if (!data || data.length === 0) {
                     console.error('Cancel returned no rows for id:', id);
-                    alert('Kon afspraak niet annuleren: afspraak niet gevonden of geen toestemming.');
+
+                    // Fetch appointment details to provide actionable feedback
+                    try {
+                        const { data: appt, error: apptErr } = await supabase
+                            .from('appointments')
+                            .select('id, user_id, salon_id, status')
+                            .eq('id', id)
+                            .single();
+
+                        if (apptErr) {
+                            console.error('Could not fetch appointment after empty update:', apptErr);
+                            alert('Kon afspraak niet annuleren: afspraak niet gevonden of geen toestemming.');
+                        } else if (!appt) {
+                            alert('Kon afspraak niet annuleren: afspraak niet gevonden.');
+                        } else {
+                            alert(`Kon afspraak niet annuleren: afspraak gevonden met status=${appt.status}, eigenaar=${appt.user_id}.`);
+                        }
+                    } catch (fetchErr) {
+                        console.error('Error fetching appointment after empty update:', fetchErr);
+                        alert('Kon afspraak niet annuleren: afspraak niet gevonden of geen toestemming.');
+                    }
+
                     return;
                 }
 
@@ -132,7 +168,9 @@ export const UserDashboard: React.FC = () => {
                 setNotification(null);
             } catch (err: any) {
                 console.error('Error cancelling appointment:', err);
-                alert('Kon afspraak niet annuleren: ' + (err?.message || 'Probeer opnieuw.'));
+                // If the Supabase error contains details, show them to the user for debugging
+                const detail = err?.details || err?.message || JSON.stringify(err);
+                alert('Kon afspraak niet annuleren: ' + (detail || 'Probeer opnieuw.'));
             }
         }
     };
