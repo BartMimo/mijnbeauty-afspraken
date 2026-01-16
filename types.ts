@@ -56,14 +56,6 @@ export interface Salon {
   email?: string;
   phone?: string;
 }
-  image: string;
-  rating: number;
-  reviewCount: number;
-  services: Service[];
-  ownerId: string;
-  email?: string;
-  phone?: string;
-}
 
 export interface Appointment {
   id: string;
