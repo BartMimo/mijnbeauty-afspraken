@@ -86,18 +86,28 @@ export const SearchPage: React.FC = () => {
     fetchLocations();
   }, []);
 
-  // Set location coords when location changes
+  // Set location coords when location changes (support postcode-city, city name or postcode)
   useEffect(() => {
-    if (filters.location) {
-      const selectedLoc = locations.find(loc => `${loc.postcode} - ${loc.city}` === filters.location);
-      if (selectedLoc) {
-        setLocationCoords({ lat: selectedLoc.latitude, lng: selectedLoc.longitude });
-      } else {
-        // Fallback to geocode if not found
-        geocodeLocation(filters.location);
-      }
-    } else {
+    const val = (filters.location || '').trim();
+    if (!val) {
       setLocationCoords(null);
+      return;
+    }
+
+    // Try exact "postcode - city" match (case-insensitive)
+    let selectedLoc = locations.find(loc => `${loc.postcode} - ${loc.city}`.toLowerCase() === val.toLowerCase());
+
+    // Try exact city match
+    if (!selectedLoc) selectedLoc = locations.find(loc => loc.city.toLowerCase() === val.toLowerCase());
+
+    // Try postcode match (exact or startsWith)
+    if (!selectedLoc) selectedLoc = locations.find(loc => loc.postcode === val || loc.postcode.startsWith(val));
+
+    if (selectedLoc) {
+      setLocationCoords({ lat: selectedLoc.latitude, lng: selectedLoc.longitude });
+    } else {
+      // Fallback to geocode if not found
+      geocodeLocation(filters.location);
     }
   }, [filters.location, locations]);
 
@@ -319,6 +329,19 @@ export const SearchPage: React.FC = () => {
   // Memoized category options
   const categoryOptions = useMemo(() => Object.values(ServiceCategory), []);
 
+  // Suggestions for location input (postcode - city, city, postcode)
+  const locationSuggestions = useMemo(() => {
+    const s = new Set<string>();
+    locations.forEach(loc => {
+      if (loc.postcode && loc.city) s.add(`${loc.postcode} - ${loc.city}`);
+      if (loc.city) s.add(loc.city);
+      if (loc.postcode) s.add(loc.postcode);
+    });
+    // also include cities from salons dataset
+    salons.forEach(salon => { if (salon.city) s.add(salon.city); });
+    return Array.from(s).slice(0, 2000);
+  }, [locations, salons]);
+
   // Filter Form as JSX element (not a component) to prevent focus loss
   const filterFormContent = (
       <div className="space-y-4">
@@ -366,8 +389,8 @@ export const SearchPage: React.FC = () => {
               className="w-full h-11 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand-400"
             />
             <datalist id="locations-list">
-              {locations.map(location => (
-                <option key={location.id} value={`${location.postcode} - ${location.city}`}>{location.postcode} - {location.city} ({location.province})</option>
+              {locationSuggestions.map((sug, idx) => (
+                <option key={`${sug}-${idx}`} value={sug}>{sug}</option>
               ))}
             </datalist>
         </div>
