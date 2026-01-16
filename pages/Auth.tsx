@@ -4,6 +4,12 @@ import { Scissors, User, Store, Briefcase, ShieldCheck, ArrowRight, ArrowLeft, C
 import { Button, Input, Card } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 
+// ============================================================
+// CONFIGURATIE: Zet op 'true' om betaalmodule te activeren
+// ============================================================
+const PAYMENT_REQUIRED = false; // Zet op true wanneer Stripe klaar is
+// ============================================================
+
 export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ initialMode = 'login' }) => {
     const [mode, setMode] = useState<'login' | 'register'>(initialMode);
     const [role, setRole] = useState<'consumer' | 'salon'>('consumer');
@@ -264,10 +270,11 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     };
 
     const handleSalonFinalSubmit = async () => {
-        // Check if payment method is selected OR valid discount code is entered
+        // Check if payment is required and valid
         const hasValidDiscount = discountCode && checkDiscountCode(discountCode);
         
-        if (!hasValidDiscount && !paymentMethod) {
+        // Only require payment if PAYMENT_REQUIRED is true
+        if (PAYMENT_REQUIRED && !hasValidDiscount && !paymentMethod) {
             setErrorMsg('Selecteer een betaalmethode of voer een geldige kortingscode in.');
             return;
         }
@@ -663,25 +670,41 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                             </div>
                                         )}
 
-                                        {/* STEP 3: Subscription */}
+                                        {/* STEP 3: Subscription / Confirmation */}
                                         {salonStep === 3 && (
                                             <div className="space-y-6 animate-fadeIn">
                                                  <div className="text-center mb-2">
-                                                    <h3 className="text-lg font-bold text-stone-900">Activeer Abonnement</h3>
+                                                    <h3 className="text-lg font-bold text-stone-900">
+                                                        {PAYMENT_REQUIRED ? 'Activeer Abonnement' : 'Bevestig Registratie'}
+                                                    </h3>
                                                 </div>
                                                 
-                                                <div className="bg-brand-50 border border-brand-200 rounded-2xl p-4 text-center">
-                                                    <div className="text-sm font-semibold text-brand-600 mb-1">PRO SALON ABONNEMENT</div>
-                                                    <div className="text-3xl font-bold text-stone-900 mb-1">€10<span className="text-sm text-stone-500 font-normal">/maand</span></div>
-                                                    <div className="inline-block bg-white text-brand-600 text-xs font-bold px-2 py-1 rounded shadow-sm mb-3">
-                                                        EERSTE MAAND GRATIS
+                                                {/* Only show pricing when payment is required */}
+                                                {PAYMENT_REQUIRED ? (
+                                                    <div className="bg-brand-50 border border-brand-200 rounded-2xl p-4 text-center">
+                                                        <div className="text-sm font-semibold text-brand-600 mb-1">PRO SALON ABONNEMENT</div>
+                                                        <div className="text-3xl font-bold text-stone-900 mb-1">€10<span className="text-sm text-stone-500 font-normal">/maand</span></div>
+                                                        <div className="inline-block bg-white text-brand-600 text-xs font-bold px-2 py-1 rounded shadow-sm mb-3">
+                                                            EERSTE MAAND GRATIS
+                                                        </div>
+                                                        <ul className="text-sm text-stone-600 space-y-1 text-left px-4">
+                                                            <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Maandelijks opzegbaar</li>
+                                                        </ul>
                                                     </div>
-                                                    <ul className="text-sm text-stone-600 space-y-1 text-left px-4">
-                                                        <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Maandelijks opzegbaar</li>
-                                                    </ul>
-                                                </div>
+                                                ) : (
+                                                    <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
+                                                        <div className="text-sm font-semibold text-green-600 mb-1">🎉 GRATIS REGISTRATIE</div>
+                                                        <div className="text-xl font-bold text-stone-900 mb-2">Je salon is bijna klaar!</div>
+                                                        <ul className="text-sm text-stone-600 space-y-1 text-left px-4">
+                                                            <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Volledig gratis tijdens de lanceringsperiode</li>
+                                                            <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Je salon wordt zichtbaar na goedkeuring</li>
+                                                            <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Direct toegang tot je dashboard</li>
+                                                        </ul>
+                                                    </div>
+                                                )}
 
-                                                {/* Discount Code Section */}
+                                                {/* Discount Code Section - only when payment required */}
+                                                {PAYMENT_REQUIRED && (
                                                 <div className="border-b border-stone-200 pb-4">
                                                     <label className="text-sm font-medium text-stone-700 mb-2 block">Heb je een kortingscode?</label>
                                                     <div className="relative">
@@ -725,9 +748,10 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                         <p className="text-red-500 text-xs mt-1.5">Ongeldige kortingscode</p>
                                                     )}
                                                 </div>
+                                                )}
 
-                                                {/* Payment Method - Only show if no valid discount code */}
-                                                {!discountCodeValid && (
+                                                {/* Payment Method - Only show if payment is required and no valid discount code */}
+                                                {PAYMENT_REQUIRED && !discountCodeValid && (
                                                 <div>
                                                     <label className="text-sm font-medium text-stone-700 mb-2 block">Betaalmethode voor verificatie</label>
                                                     <div className="grid grid-cols-2 gap-3 mb-4">
@@ -760,9 +784,9 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                         type="submit" 
                                                         className="flex-1"
                                                         isLoading={loading}
-                                                        disabled={!discountCodeValid && !paymentMethod}
+                                                        disabled={PAYMENT_REQUIRED && !discountCodeValid && !paymentMethod}
                                                     >
-                                                        {discountCodeValid ? 'Gratis Starten' : 'Registreren & Starten'}
+                                                        {!PAYMENT_REQUIRED ? 'Gratis Registreren' : (discountCodeValid ? 'Gratis Starten' : 'Registreren & Starten')}
                                                     </Button>
                                                 </div>
                                             </div>
