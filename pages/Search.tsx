@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MapPin, SlidersHorizontal, Heart, Loader2 } from 'lucide-react';
 import { Button, Card, Input, Badge } from '../components/UIComponents';
@@ -42,13 +42,6 @@ type SalonVM = {
   services?: { id: string; name: string }[];
 };
 
-type LocationRow = {
-  city: string;
-  postcode: string;
-  latitude?: number;
-  longitude?: number;
-};
-
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800';
 
@@ -66,79 +59,16 @@ export const SearchPage: React.FC = () => {
   ======================= */
 
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
-  const [location, setLocation] = useState(searchParams.get('loc') ?? '');
   const [category, setCategory] = useState<string>('all');
   const [showDealsOnly, setShowDealsOnly] = useState(
     searchParams.get('filter') === 'deals'
   );
 
   const [salons, setSalons] = useState<SalonVM[]>([]);
-  const [locations, setLocations] = useState<LocationRow[]>([]);
-  const [csvLocations, setCsvLocations] = useState<LocationRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [page, setPage] = useState(1);
   const perPage = 20;
-
-  /* =======================
-     Debounced geocode
-  ======================= */
-
-  const geocodeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const geocode = (value: string) => {
-    if (geocodeTimeout.current) clearTimeout(geocodeTimeout.current);
-
-    geocodeTimeout.current = setTimeout(async () => {
-      if (value.trim().length < 3) return;
-      try {
-        await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            value + ', Netherlands'
-          )}`
-        );
-      } catch {
-        /* silent */
-      }
-    }, 500);
-  };
-
-  /* =======================
-     Fetch CSV locations
-  ======================= */
-
-  useEffect(() => {
-    fetch('/locations.csv')
-      .then(r => r.ok ? r.text() : null)
-      .then(txt => {
-        if (!txt) return;
-        const parsed = txt
-          .split('\n')
-          .map(l => l.split(','))
-          .map(cols => ({
-            city: cols[0]?.trim(),
-            postcode: cols[1]?.trim(),
-            latitude: parseFloat(cols[2]),
-            longitude: parseFloat(cols[3]),
-          }))
-          .filter(r => r.city && r.postcode);
-        setCsvLocations(parsed as LocationRow[]);
-      })
-      .catch(() => {});
-  }, []);
-
-  /* =======================
-     Fetch DB locations
-  ======================= */
-
-  useEffect(() => {
-    supabase
-      .from('locations')
-      .select('*')
-      .order('city')
-      .then(({ data }) => setLocations((data ?? []) as LocationRow[]))
-      .catch(() => {});
-  }, []);
 
   /* =======================
      Fetch salons
@@ -194,7 +124,6 @@ export const SearchPage: React.FC = () => {
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    const loc = location.toLowerCase().trim();
 
     return salons.filter(s => {
       if (showDealsOnly) return true;
@@ -207,14 +136,9 @@ export const SearchPage: React.FC = () => {
       const matchCategory =
         category === 'all' || s.categories?.includes(category);
 
-      const matchLocation =
-        !loc ||
-        s.city.toLowerCase().includes(loc) ||
-        s.zipCode?.startsWith(location);
-
-      return matchQuery && matchCategory && matchLocation;
+      return matchQuery && matchCategory;
     });
-  }, [salons, query, location, category, showDealsOnly]);
+  }, [salons, query, category, showDealsOnly]);
 
   /* =======================
      Pagination
@@ -227,21 +151,6 @@ export const SearchPage: React.FC = () => {
     () => filtered.slice((page - 1) * perPage, page * perPage),
     [filtered, page]
   );
-
-  /* =======================
-     Suggestions
-  ======================= */
-
-  const suggestions = useMemo(() => {
-    const set = new Set<string>();
-    [...locations, ...csvLocations].forEach(l => {
-      if (l.city) set.add(l.city);
-      if (l.postcode) set.add(l.postcode);
-      if (l.city && l.postcode) set.add(`${l.postcode} - ${l.city}`);
-    });
-    salons.forEach(s => s.city && set.add(s.city));
-    return Array.from(set).slice(0, 2000);
-  }, [locations, csvLocations, salons]);
 
   /* =======================
      UI
@@ -259,24 +168,6 @@ export const SearchPage: React.FC = () => {
             setPage(1);
           }}
         />
-
-        <input
-          list="locs"
-          placeholder="Postcode of stad"
-          value={location}
-          onChange={e => {
-            setLocation(e.target.value);
-            geocode(e.target.value);
-            setPage(1);
-          }}
-          className="h-11 rounded-xl border border-stone-200 px-3"
-        />
-
-        <datalist id="locs">
-          {suggestions.map(s => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
 
         <Button onClick={() => setPage(1)}>Zoek</Button>
       </div>
@@ -314,7 +205,6 @@ export const SearchPage: React.FC = () => {
                   variant="outline" 
                   onClick={() => { 
                     setQuery(''); 
-                    setLocation(''); 
                     setCategory('all'); 
                     setPage(1); 
                   }}
