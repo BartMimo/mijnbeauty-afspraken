@@ -86,6 +86,13 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='salons' AND column_name='review_count') THEN
         ALTER TABLE salons ADD COLUMN review_count INTEGER DEFAULT 0;
     END IF;
+    -- Add latitude and longitude columns for location-based search
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='salons' AND column_name='latitude') THEN
+        ALTER TABLE salons ADD COLUMN latitude NUMERIC(10,8);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='salons' AND column_name='longitude') THEN
+        ALTER TABLE salons ADD COLUMN longitude NUMERIC(11,8);
+    END IF;
 END $$;
 
 -- Indexes for performance

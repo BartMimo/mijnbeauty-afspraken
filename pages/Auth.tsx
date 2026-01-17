@@ -26,7 +26,7 @@ const SALON_CATEGORIES = [
 // Geocode function
 const geocodeAddress = async (address: string) => {
     try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Netherlands')}`);
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Netherlands')}&limit=1`);
         const data = await response.json();
         if (data.length > 0) {
             return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
@@ -88,6 +88,12 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
     const [locations, setLocations] = useState<Location[]>([]);
     const [regPhone, setRegPhone] = useState('');
+
+    // Address geocoding state
+    const [fullAddress, setFullAddress] = useState('');
+    const [addressValidated, setAddressValidated] = useState(false);
+    const [addressValidating, setAddressValidating] = useState(false);
+    const [validatedCoords, setValidatedCoords] = useState<{lat: number, lng: number} | null>(null);
     
     const [paymentMethod, setPaymentMethod] = useState<'ideal' | 'creditcard' | null>(null);
     const [selectedBank, setSelectedBank] = useState<string>('');
@@ -252,7 +258,8 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                     city: pendingSalon.city,
                                     zipCode: pendingSalon.zipCode,
                                     address: pendingSalon.address,
-                                    location_id: pendingSalon.location_id,
+                                    latitude: pendingSalon.latitude,
+                                    longitude: pendingSalon.longitude,
                                     phone: pendingSalon.phone
                                 })
                                 .select()
@@ -357,8 +364,12 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         }
         if (salonStep === 2) {
             // Validate step 2 fields
-            if (!regStreet || !regHouseNumber || !selectedLocationId || !regPhone) {
-                alert("Vul alle adresgegevens in.");
+            if (!fullAddress.trim() || !addressValidated || !validatedCoords) {
+                alert("Voer een geldig adres in en klik op 'Controleren' om het te valideren.");
+                return;
+            }
+            if (!regPhone) {
+                alert("Vul je telefoonnummer in.");
                 return;
             }
         }
@@ -384,7 +395,33 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         setSalonStep(prev => prev + 1);
     };
 
-    // Handle image upload to Supabase Storage
+    // Handle address validation
+    const validateAddress = async () => {
+        if (!fullAddress.trim()) {
+            alert('Voer een volledig adres in');
+            return;
+        }
+
+        setAddressValidating(true);
+        try {
+            const coords = await geocodeAddress(fullAddress.trim());
+            if (coords) {
+                setValidatedCoords(coords);
+                setAddressValidated(true);
+                alert('Adres gevonden! Het adres is geldig.');
+            } else {
+                setValidatedCoords(null);
+                setAddressValidated(false);
+                alert('Adres niet gevonden. Controleer het adres en probeer opnieuw.');
+            }
+        } catch (err) {
+            setValidatedCoords(null);
+            setAddressValidated(false);
+            alert('Fout bij het controleren van het adres. Probeer het opnieuw.');
+        } finally {
+            setAddressValidating(false);
+        }
+    };
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -554,14 +591,13 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                         slug: regSubdomain,
                         subdomain: regSubdomain,
                         status: 'pending',
-                        city: selectedLocation.city,
-                        zipCode: selectedLocation.postcode,
                         address: fullAddress,
-                        location_id: selectedLocation.id,
                         phone: regPhone,
                         description: salonDescription,
                         categories: salonCategories,
-                        image_url: salonImageUrl || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'
+                        image_url: salonImageUrl || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800',
+                        latitude: validatedCoords?.lat,
+                        longitude: validatedCoords?.lng
                     })
                     .select()
                     .single();
@@ -611,15 +647,14 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                     userId: data.user.id,
                     salonName: regSalonName,
                     subdomain: regSubdomain,
-                    city: selectedLocation.city,
-                    zipCode: selectedLocation.postcode,
                     address: fullAddress,
-                    location_id: selectedLocation.id,
                     phone: regPhone,
                     ownerName: regName,
                     description: salonDescription,
                     categories: salonCategories,
                     imageUrl: salonImageUrl,
+                    latitude: validatedCoords?.lat,
+                    longitude: validatedCoords?.lng,
                     services: initialServices.filter(s => s.name && s.price > 0)
                 }));
                 
@@ -865,52 +900,61 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                     <h3 className="text-lg font-bold text-stone-900">Salon Locatie</h3>
                                                     <p className="text-sm text-stone-500">Stap 2 van 5 - Waar kunnen klanten je vinden?</p>
                                                 </div>
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    <div className="col-span-2">
-                                                        <Input 
-                                                            label="Straat" 
-                                                            placeholder="Kerkstraat" 
-                                                            required 
-                                                            value={regStreet}
-                                                            onChange={e => setRegStreet(e.target.value)}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <Input 
-                                                            label="Nr" 
-                                                            placeholder="12" 
-                                                            required 
-                                                            value={regHouseNumber}
-                                                            onChange={e => setRegHouseNumber(e.target.value)}
-                                                        />
-                                                    </div>
-                                                </div>
+
+                                                {/* Full Address Input */}
                                                 <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                        Locatie (Postcode + Plaats) *
+                                                    <label className="block text-sm font-medium text-stone-700 mb-2">
+                                                        Volledig Adres *
                                                     </label>
-                                                    <select
-                                                        value={selectedLocationId || ''}
-                                                        onChange={e => setSelectedLocationId(e.target.value ? parseInt(e.target.value) : null)}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                        required
-                                                    >
-                                                        <option value="">Selecteer een locatie</option>
-                                                        {locations.map(location => (
-                                                            <option key={location.id} value={location.id}>
-                                                                {location.postcode} - {location.city} ({location.province})
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                    <div className="flex gap-3">
+                                                        <Input
+                                                            placeholder="Kerkstraat 12, 1234 AB Amsterdam"
+                                                            value={fullAddress}
+                                                            onChange={(e) => {
+                                                                setFullAddress(e.target.value);
+                                                                // Reset validation when address changes
+                                                                setAddressValidated(false);
+                                                                setValidatedCoords(null);
+                                                            }}
+                                                            className="flex-1"
+                                                        />
+                                                        <Button
+                                                            onClick={validateAddress}
+                                                            disabled={addressValidating || !fullAddress.trim()}
+                                                            variant="outline"
+                                                        >
+                                                            {addressValidating ? <Loader2 size={16} className="animate-spin" /> : 'Controleren'}
+                                                        </Button>
+                                                    </div>
+                                                    <p className="text-xs text-stone-400 mt-1">
+                                                        Voer je volledige adres in en klik op 'Controleren' om te valideren
+                                                    </p>
                                                 </div>
-                                                <Input 
-                                                    label="Telefoonnummer (Zakelijk)" 
-                                                    placeholder="020 - 123 45 67" 
-                                                    required 
-                                                    value={regPhone}
-                                                    onChange={e => setRegPhone(e.target.value)}
-                                                />
-                                                
+
+                                                {/* Address Validation Status */}
+                                                {addressValidated && validatedCoords && (
+                                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                                        <div className="flex items-center text-green-800">
+                                                            <CheckCircle2 size={20} className="mr-2" />
+                                                            <span className="font-medium">Adres gevonden!</span>
+                                                        </div>
+                                                        <p className="text-sm text-green-700 mt-1">
+                                                            Coördinaten: {validatedCoords.lat.toFixed(6)}, {validatedCoords.lng.toFixed(6)}
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Phone Number */}
+                                                <div>
+                                                    <Input
+                                                        label="Telefoonnummer (Zakelijk) *"
+                                                        placeholder="020 - 123 45 67"
+                                                        required
+                                                        value={regPhone}
+                                                        onChange={e => setRegPhone(e.target.value)}
+                                                    />
+                                                </div>
+
                                                 <div className="flex gap-3 mt-6">
                                                     <Button type="button" variant="outline" onClick={() => setSalonStep(1)}>
                                                         <ArrowLeft size={16} />

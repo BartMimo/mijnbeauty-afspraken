@@ -264,7 +264,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         setIsReviewModalOpen(true);
     };
 
-    const handleSubmitReview = () => {
+    const handleSubmitReview = async () => {
         if (reviewForm.rating === 0) {
             alert("Selecteer alstublieft een aantal sterren.");
             return;
@@ -274,15 +274,48 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             return;
         }
 
-        const newReview = {
-            id: Date.now(),
-            user: reviewForm.name,
-            text: reviewForm.text,
-            rating: reviewForm.rating
-        };
+        if (!user) {
+            alert("Log in om een review te plaatsen.");
+            return;
+        }
 
-        setReviews([newReview, ...reviews]);
-        setIsReviewModalOpen(false);
+        try {
+            // Save review to database
+            const { data: newReviewData, error } = await supabase
+                .from('reviews')
+                .insert({
+                    salon_id: salon.supabaseId,
+                    user_id: user.id,
+                    rating: reviewForm.rating,
+                    comment: reviewForm.text
+                })
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Error saving review:', error);
+                alert('Er ging iets mis bij het opslaan van je review. Probeer het opnieuw.');
+                return;
+            }
+
+            // Add to local state for immediate UI update
+            const newReview = {
+                id: newReviewData.id,
+                user: reviewForm.name,
+                text: reviewForm.text,
+                rating: reviewForm.rating,
+                created_at: newReviewData.created_at
+            };
+
+            setReviews([newReview, ...reviews]);
+            setIsReviewModalOpen(false);
+            setReviewForm({ name: '', rating: 0, text: '' });
+
+            alert('Bedankt voor je review!');
+        } catch (err) {
+            console.error('Error submitting review:', err);
+            alert('Er ging iets mis. Probeer het opnieuw.');
+        }
     };
 
     // --- Actions ---

@@ -5,7 +5,6 @@ import { PublicLayout, DashboardLayout } from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext'; // Import AuthProvider
 import { Home } from './pages/Home';
 import { SearchPage } from './pages/Search';
-import { Zoeken } from './pages/Zoeken';
 import { SalonDetailPage } from './pages/SalonDetailPage';
 import { ErrorBoundaryRoot } from './components/ErrorBoundary';
 import { ForPartners } from './pages/ForPartners';
@@ -141,7 +140,7 @@ const App: React.FC = () => {
                             }
                         />
             <Route path="/search" element={<PublicLayout><SearchPage /></PublicLayout>} />
-            <Route path="/zoeken" element={<PublicLayout><Zoeken /></PublicLayout>} />
+            <Route path="/zoeken" element={<PublicLayout><SearchPage /></PublicLayout>} />
             <Route path="/salon/:id" element={<PublicLayout><SalonDetailPage /></PublicLayout>} />
             <Route path="/for-partners" element={<PublicLayout><ForPartners /></PublicLayout>} />
             <Route path="/salontest/*" element={<SalonTest />} />

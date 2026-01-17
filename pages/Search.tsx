@@ -103,12 +103,75 @@ export const SearchPage: React.FC = () => {
   const [salons, setSalons] = useState<SalonVM[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Favorites state
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+
   const [page, setPage] = useState(1);
   const perPage = 20;
 
   /* =======================
      Fetch salons
   ======================= */
+
+  const fetchFavorites = async () => {
+    if (!user) {
+      setFavorites(new Set());
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('salon_id')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error fetching favorites:', error);
+        return;
+      }
+
+      setFavorites(new Set(data.map(f => f.salon_id)));
+    } catch (err) {
+      console.error('Error fetching favorites:', err);
+    }
+  };
+
+  const toggleFavorite = async (salonId: string) => {
+    if (!user) {
+      alert('Log in om salons toe te voegen aan je favorieten');
+      return;
+    }
+
+    const isFavorite = favorites.has(salonId);
+    const newFavorites = new Set(favorites);
+
+    try {
+      if (isFavorite) {
+        // Remove from favorites
+        await supabase
+          .from('favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('salon_id', salonId);
+        
+        newFavorites.delete(salonId);
+      } else {
+        // Add to favorites
+        await supabase
+          .from('favorites')
+          .insert({
+            user_id: user.id,
+            salon_id: salonId
+          });
+        
+        newFavorites.add(salonId);
+      }
+      
+      setFavorites(newFavorites);
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -118,7 +181,7 @@ export const SearchPage: React.FC = () => {
 
       const { data, error } = await supabase
         .from('salons')
-        .select(`*, services(id,name), categories, locations(latitude,longitude,city,postcode)`)
+        .select(`*, services(id,name), categories`)
         .eq('status', 'active');
 
       if (!active || error) return;
@@ -128,11 +191,11 @@ export const SearchPage: React.FC = () => {
           id: s.slug ?? s.id,
           slug: s.slug,
           name: s.name,
-          city: s.locations?.city ?? '',
+          city: s.city ?? '',
           address: s.address ?? '',
-          zipCode: s.locations?.postcode ?? '',
-          latitude: s.locations?.latitude,
-          longitude: s.locations?.longitude,
+          zipCode: s.zip_code ?? '',
+          latitude: s.latitude,
+          longitude: s.longitude,
           description: s.description ?? '',
           image: s.image_url ?? s.image ?? FALLBACK_IMAGE,
           rating: s.rating ?? 4.5,
@@ -146,13 +209,16 @@ export const SearchPage: React.FC = () => {
       );
 
       setLoading(false);
+
+      // Fetch favorites after salons are loaded
+      await fetchFavorites();
     }
 
     load();
     return () => {
       active = false;
     };
-  }, []);
+  }, [user]);
 
   /* =======================
      Filtering
@@ -421,8 +487,18 @@ export const SearchPage: React.FC = () => {
                         <Button onClick={() => navigate(`/salon/${s.id}`)}>
                           Bekijk
                         </Button>
-                        <button className="p-2 rounded-full bg-stone-100">
-                          <Heart />
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(s.id);
+                          }}
+                          className={`p-2 rounded-full transition-colors ${
+                            favorites.has(s.id) 
+                              ? 'bg-red-100 text-red-600 hover:bg-red-200' 
+                              : 'bg-stone-100 text-stone-400 hover:bg-stone-200 hover:text-stone-600'
+                          }`}
+                        >
+                          <Heart className={favorites.has(s.id) ? 'fill-current' : ''} size={16} />
                         </button>
                       </div>
                     </div>
