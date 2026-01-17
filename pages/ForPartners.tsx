@@ -112,7 +112,6 @@ export const ForPartners: React.FC = () => {
                                     "Agenda & klantenbeheer",
                                     "Deals & promoties plaatsen",
                                     "Statistieken dashboard",
-                                    "Gratis (voor salons)",
 
                                 ].map((item, i) => (
                                     <li key={i} className="flex items-center text-stone-600">
