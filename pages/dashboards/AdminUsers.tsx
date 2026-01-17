@@ -18,7 +18,8 @@ export const AdminUsers: React.FC = () => {
             try {
                 const { data, error } = await supabase
                     .from('profiles')
-                    .select('id, full_name, email, role, created_at')
+                    .select('id, full_name, email, role, created_at, deleted_at')
+                    .is('deleted_at', null)  // Only show non-deleted users
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
@@ -89,19 +90,27 @@ export const AdminUsers: React.FC = () => {
     };
 
     const handleDelete = async (user: any) => {
-        if (!window.confirm(`Weet je zeker dat je "${user.name}" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.`)) {
+        if (!window.confirm(`Weet je zeker dat je "${user.name}" wilt verwijderen? De gebruiker kan niet meer inloggen, maar het account blijft bestaan voor administratieve doeleinden.`)) {
             return;
         }
 
         try {
+            // Soft delete: set deleted_at timestamp instead of hard delete
             const { error } = await supabase
                 .from('profiles')
-                .delete()
+                .update({ deleted_at: new Date().toISOString() })
                 .eq('id', user.id);
 
             if (error) throw error;
 
-            setUsers(prev => prev.filter(u => u.id !== user.id));
+            // Update local state to reflect the change
+            setUsers(prev => prev.map(u => 
+                u.id === user.id 
+                    ? { ...u, status: 'Verwijderd' } 
+                    : u
+            ));
+            
+            alert('Gebruiker succesvol verwijderd. Het account kan niet meer worden gebruikt.');
         } catch (err: any) {
             console.error('Delete failed:', err);
             alert('Verwijderen mislukt: ' + err.message);
