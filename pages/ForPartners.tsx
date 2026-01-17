@@ -107,6 +107,33 @@ export const ForPartners: React.FC = () => {
                   />
                 </div>
               </SwiperSlide>
+              <SwiperSlide>
+                <div className="aspect-video bg-white rounded-2xl overflow-hidden">
+                  <img 
+                    src="/dashboard-screenshot-5.png" 
+                    alt="Dashboard screenshot 5" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </SwiperSlide>
+              <SwiperSlide>
+                <div className="aspect-video bg-white rounded-2xl overflow-hidden">
+                  <img 
+                    src="/dashboard-screenshot-6.png" 
+                    alt="Dashboard screenshot 6" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </SwiperSlide>
+              <SwiperSlide>
+                <div className="aspect-video bg-white rounded-2xl overflow-hidden">
+                  <img 
+                    src="/dashboard-screenshot-7.png" 
+                    alt="Dashboard screenshot 7" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </SwiperSlide>
             </Swiper>
           </div>
         </div>
