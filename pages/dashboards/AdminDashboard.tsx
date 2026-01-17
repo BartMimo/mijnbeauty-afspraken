@@ -13,6 +13,9 @@ export const AdminDashboard: React.FC = () => {
         users: 0
     });
     const [bookingsByDay, setBookingsByDay] = useState<{ name: string; bookings: number }[]>([]);
+    const [bookingsByMonth, setBookingsByMonth] = useState<{ name: string; bookings: number }[]>([]);
+    const [weeklyComparison, setWeeklyComparison] = useState<{ week: string; bookings: number; revenue: number }[]>([]);
+    const [monthlyComparison, setMonthlyComparison] = useState<{ month: string; bookings: number; revenue: number }[]>([]);
     const [salonGrowth, setSalonGrowth] = useState<{ m: string; s: number }[]>([]);
     const [newSalons, setNewSalons] = useState<{ id: string; name: string; city: string; date: string }[]>([]);
     const [flaggedReviews, setFlaggedReviews] = useState<any[]>([]);
@@ -62,24 +65,96 @@ export const AdminDashboard: React.FC = () => {
                 });
                 setBookingsByDay(dayLabels.map((name, i) => ({ name, bookings: dayCounts[i] })));
 
-                // Salon growth last 6 months
-                const now = new Date();
-                const months = [] as { key: string; label: string }[];
+                // Bookings by month (last 12 months)
+                const nowBookings = new Date();
+                const bookingMonths = [];
+                for (let i = 11; i >= 0; i--) {
+                    const d = new Date(nowBookings.getFullYear(), nowBookings.getMonth() - i, 1);
+                    bookingMonths.push({
+                        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+                        label: d.toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' })
+                    });
+                }
+                const bookingMonthCounts = new Map(bookingMonths.map(m => [m.key, 0]));
+                appointments.forEach((a: any) => {
+                    if (!a.date) return;
+                    const d = new Date(a.date);
+                    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                    if (bookingMonthCounts.has(key)) bookingMonthCounts.set(key, (bookingMonthCounts.get(key) || 0) + 1);
+                });
+                setBookingsByMonth(bookingMonths.map(m => ({ name: m.label, bookings: bookingMonthCounts.get(m.key) || 0 })));
+
+                // Weekly comparison (last 8 weeks)
+                const nowWeekly = new Date();
+                const weeks = [];
+                for (let i = 7; i >= 0; i--) {
+                    const startOfWeek = new Date(nowWeekly);
+                    startOfWeek.setDate(nowWeekly.getDate() - (nowWeekly.getDay() === 0 ? 7 : nowWeekly.getDay()) - (i * 7) + 1);
+                    const endOfWeek = new Date(startOfWeek);
+                    endOfWeek.setDate(startOfWeek.getDate() + 6);
+                    
+                    const weekLabel = `${startOfWeek.getDate()}/${startOfWeek.getMonth() + 1}`;
+                    weeks.push({
+                        start: startOfWeek,
+                        end: endOfWeek,
+                        label: weekLabel
+                    });
+                }
+                
+                const weeklyData = weeks.map(week => {
+                    const weekBookings = appointments.filter((a: any) => {
+                        if (!a.date) return false;
+                        const appointmentDate = new Date(a.date);
+                        return appointmentDate >= week.start && appointmentDate <= week.end;
+                    });
+                    
+                    return {
+                        week: week.label,
+                        bookings: weekBookings.length,
+                        revenue: weekBookings.reduce((sum: number, a: any) => sum + (a.price || 0), 0)
+                    };
+                });
+                setWeeklyComparison(weeklyData);
+
+                // Monthly comparison (last 6 months)
+                const nowMonthly = new Date();
+                const monthlyData = [];
                 for (let i = 5; i >= 0; i--) {
-                    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                    months.push({
+                    const monthStart = new Date(nowMonthly.getFullYear(), nowMonthly.getMonth() - i, 1);
+                    const monthEnd = new Date(nowMonthly.getFullYear(), nowMonthly.getMonth() - i + 1, 0);
+                    
+                    const monthBookings = appointments.filter((a: any) => {
+                        if (!a.date) return false;
+                        const appointmentDate = new Date(a.date);
+                        return appointmentDate >= monthStart && appointmentDate <= monthEnd;
+                    });
+                    
+                    monthlyData.push({
+                        month: monthStart.toLocaleDateString('nl-NL', { month: 'long', year: '2-digit' }),
+                        bookings: monthBookings.length,
+                        revenue: monthBookings.reduce((sum: number, a: any) => sum + (a.price || 0), 0)
+                    });
+                }
+                setMonthlyComparison(monthlyData);
+
+                // Salon growth last 6 months
+                const nowGrowth = new Date();
+                const growthMonths = [] as { key: string; label: string }[];
+                for (let i = 5; i >= 0; i--) {
+                    const d = new Date(nowGrowth.getFullYear(), nowGrowth.getMonth() - i, 1);
+                    growthMonths.push({
                         key: `${d.getFullYear()}-${d.getMonth()}`,
                         label: d.toLocaleDateString('nl-NL', { month: 'short' })
                     });
                 }
-                const monthCounts = new Map(months.map(m => [m.key, 0]));
+                const growthMonthCounts = new Map(growthMonths.map(m => [m.key, 0]));
                 salons.forEach((s: any) => {
                     if (!s.created_at) return;
                     const d = new Date(s.created_at);
                     const key = `${d.getFullYear()}-${d.getMonth()}`;
-                    if (monthCounts.has(key)) monthCounts.set(key, (monthCounts.get(key) || 0) + 1);
+                    if (growthMonthCounts.has(key)) growthMonthCounts.set(key, (growthMonthCounts.get(key) || 0) + 1);
                 });
-                setSalonGrowth(months.map(m => ({ m: m.label, s: monthCounts.get(m.key) || 0 })));
+                setSalonGrowth(growthMonths.map(m => ({ m: m.label, s: growthMonthCounts.get(m.key) || 0 })));
 
                 // Placeholder for moderation queue (no reviews moderation table yet)
                 setFlaggedReviews([]);
@@ -94,13 +169,14 @@ export const AdminDashboard: React.FC = () => {
     }, []);
 
     const data = useMemo(() => bookingsByDay, [bookingsByDay]);
+    const monthlyData = useMemo(() => bookingsByMonth, [bookingsByMonth]);
 
     return (
         <div className="space-y-8">
             <h1 className="text-2xl font-bold text-stone-900">Admin Overzicht</h1>
             
             {/* System Status / Billing */}
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-4 gap-6">
                 <Card className="p-6 bg-stone-900 text-white border-none">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="p-2 bg-white/10 rounded-lg"><ShieldAlert size={20} className="text-brand-300"/></div>
@@ -114,14 +190,19 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                 </Card>
                  <Card className="p-6">
-                    <h3 className="font-bold text-stone-800 mb-2">Totale Omzet (Platform)</h3>
+                    <h3 className="font-bold text-stone-800 mb-2">Totale Omzet</h3>
                     <p className="text-3xl font-bold text-stone-900">€{stats.revenue.toFixed(0)}</p>
-                    <p className="text-sm text-stone-500 mt-1">Totaal geboekt: {stats.bookings}</p>
+                    <p className="text-sm text-stone-500 mt-1">Totaal boekingen: {stats.bookings}</p>
                 </Card>
                  <Card className="p-6">
                     <h3 className="font-bold text-stone-800 mb-2">Actieve Salons</h3>
                     <p className="text-3xl font-bold text-stone-900">{stats.salons}</p>
                     <p className="text-sm text-stone-500 mt-1">Gebruikers: {stats.users}</p>
+                </Card>
+                 <Card className="p-6">
+                    <h3 className="font-bold text-stone-800 mb-2">Deze Maand</h3>
+                    <p className="text-3xl font-bold text-stone-900">{monthlyComparison[monthlyComparison.length - 1]?.bookings || 0}</p>
+                    <p className="text-sm text-stone-500 mt-1">€{(monthlyComparison[monthlyComparison.length - 1]?.revenue || 0).toFixed(0)} omzet</p>
                 </Card>
             </div>
 
@@ -165,6 +246,81 @@ export const AdminDashboard: React.FC = () => {
                             </LineChart>
                         </ResponsiveContainer>
                         )}
+                    </div>
+                </Card>
+            </div>
+
+            {/* Monthly Bookings Chart */}
+            <Card className="p-6">
+                <h3 className="font-bold text-stone-800 mb-6">Boekingen per maand (laatste 12 maanden)</h3>
+                <div className="h-64">
+                    {loading ? (
+                        <div className="h-full flex items-center justify-center text-stone-400">
+                            <Loader2 className="animate-spin" size={24} />
+                        </div>
+                    ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={monthlyData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#78716c'}} />
+                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#78716c'}} />
+                            <Tooltip cursor={{fill: '#f5f5f4'}} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                            <Bar dataKey="bookings" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                    )}
+                </div>
+            </Card>
+
+            {/* Comparison Tables */}
+            <div className="grid md:grid-cols-2 gap-6">
+                {/* Weekly Comparison Table */}
+                <Card className="p-6">
+                    <h3 className="font-bold text-stone-800 mb-4">Wekelijkse Vergelijking</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-stone-200">
+                                    <th className="text-left py-2 font-semibold text-stone-700">Week</th>
+                                    <th className="text-right py-2 font-semibold text-stone-700">Boekingen</th>
+                                    <th className="text-right py-2 font-semibold text-stone-700">Omzet</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {weeklyComparison.map((week, index) => (
+                                    <tr key={index} className="border-b border-stone-100">
+                                        <td className="py-2 text-stone-900">{week.week}</td>
+                                        <td className="py-2 text-right text-stone-900">{week.bookings}</td>
+                                        <td className="py-2 text-right text-stone-900">€{week.revenue.toFixed(0)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+
+                {/* Monthly Comparison Table */}
+                <Card className="p-6">
+                    <h3 className="font-bold text-stone-800 mb-4">Maandelijkse Vergelijking</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-stone-200">
+                                    <th className="text-left py-2 font-semibold text-stone-700">Maand</th>
+                                    <th className="text-right py-2 font-semibold text-stone-700">Boekingen</th>
+                                    <th className="text-right py-2 font-semibold text-stone-700">Omzet</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {monthlyComparison.map((month, index) => (
+                                    <tr key={index} className="border-b border-stone-100">
+                                        <td className="py-2 text-stone-900">{month.month}</td>
+                                        <td className="py-2 text-right text-stone-900">{month.bookings}</td>
+                                        <td className="py-2 text-right text-stone-900">€{month.revenue.toFixed(0)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </Card>
             </div>
