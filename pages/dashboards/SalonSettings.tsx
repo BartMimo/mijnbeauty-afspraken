@@ -133,10 +133,24 @@ export const SalonSettings: React.FC = () => {
     };
 
     // --- Portfolio Logic ---
-    const handleUpload = () => {
-        // Simulating upload by adding a random unsplash image
-        const newImage = `https://images.unsplash.com/photo-1522337660859-02fbefca4702?auto=format&fit=crop&q=80&w=400&random=${Date.now()}`;
-        setSettings({ ...settings, portfolio: [...(settings.portfolio || []), newImage] });
+    const [newImageUrl, setNewImageUrl] = useState('');
+
+    const handleAddImage = () => {
+        if (!newImageUrl.trim()) {
+            alert('Voer een afbeelding URL in');
+            return;
+        }
+
+        // Basic URL validation
+        try {
+            new URL(newImageUrl);
+        } catch {
+            alert('Voer een geldige URL in');
+            return;
+        }
+
+        setSettings({ ...settings, portfolio: [...(settings.portfolio || []), newImageUrl] });
+        setNewImageUrl('');
     };
 
     const handleDeleteImage = (index: number) => {
@@ -319,16 +333,28 @@ export const SalonSettings: React.FC = () => {
             {activeTab === 'portfolio' && (
                 <div className="space-y-6 animate-fadeIn">
                      <Card className="p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
-                                <h2 className="text-lg font-bold flex items-center text-stone-800">
-                                    <ImageIcon size={20} className="mr-2 text-brand-500"/> Portfolio
-                                </h2>
-                                <p className="text-sm text-stone-500">Foto's worden getoond op je publieke salonpagina.</p>
+                        <div className="mb-6">
+                            <h2 className="text-lg font-bold flex items-center text-stone-800">
+                                <ImageIcon size={20} className="mr-2 text-brand-500"/> Portfolio
+                            </h2>
+                            <p className="text-sm text-stone-500">Foto's worden getoond op je publieke salonpagina.</p>
+                        </div>
+
+                        {/* Add Image URL */}
+                        <div className="mb-6 p-4 bg-stone-50 rounded-xl border border-stone-200">
+                            <div className="flex gap-3">
+                                <Input
+                                    type="url"
+                                    placeholder="https://example.com/afbeelding.jpg"
+                                    value={newImageUrl}
+                                    onChange={(e) => setNewImageUrl(e.target.value)}
+                                    className="flex-1"
+                                />
+                                <Button onClick={handleAddImage}>
+                                    <Upload size={18} className="mr-2" /> Toevoegen
+                                </Button>
                             </div>
-                            <Button onClick={handleUpload}>
-                                <Upload size={18} className="mr-2" /> Foto Uploaden
-                            </Button>
+                            <p className="text-xs text-stone-400 mt-2">Plak een link naar je foto (bijv. van Instagram, je website, of een foto service)</p>
                         </div>
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -344,12 +370,9 @@ export const SalonSettings: React.FC = () => {
                                 </div>
                             ))}
                              {/* Empty State placeholder */}
-                             <div 
-                                onClick={handleUpload}
-                                className="aspect-square rounded-xl border-2 border-dashed border-stone-200 flex flex-col items-center justify-center text-stone-400 hover:border-brand-300 hover:text-brand-500 hover:bg-brand-50 cursor-pointer transition-all"
-                             >
-                                 <Upload size={24} className="mb-2" />
-                                 <span className="text-xs font-medium">Sleep foto hierheen</span>
+                             <div className="aspect-square rounded-xl border-2 border-dashed border-stone-200 flex flex-col items-center justify-center text-stone-400">
+                                 <ImageIcon size={32} className="mb-2" />
+                                 <p className="text-xs text-center">Geen foto's toegevoegd</p>
                              </div>
                         </div>
                     </Card>

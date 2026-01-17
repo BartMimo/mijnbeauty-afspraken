@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Scissors, User, Store, Briefcase, ShieldCheck, ArrowRight, ArrowLeft, Check, Landmark, CreditCard, AlertCircle, CheckCircle2, Loader2, Upload, Image, Clock, Euro, Plus, Trash2 } from 'lucide-react';
+import { Scissors, User, Store, Briefcase, ShieldCheck, ArrowRight, ArrowLeft, Check, Landmark, CreditCard, AlertCircle, CheckCircle2, Loader2, Upload, Image, Clock, Euro, Plus, Trash2, X } from 'lucide-react';
 import { Button, Input, Card } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 import { Location } from '../types';
@@ -414,10 +414,17 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 .upload(filePath, file);
 
             if (uploadError) {
-                // If bucket doesn't exist, use a placeholder
                 console.error('Upload error:', uploadError);
-                // Use a default image URL instead
-                setSalonImageUrl(`https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800`);
+
+                // Check if it's a bucket not found error
+                if (uploadError.message?.includes('not found') || uploadError.message?.includes('bucket')) {
+                    alert('Afbeelding upload is tijdelijk niet beschikbaar. Je kunt later een afbeelding toevoegen via je dashboard.');
+                    // Don't set a default image - keep it empty so user knows upload failed
+                    return;
+                }
+
+                // For other errors, try to provide a more specific message
+                alert(`Upload mislukt: ${uploadError.message || 'Onbekende fout'}. Probeer het opnieuw of voeg later een afbeelding toe via je dashboard.`);
                 return;
             }
 
@@ -427,9 +434,10 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 .getPublicUrl(filePath);
 
             setSalonImageUrl(publicUrl);
+            alert('Afbeelding succesvol geüpload!');
         } catch (err) {
             console.error('Upload error:', err);
-            alert('Upload mislukt. Probeer het opnieuw.');
+            alert('Upload mislukt. Probeer het opnieuw of voeg later een afbeelding toe via je dashboard.');
         } finally {
             setImageUploading(false);
         }
@@ -970,47 +978,45 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                 {/* Image Upload */}
                                                 <div>
                                                     <label className="block text-sm font-medium text-stone-700 mb-2">Salon Afbeelding</label>
-                                                    <div className="border-2 border-dashed border-stone-200 rounded-xl p-4 text-center hover:border-brand-300 transition-colors">
-                                                        {salonImageUrl ? (
-                                                            <div className="relative">
-                                                                <img 
-                                                                    src={salonImageUrl} 
-                                                                    alt="Salon preview" 
-                                                                    className="w-full h-32 object-cover rounded-lg"
+                                                    <div className="space-y-3">
+                                                        {/* URL Input */}
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-stone-600 mb-1">Afbeelding URL (optioneel)</label>
+                                                            <Input
+                                                                type="url"
+                                                                placeholder="https://example.com/afbeelding.jpg"
+                                                                value={salonImageUrl}
+                                                                onChange={(e) => setSalonImageUrl(e.target.value)}
+                                                                className="text-sm"
+                                                            />
+                                                            <p className="text-xs text-stone-400 mt-1">Plak een link naar je salon afbeelding</p>
+                                                        </div>
+
+                                                        {/* Preview */}
+                                                        {salonImageUrl && (
+                                                            <div className="relative inline-block">
+                                                                <img
+                                                                    src={salonImageUrl}
+                                                                    alt="Salon preview"
+                                                                    className="w-32 h-32 object-cover rounded-lg border border-stone-200"
+                                                                    onError={() => {
+                                                                        alert('Deze afbeelding URL werkt niet. Controleer de link.');
+                                                                        setSalonImageUrl('');
+                                                                    }}
                                                                 />
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setSalonImageUrl('')}
-                                                                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                                                                    className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
                                                                 >
-                                                                    <Trash2 size={14} />
+                                                                    <X size={12} />
                                                                 </button>
                                                             </div>
-                                                        ) : (
-                                                            <label className="cursor-pointer block">
-                                                                <input
-                                                                    type="file"
-                                                                    accept="image/*"
-                                                                    onChange={handleImageUpload}
-                                                                    className="hidden"
-                                                                    disabled={imageUploading}
-                                                                />
-                                                                {imageUploading ? (
-                                                                    <div className="py-4">
-                                                                        <Loader2 className="mx-auto animate-spin text-brand-400" size={32} />
-                                                                        <p className="text-sm text-stone-500 mt-2">Uploaden...</p>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="py-4">
-                                                                        <Image className="mx-auto text-stone-300" size={40} />
-                                                                        <p className="text-sm text-stone-500 mt-2">Klik om een afbeelding te uploaden</p>
-                                                                        <p className="text-xs text-stone-400">JPG, PNG (max 5MB)</p>
-                                                                    </div>
-                                                                )}
-                                                            </label>
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-stone-400 mt-1">Optioneel - Je kunt dit later toevoegen</p>
+                                                    <p className="text-xs text-stone-400 mt-2">
+                                                        Optioneel - Je kunt dit later wijzigen in je dashboard onder 'Instellingen'
+                                                    </p>
                                                 </div>
 
                                                 <div className="flex gap-3 mt-6">
