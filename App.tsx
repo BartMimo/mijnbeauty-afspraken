@@ -12,6 +12,7 @@ import { ForPartners } from './pages/ForPartners';
 import { SalonTest } from './pages/SalonTest';
 import { UserTest } from './pages/UserTest';
 import { AdminTest } from './pages/AdminTest';
+import { Salonpaginatest } from './pages/Salonpaginatest';
 import { AuthPage } from './pages/Auth';
 import { UserDashboard } from './pages/dashboards/UserDashboard';
 import { UserProfile } from './pages/dashboards/UserProfile';
@@ -146,6 +147,7 @@ const App: React.FC = () => {
             <Route path="/salontest/*" element={<SalonTest />} />
             <Route path="/usertest/*" element={<UserTest />} />
             <Route path="/admintest/*" element={<AdminTest />} />
+            <Route path="/salonpaginatest" element={<PublicLayout><Salonpaginatest /></PublicLayout>} />
             
             {/* Footer Pages */}
             <Route path="/about" element={<PublicLayout><AboutPage /></PublicLayout>} />

@@ -168,6 +168,56 @@ export const ForPartners: React.FC = () => {
         </div>
       </section>
 
+      {/* Salon Examples Slider */}
+      <section className="py-20 bg-stone-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <h2 className="text-3xl font-bold text-stone-900 mb-4">Bekijk hoe salons eruit zien</h2>
+            <p className="text-stone-500 text-lg">Ontdek hoe professionele salonpagina's eruit zien op ons platform.</p>
+          </div>
+          
+          <div className="max-w-5xl mx-auto">
+            <Swiper
+              modules={[Navigation, Pagination, Autoplay]}
+              spaceBetween={30}
+              slidesPerView={1}
+              navigation
+              pagination={{ clickable: true }}
+              autoplay={{ delay: 5000, disableOnInteraction: false }}
+              className="rounded-2xl shadow-2xl"
+            >
+              <SwiperSlide>
+                <div className="aspect-video bg-white rounded-2xl overflow-hidden">
+                  <img 
+                    src="/salon-example-1.png" 
+                    alt="Voorbeeld salon pagina 1" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </SwiperSlide>
+              <SwiperSlide>
+                <div className="aspect-video bg-white rounded-2xl overflow-hidden">
+                  <img 
+                    src="/salon-example-2.png" 
+                    alt="Voorbeeld salon pagina 2" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </SwiperSlide>
+              <SwiperSlide>
+                <div className="aspect-video bg-white rounded-2xl overflow-hidden">
+                  <img 
+                    src="/salon-example-3.png" 
+                    alt="Voorbeeld salon pagina 3" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </SwiperSlide>
+            </Swiper>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
       <section className="py-20 bg-brand-50/50">
         <div className="container mx-auto px-4">
