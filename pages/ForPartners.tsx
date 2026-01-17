@@ -21,7 +21,7 @@ export const ForPartners: React.FC = () => {
                 </p>
                 <div className="mt-8 flex items-center gap-4 text-sm text-stone-400">
                     <span className="flex items-center"><CheckCircle size={16} className="mr-2 text-brand-400" /> Geen creditcard nodig</span>
-                    <span className="flex items-center"><CheckCircle size={16} className="mr-2 text-brand-400" /> Altijd gratis</span>
+                    <span className="flex items-center"><CheckCircle size={16} className="mr-2 text-brand-400" />  Gratis</span>
                 </div>
             </div>
             <div className="md:w-1/2 relative">
@@ -82,7 +82,7 @@ export const ForPartners: React.FC = () => {
         <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
                 <div className="text-center mb-12">
-                    <h2 className="text-3xl font-bold text-stone-900 mb-4">Aanmelden is gratis — altijd</h2>
+                    <h2 className="text-3xl font-bold text-stone-900 mb-4">Aanmelden is gratis</h2>
                     <p className="text-stone-500 text-lg">Geen abonnementskosten voor salons. Meld je aan en gebruik alle functies gratis.</p>
                 </div>
                 
@@ -112,8 +112,8 @@ export const ForPartners: React.FC = () => {
                                     "Agenda & klantenbeheer",
                                     "Deals & promoties plaatsen",
                                     "Statistieken dashboard",
-                                    "Altijd gratis (voor salons)",
-                                    "Geen extra kosten of commissies"
+                                    "Gratis (voor salons)",
+
                                 ].map((item, i) => (
                                     <li key={i} className="flex items-center text-stone-600">
                                         <div className="mr-3 flex-shrink-0 h-6 w-6 rounded-full bg-green-100 flex items-center justify-center text-green-600">
