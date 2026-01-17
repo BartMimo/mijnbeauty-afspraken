@@ -103,18 +103,14 @@ export const AdminDashboard: React.FC = () => {
             <div className="grid md:grid-cols-3 gap-6">
                 <Card className="p-6 bg-stone-900 text-white border-none">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-white/10 rounded-lg"><CreditCard size={20} className="text-brand-300"/></div>
+                        <div className="p-2 bg-white/10 rounded-lg"><ShieldAlert size={20} className="text-brand-300"/></div>
                         <div>
-                            <h3 className="font-bold">Stripe Connect</h3>
-                            <p className="text-xs text-stone-400">Automatische Facturatie</p>
+                            <h3 className="font-bold">Betalingen uitgeschakeld</h3>
+                            <p className="text-xs text-stone-400">Registratie en betalingen zijn uitgeschakeld — salons zijn gratis</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 mb-2">
-                         <div className="h-2 w-2 rounded-full bg-green-400 animate-pulse"></div>
-                         <span className="text-sm font-medium">Systeem Actief</span>
-                    </div>
                     <div className="text-xs text-stone-400 mt-2 pt-2 border-t border-white/10">
-                        Laatste batch: Vandaag, 04:00 (124 facturen)
+                        Geen facturen gegenereerd terwijl betalingen uit staan
                     </div>
                 </Card>
                  <Card className="p-6">

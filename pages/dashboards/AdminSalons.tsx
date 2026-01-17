@@ -13,7 +13,7 @@ interface AdminSalon {
     rating: number;
     kvk?: string;
     subscription: {
-        plan: 'Pro' | 'Starter' | 'Geen';
+        plan: 'Pro' | 'Starter' | 'Gratis';
         status: 'active' | 'trialing' | 'past_due' | 'canceled' | 'none';
         renewsAt?: string;
     };
@@ -53,7 +53,7 @@ export const AdminSalons: React.FC = () => {
                     address: s.address || '',
                     status: (s.status || 'active') as AdminSalon['status'],
                     rating: s.rating || 0,
-                    subscription: { plan: 'Geen', status: 'none' }
+                    subscription: { plan: 'Gratis', status: 'none' }
                 }));
 
                 console.log('Mapped salons:', mapped);
@@ -218,7 +218,11 @@ export const AdminSalons: React.FC = () => {
                     </div>
                 );
             default:
-                return <span className="text-stone-400 text-xs">-</span>;
+                return (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-200 whitespace-nowrap">
+                        Gratis
+                    </span>
+                );
         }
     };
 
@@ -252,7 +256,7 @@ export const AdminSalons: React.FC = () => {
                                 <th className="px-6 py-4 font-medium text-stone-600">Locatie</th>
                                 <th className="px-6 py-4 font-medium text-stone-600">
                                     <div className="flex items-center gap-1">
-                                        <CreditCard size={14} /> Abonnement
+                                        <ShieldAlert size={14} /> Account
                                     </div>
                                 </th>
                                 <th className="px-6 py-4 font-medium text-stone-600">Status</th>

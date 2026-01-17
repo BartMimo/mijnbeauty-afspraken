@@ -6,9 +6,9 @@ import { supabase } from '../lib/supabase';
 import { Location } from '../types';
 
 // ============================================================
-// CONFIGURATIE: Zet op 'true' om betaalmodule te activeren
+// CONFIGURATIE: Registratie voor salons is permanent gratis (betalingen uitgeschakeld)
 // ============================================================
-const PAYMENT_REQUIRED = false; // Zet op true wanneer Stripe klaar is
+const PAYMENT_REQUIRED = false; // Registratie gratis — betalingen/Stripe uitgeschakeld
 // ============================================================
 
 // Salon categories - matches ServiceCategory enum
@@ -1157,13 +1157,13 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                 {/* Only show pricing when payment is required */}
                                                 {PAYMENT_REQUIRED ? (
                                                     <div className="bg-brand-50 border border-brand-200 rounded-2xl p-4 text-center">
-                                                        <div className="text-sm font-semibold text-brand-600 mb-1">PRO SALON ABONNEMENT</div>
-                                                        <div className="text-3xl font-bold text-stone-900 mb-1">€10<span className="text-sm text-stone-500 font-normal">/maand</span></div>
+                                                        <div className="text-sm font-semibold text-brand-600 mb-1">PRO SALON (uitgeschakeld)</div>
+                                                        <div className="text-3xl font-bold text-stone-900 mb-1">Nog niet actief</div>
                                                         <div className="inline-block bg-white text-brand-600 text-xs font-bold px-2 py-1 rounded shadow-sm mb-3">
-                                                            EERSTE 2 MAANDEN GRATIS
+                                                            Betalingsopties tijdelijk uitgeschakeld — registratie blijft gratis
                                                         </div>
                                                         <ul className="text-sm text-stone-600 space-y-1 text-left px-4">
-                                                            <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Maandelijks opzegbaar</li>
+                                                            <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Aanmelden blijft gratis</li>
                                                         </ul>
                                                     </div>
                                                 ) : (
@@ -1171,7 +1171,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                         <div className="text-sm font-semibold text-green-600 mb-1">🎉 GRATIS REGISTRATIE</div>
                                                         <div className="text-xl font-bold text-stone-900 mb-2">Je salon is bijna klaar!</div>
                                                         <ul className="text-sm text-stone-600 space-y-1 text-left px-4">
-                                                            <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Volledig gratis tijdens de lanceringsperiode</li>
+                                                            <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Volledig gratis — geen abonnementskosten voor salons</li>
                                                             <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Je salon wordt zichtbaar na goedkeuring</li>
                                                             <li className="flex items-center"><Check size={14} className="text-green-500 mr-2" /> Direct toegang tot je dashboard</li>
                                                         </ul>
@@ -1247,7 +1247,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                             Creditcard
                                                         </button>
                                                     </div>
-                                                    <p className="text-xs text-stone-400 text-center">Stripe integratie komt binnenkort</p>
+                                                    <p className="text-xs text-stone-400 text-center">Betalingen/Stripe zijn uitgeschakeld — registratie is gratis</p>
                                                 </div>
                                                 )}
                                                 
