@@ -938,9 +938,6 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                             <CheckCircle2 size={20} className="mr-2" />
                                                             <span className="font-medium">Adres gevonden!</span>
                                                         </div>
-                                                        <p className="text-sm text-green-700 mt-1">
-                                                            Coördinaten: {validatedCoords.lat.toFixed(6)}, {validatedCoords.lng.toFixed(6)}
-                                                        </p>
                                                     </div>
                                                 )}
 
