@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Tag, Zap, Phone, Mail, MessageCircle, Loader2 } from 'lucide-react';
+import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Tag, Zap, Phone, Mail, MessageCircle, Loader2, Heart } from 'lucide-react';
 import { Button, Card, Badge } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -69,6 +69,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
     const [bookingStep, setBookingStep] = useState<'service' | 'time' | 'confirm'>('service');
     const [existingAppointments, setExistingAppointments] = useState<Appointment[]>([]);
+    
+    // Favorite State
+    const [isFavorite, setIsFavorite] = useState(false);
     
     // Calendar State
     const [currentDate, setCurrentDate] = useState(new Date()); 
@@ -221,6 +224,17 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     image: data.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'
                 });
 
+                // Check if user has this salon as favorite
+                if (user) {
+                    const { data: favoriteData } = await supabase
+                        .from('favorites')
+                        .select('id')
+                        .eq('user_id', user.id)
+                        .eq('salon_id', data.id)
+                        .maybeSingle();
+                    setIsFavorite(!!favoriteData);
+                }
+
                 // Fetch deals separately
                 const { data: dealsData } = await supabase
                     .from('deals')
@@ -266,7 +280,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         };
 
         fetchSalon();
-    }, [salonId]);
+    }, [salonId, user]);
 
     if (loading) {
         return (
@@ -312,6 +326,38 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         }, 100);
     };
 
+    const toggleFavorite = async () => {
+        if (!salon || !user) {
+            // Redirect to login or show message
+            alert('Log in om salons toe te voegen aan je favorieten');
+            return;
+        }
+
+        try {
+            if (isFavorite) {
+                // Remove from favorites
+                await supabase
+                    .from('favorites')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .eq('salon_id', salon.id);
+            } else {
+                // Add to favorites
+                await supabase
+                    .from('favorites')
+                    .insert({
+                        user_id: user.id,
+                        salon_id: salon.id
+                    });
+            }
+            setIsFavorite(!isFavorite);
+        } catch (err) {
+            if (process.env.NODE_ENV === 'development') {
+                console.error('Error toggling favorite:', err);
+            }
+        }
+    };
+
     // Calendar helpers (kept here but defined before early returns to ensure stable hooks order)
     const daysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
     const firstDayOfMonth = (date: Date) => {
@@ -348,22 +394,31 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             <div className="h-64 md:h-80 w-full overflow-hidden relative">
                 <img src={salon.image} alt={salon.name} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                <div className="absolute bottom-0 left-0 p-6 md:p-12 text-white container mx-auto">
-                    <h1 className="text-3xl md:text-5xl font-bold">{salon.name}</h1>
-                    <div className="flex items-center gap-4 mt-2">
-                        <span className="flex items-center text-sm md:text-base"><MapPin size={16} className="mr-1" /> {salon.city}</span>
-                        <span className="flex items-center text-sm md:text-base"><Star size={16} className="mr-1 fill-yellow-400 text-yellow-400" /> {salon.rating} ({salon.reviewCount})</span>
-                        {salon.categories && salon.categories.length > 0 && (
-                            <div className="flex items-center gap-1 text-sm md:text-base">
-                                {SALON_CATEGORIES.filter(c => salon.categories.includes(c.value)).map(c => (
-                                    <span key={c.value} className="flex items-center bg-white/20 backdrop-blur-sm rounded-full px-3 py-1">
-                                        <span className="mr-1">{c.icon}</span>
-                                        {c.label}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
+                <div className="absolute bottom-0 left-0 p-6 md:p-12 text-white container mx-auto flex justify-between items-end">
+                    <div className="max-w-[80%]">
+                        <h1 className="text-3xl md:text-5xl font-bold">{salon.name}</h1>
+                        <div className="flex items-center gap-4 mt-2">
+                            <span className="flex items-center text-sm md:text-base"><MapPin size={16} className="mr-1" /> {salon.city}</span>
+                            <span className="flex items-center text-sm md:text-base"><Star size={16} className="mr-1 fill-yellow-400 text-yellow-400" /> {salon.rating} ({salon.reviewCount})</span>
+                            {salon.categories && salon.categories.length > 0 && (
+                                <div className="flex items-center gap-1 text-sm md:text-base">
+                                    {SALON_CATEGORIES.filter(c => salon.categories.includes(c.value)).map(c => (
+                                        <span key={c.value} className="flex items-center bg-white/20 backdrop-blur-sm rounded-full px-3 py-1">
+                                            <span className="mr-1">{c.icon}</span>
+                                            {c.label}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
+                    <button 
+                        onClick={toggleFavorite}
+                        className={`p-3 rounded-full backdrop-blur-md transition-all hover:scale-105 shadow-lg ${isFavorite ? 'bg-white text-red-500' : 'bg-white/20 text-white hover:bg-white/30'}`}
+                        title={isFavorite ? "Verwijder uit favorieten" : "Voeg toe aan favorieten"}
+                    >
+                        <Heart size={20} className={isFavorite ? "fill-red-500" : ""} />
+                    </button>
                 </div>
             </div>
 
