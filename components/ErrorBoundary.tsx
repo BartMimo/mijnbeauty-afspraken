@@ -11,7 +11,9 @@ export class ErrorBoundaryRoot extends React.Component<{children?: React.ReactNo
     }
 
     componentDidCatch(error: any, info: any) {
-        console.error('Root ErrorBoundary caught:', error, info);
+        if (process.env.NODE_ENV === 'development') {
+            console.error('Root ErrorBoundary caught:', error, info);
+        }
     }
 
     render() {

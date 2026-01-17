@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Store, MapPin, Clock, Image as ImageIcon, Upload, Trash2, Smartphone, Check, Calendar, Copy, Link as LinkIcon, RefreshCw, X } from 'lucide-react';
-import { Button, Input, Card, Badge, Modal } from '../../components/UIComponents';
+import { Save, Store, MapPin, Clock, Image as ImageIcon, Upload, Trash2, Check, X } from 'lucide-react';
+import { Button, Input, Card, Badge } from '../../components/UIComponents';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -10,7 +10,7 @@ export const SalonSettings: React.FC = () => {
     const [loading, setLoading] = useState(true);
     
     // Tab State
-    const [activeTab, setActiveTab] = useState<'general' | 'portfolio' | 'sync'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'portfolio'>('general');
 
     // State initialization
     const [settings, setSettings] = useState({
@@ -29,11 +29,7 @@ export const SalonSettings: React.FC = () => {
             vr: { start: '09:00', end: '18:00' },
             za: { start: '10:00', end: '17:00' }
         },
-        portfolio: [] as string[],
-        calendarSync: {
-            google: { connected: false, email: '' },
-            apple: { connected: false, url: '' }
-        }
+        portfolio: [] as string[]
     });
 
     // Fetch salon data
@@ -82,11 +78,6 @@ export const SalonSettings: React.FC = () => {
     }, [user]);
 
     const [isSaved, setIsSaved] = useState(false);
-    
-    // Sync UI States
-    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-    const [isICalModalOpen, setIsICalModalOpen] = useState(false);
-    const [icalInput, setIcalInput] = useState('');
 
     const handleSave = async () => {
         if (!salonId) return;
@@ -158,54 +149,6 @@ export const SalonSettings: React.FC = () => {
         setSettings({ ...settings, portfolio: newPortfolio });
     };
 
-    // --- Sync Logic: Google ---
-    const handleGoogleConnect = () => {
-        if (settings.calendarSync?.google?.connected) {
-            // Disconnect
-            setSettings({
-                ...settings,
-                calendarSync: { ...settings.calendarSync, google: { connected: false, email: '' } }
-            });
-        } else {
-            // Connect Simulation
-            setIsGoogleLoading(true);
-            setTimeout(() => {
-                setSettings({
-                    ...settings,
-                    calendarSync: { ...settings.calendarSync, google: { connected: true, email: 'salon.eigenaar@gmail.com' } }
-                });
-                setIsGoogleLoading(false);
-            }, 1500);
-        }
-    };
-
-    // --- Sync Logic: Apple/iCal ---
-    const handleAppleConnect = () => {
-        if (settings.calendarSync?.apple?.connected) {
-             setSettings({
-                ...settings,
-                calendarSync: { ...settings.calendarSync, apple: { connected: false, url: '' } }
-            });
-        } else {
-            setIcalInput('');
-            setIsICalModalOpen(true);
-        }
-    };
-
-    const saveICal = () => {
-        if(!icalInput) return;
-        setSettings({
-            ...settings,
-            calendarSync: { ...settings.calendarSync, apple: { connected: true, url: icalInput } }
-        });
-        setIsICalModalOpen(false);
-    };
-
-    const copyExportUrl = () => {
-        navigator.clipboard.writeText("https://api.mijnbeauty.nl/cal/837492.ics");
-        alert("Link gekopieerd naar klembord!");
-    };
-
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
@@ -231,12 +174,6 @@ export const SalonSettings: React.FC = () => {
                     className={`pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'portfolio' ? 'border-brand-500 text-brand-600' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
                 >
                     Portfolio & Foto's
-                </button>
-                 <button 
-                    onClick={() => setActiveTab('sync')}
-                    className={`pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'sync' ? 'border-brand-500 text-brand-600' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
-                >
-                    Agenda Synchronisatie
                 </button>
             </div>
 
@@ -379,104 +316,6 @@ export const SalonSettings: React.FC = () => {
                 </div>
             )}
 
-             {/* TAB: SYNC */}
-             {activeTab === 'sync' && (
-                <div className="space-y-6 animate-fadeIn">
-                     <Card className="p-6">
-                         <div className="mb-6">
-                            <h2 className="text-lg font-bold flex items-center text-stone-800">
-                                <Calendar size={20} className="mr-2 text-brand-500"/> Agenda Koppeling (Import)
-                            </h2>
-                            <p className="text-sm text-stone-500">Haal afspraken uit je privé agenda (Google, iCloud) op zodat je niet dubbel geboekt wordt.</p>
-                         </div>
-
-                         <div className="space-y-4">
-                             {/* Google */}
-                             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-stone-100 rounded-xl bg-white shadow-sm gap-4">
-                                 <div className="flex items-center gap-4">
-                                     <div className="h-10 w-10 bg-white border border-stone-200 rounded-full flex items-center justify-center shrink-0">
-                                         <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg" className="w-6 h-6" alt="Google" />
-                                     </div>
-                                     <div>
-                                         <p className="font-bold text-stone-900">Google Calendar</p>
-                                         <p className="text-xs text-stone-500">
-                                             {settings.calendarSync?.google?.connected 
-                                                ? `Verbonden met ${settings.calendarSync.google.email}` 
-                                                : 'Real-time synchronisatie via OAuth'}
-                                         </p>
-                                     </div>
-                                 </div>
-                                 <button 
-                                    onClick={handleGoogleConnect}
-                                    disabled={isGoogleLoading}
-                                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex items-center justify-center ${settings.calendarSync?.google?.connected ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
-                                 >
-                                     {isGoogleLoading ? (
-                                         <><RefreshCw className="animate-spin mr-2 h-4 w-4"/> Verbinden...</>
-                                     ) : settings.calendarSync?.google?.connected ? (
-                                         <><Check className="mr-2 h-4 w-4"/> Verbonden</>
-                                     ) : (
-                                         'Verbinden'
-                                     )}
-                                 </button>
-                             </div>
-
-                             {/* Apple / iCal */}
-                             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-stone-100 rounded-xl bg-white shadow-sm gap-4">
-                                 <div className="flex items-center gap-4">
-                                     <div className="h-10 w-10 bg-stone-900 rounded-full flex items-center justify-center text-white shrink-0">
-                                         <Smartphone size={20} />
-                                     </div>
-                                     <div className="overflow-hidden">
-                                         <p className="font-bold text-stone-900">Apple / Outlook (iCal)</p>
-                                         <p className="text-xs text-stone-500 truncate">
-                                             {settings.calendarSync?.apple?.connected 
-                                                ? `Importeert van URL` 
-                                                : 'Importeer agenda via publieke iCal URL'}
-                                         </p>
-                                     </div>
-                                 </div>
-                                 <button 
-                                    onClick={handleAppleConnect}
-                                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex items-center justify-center ${settings.calendarSync?.apple?.connected ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
-                                 >
-                                     {settings.calendarSync?.apple?.connected ? (
-                                         <><Check className="mr-2 h-4 w-4"/> Verbonden</>
-                                     ) : (
-                                         'Instellen'
-                                     )}
-                                 </button>
-                             </div>
-                         </div>
-                     </Card>
-
-                     <Card className="p-6">
-                         <div className="mb-6">
-                            <h2 className="text-lg font-bold flex items-center text-stone-800">
-                                <LinkIcon size={20} className="mr-2 text-brand-500"/> Jouw Salon Agenda (Export)
-                            </h2>
-                            <p className="text-sm text-stone-500">
-                                Wil je jouw werkafspraken op je eigen telefoon zien? Abonneer je dan op deze agenda link in je telefooninstellingen.
-                            </p>
-                         </div>
-                         
-                         <div className="flex gap-2">
-                             <input 
-                                readOnly
-                                value="https://api.mijnbeauty.nl/cal/837492.ics"
-                                className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 text-sm text-stone-600"
-                             />
-                             <Button onClick={copyExportUrl} variant="outline">
-                                 <Copy size={18} />
-                             </Button>
-                         </div>
-                         <div className="mt-4 p-4 bg-blue-50 text-blue-800 text-xs rounded-xl border border-blue-100">
-                             <strong>Tip:</strong> Ga op je iPhone naar Instellingen &gt; Agenda &gt; Accounts &gt; Nieuwe agenda-abonnement en plak deze link.
-                         </div>
-                     </Card>
-                </div>
-             )}
-
             <div className="flex justify-end pt-4 pb-8 items-center gap-4">
                 {isSaved && <span className="text-green-600 text-sm font-medium animate-fadeIn">Wijzigingen opgeslagen!</span>}
                 <Button onClick={handleSave}>
@@ -484,28 +323,6 @@ export const SalonSettings: React.FC = () => {
                 </Button>
             </div>
 
-            {/* iCal Modal */}
-            <Modal
-                isOpen={isICalModalOpen}
-                onClose={() => setIsICalModalOpen(false)}
-                title="Verbinden met iCal"
-            >
-                <div className="space-y-4">
-                    <p className="text-sm text-stone-600">
-                        Plak hier de publieke iCal (.ics) link van je externe agenda (bijv. iCloud, Outlook of een ander systeem). Wij halen elke 15 minuten nieuwe blokkades op.
-                    </p>
-                    <Input 
-                        placeholder="https://p32-caldav.icloud.com/..."
-                        value={icalInput}
-                        onChange={(e) => setIcalInput(e.target.value)}
-                        autoFocus
-                    />
-                    <div className="flex justify-end pt-2 gap-2">
-                        <Button variant="outline" onClick={() => setIsICalModalOpen(false)}>Annuleren</Button>
-                        <Button onClick={saveICal} disabled={!icalInput}>Verbinden</Button>
-                    </div>
-                </div>
-            </Modal>
         </div>
     );
 };

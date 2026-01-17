@@ -214,7 +214,7 @@ export const Home: React.FC = () => {
             <div className="bg-white p-8 md:p-12 flex flex-col justify-center items-start border-l border-stone-100">
                 <h3 className="text-2xl font-bold text-stone-900 mb-4">Start vandaag nog</h3>
                 <p className="text-stone-600 mb-8">
-                    Sluit je aan bij honderden andere salons. Geen opstartkosten, betaal alleen bij succes.
+                    Sluit je aan bij andere salons en betaal geen opstartkosten.
                 </p>
                 <div className="flex flex-col w-full gap-4">
                      <Button size="lg" className="w-full justify-center" onClick={() => navigate('/register?role=salon')}>

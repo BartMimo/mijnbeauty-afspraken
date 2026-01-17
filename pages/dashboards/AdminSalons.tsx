@@ -33,13 +33,17 @@ export const AdminSalons: React.FC = () => {
     useEffect(() => {
         const fetchSalons = async () => {
             try {
-                console.log('Fetching salons...');
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('Fetching salons...');
+                }
                 const { data, error, count } = await supabase
                     .from('salons')
                     .select('*', { count: 'exact' })
                     .order('created_at', { ascending: false });
 
-                console.log('Salons fetch result:', { data, error, count });
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('Salons fetch result:', { data, error, count });
+                }
 
                 if (error) {
                     console.error('Supabase error details:', error);
@@ -56,7 +60,9 @@ export const AdminSalons: React.FC = () => {
                     subscription: { plan: 'Gratis', status: 'none' }
                 }));
 
-                console.log('Mapped salons:', mapped);
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('Mapped salons:', mapped);
+                }
                 setSalons(mapped);
             } catch (err) {
                 console.error('Error loading salons:', err);

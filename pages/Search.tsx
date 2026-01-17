@@ -106,6 +106,9 @@ export const SearchPage: React.FC = () => {
   // Favorites state
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
+  // Deals state - track which salons have active deals
+  const [salonsWithDeals, setSalonsWithDeals] = useState<Set<string>>(new Set());
+
   const [page, setPage] = useState(1);
   const perPage = 20;
 
@@ -133,6 +136,24 @@ export const SearchPage: React.FC = () => {
       setFavorites(new Set(data.map(f => f.salon_id)));
     } catch (err) {
       console.error('Error fetching favorites:', err);
+    }
+  };
+
+  const fetchSalonsWithDeals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('deals')
+        .select('salon_id')
+        .eq('status', 'active');
+
+      if (error) {
+        console.error('Error fetching salons with deals:', error);
+        return;
+      }
+
+      setSalonsWithDeals(new Set(data.map(d => d.salon_id)));
+    } catch (err) {
+      console.error('Error fetching salons with deals:', err);
     }
   };
 
@@ -210,8 +231,9 @@ export const SearchPage: React.FC = () => {
 
       setLoading(false);
 
-      // Fetch favorites after salons are loaded
+      // Fetch favorites and deals after salons are loaded
       await fetchFavorites();
+      await fetchSalonsWithDeals();
     }
 
     load();
@@ -219,6 +241,18 @@ export const SearchPage: React.FC = () => {
       active = false;
     };
   }, [user]);
+
+  // Update URL when deals filter changes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (showDealsOnly) {
+      params.set('filter', 'deals');
+    } else {
+      params.delete('filter');
+    }
+    const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+    window.history.replaceState({}, '', newUrl);
+  }, [showDealsOnly]);
 
   /* =======================
      Filtering
@@ -228,8 +262,6 @@ export const SearchPage: React.FC = () => {
     const q = query.toLowerCase().trim();
 
     return salons.filter(s => {
-      if (showDealsOnly) return true;
-
       const matchQuery =
         !q ||
         s.name.toLowerCase().includes(q) ||
@@ -242,9 +274,12 @@ export const SearchPage: React.FC = () => {
       const matchLocation = !userLocation || !s.latitude || !s.longitude ||
         calculateDistance(userLocation.lat, userLocation.lng, s.latitude, s.longitude) <= searchRadius;
 
-      return matchQuery && matchCategory && matchLocation;
+      // Deals filtering
+      const matchDeals = !showDealsOnly || salonsWithDeals.has(s.id);
+
+      return matchQuery && matchCategory && matchLocation && matchDeals;
     });
-  }, [salons, query, category, showDealsOnly, userLocation, searchRadius]);
+  }, [salons, query, category, showDealsOnly, userLocation, searchRadius, salonsWithDeals]);
 
   /* =======================
      Location Search Handler
@@ -395,6 +430,22 @@ export const SearchPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Deals filter */}
+              <div className="pt-4 border-t border-stone-200">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showDealsOnly}
+                    onChange={(e) => {
+                      setShowDealsOnly(e.target.checked);
+                      setPage(1);
+                    }}
+                    className="rounded border-stone-300 text-brand-500 focus:ring-brand-500"
+                  />
+                  <span className="text-sm font-medium text-stone-700">Alleen salons met deals</span>
+                </label>
+              </div>
+
               {/* Additional filters can be added here */}
               <div className="pt-4 border-t border-stone-200">
                 <Button 
@@ -405,6 +456,7 @@ export const SearchPage: React.FC = () => {
                     setUserLocation(null);
                     setLocationQuery('');
                     setSearchRadius(10);
+                    setShowDealsOnly(false);
                     setPage(1); 
                   }}
                   className="w-full"
@@ -456,7 +508,14 @@ export const SearchPage: React.FC = () => {
 
                   <div className="p-4 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-lg">{s.name}</h3>
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-bold text-lg">{s.name}</h3>
+                        {salonsWithDeals.has(s.id) && (
+                          <Badge className="bg-green-100 text-green-700 text-xs px-2 py-1">
+                            Deal
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-stone-500">
                         <MapPin size={14} className="inline mr-1" />
                         {s.city}

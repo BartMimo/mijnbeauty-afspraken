@@ -403,7 +403,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         <p className="text-stone-600 leading-relaxed mb-6 text-sm md:text-base">{salon.description}</p>
                         
                         {/* Contact Buttons */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                             {salon.phone && (
                                 <a 
                                     href={`tel:${salon.phone}`} 
@@ -433,6 +433,18 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                     Mailen
                                 </a>
                             )}
+                            <button 
+                                onClick={toggleFavorite}
+                                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border font-medium transition-colors ${
+                                    isFavorite 
+                                        ? 'border-red-200 text-red-700 bg-red-50 hover:bg-red-100' 
+                                        : 'border-stone-200 text-stone-700 hover:bg-stone-50 hover:text-stone-900'
+                                }`}
+                                title={isFavorite ? "Verwijder uit favorieten" : "Voeg toe aan favorieten"}
+                            >
+                                <Heart size={18} className={isFavorite ? "fill-red-500 text-red-500" : ""} />
+                                {isFavorite ? 'Favoriet' : 'Toevoegen aan favorieten'}
+                            </button>
                         </div>
 
                         <div className="pt-6 border-t border-stone-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">

@@ -1,34 +1,42 @@
 
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { PublicLayout, DashboardLayout } from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext'; // Import AuthProvider
-import { Home } from './pages/Home';
-import { SearchPage } from './pages/Search';
-import { SalonDetailPage } from './pages/SalonDetailPage';
 import { ErrorBoundaryRoot } from './components/ErrorBoundary';
-import { ForPartners } from './pages/ForPartners';
-import { SalonTest } from './pages/SalonTest';
-import { UserTest } from './pages/UserTest';
-import { AdminTest } from './pages/AdminTest';
-import { Salonpaginatest } from './pages/Salonpaginatest';
-import { AuthPage } from './pages/Auth';
-import { UserDashboard } from './pages/dashboards/UserDashboard';
-import { UserProfile } from './pages/dashboards/UserProfile';
-import { UserFavorites } from './pages/dashboards/UserFavorites';
-import { SalonDashboard } from './pages/dashboards/SalonDashboard';
-import { SalonSchedule } from './pages/dashboards/SalonSchedule';
-import { SalonServices } from './pages/dashboards/SalonServices';
-import { SalonStaff } from './pages/dashboards/SalonStaff';
-import { SalonSettings } from './pages/dashboards/SalonSettings';
-import { SalonDeals } from './pages/dashboards/SalonDeals'; 
-import { SalonClients } from './pages/dashboards/SalonClients';
-import { AdminDashboard } from './pages/dashboards/AdminDashboard';
-import { AdminSalons } from './pages/dashboards/AdminSalons';
-import { AdminUsers } from './pages/dashboards/AdminUsers';
-import { StaffDashboard } from './pages/dashboards/StaffDashboard';
-import { StaffProfile } from './pages/dashboards/StaffProfile';
-import { AboutPage, HelpPage, PrivacyPage, TermsPage } from './pages/StaticPages';
+
+// Lazy load all page components for better performance
+const Home = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
+const SearchPage = lazy(() => import('./pages/Search').then(module => ({ default: module.SearchPage })));
+const SalonDetailPage = lazy(() => import('./pages/SalonDetailPage').then(module => ({ default: module.SalonDetailPage })));
+const ForPartners = lazy(() => import('./pages/ForPartners').then(module => ({ default: module.ForPartners })));
+const SalonTest = lazy(() => import('./pages/SalonTest').then(module => ({ default: module.SalonTest })));
+const UserTest = lazy(() => import('./pages/UserTest').then(module => ({ default: module.UserTest })));
+const AdminTest = lazy(() => import('./pages/AdminTest').then(module => ({ default: module.AdminTest })));
+const Salonpaginatest = lazy(() => import('./pages/Salonpaginatest').then(module => ({ default: module.Salonpaginatest })));
+const AuthPage = lazy(() => import('./pages/Auth').then(module => ({ default: module.AuthPage })));
+
+// Dashboard components - grouped for better chunking
+const UserDashboard = lazy(() => import('./pages/dashboards/UserDashboard').then(module => ({ default: module.UserDashboard })));
+const UserProfile = lazy(() => import('./pages/dashboards/UserProfile').then(module => ({ default: module.UserProfile })));
+const UserFavorites = lazy(() => import('./pages/dashboards/UserFavorites').then(module => ({ default: module.UserFavorites })));
+const SalonDashboard = lazy(() => import('./pages/dashboards/SalonDashboard').then(module => ({ default: module.SalonDashboard })));
+const SalonSchedule = lazy(() => import('./pages/dashboards/SalonSchedule').then(module => ({ default: module.SalonSchedule })));
+const SalonServices = lazy(() => import('./pages/dashboards/SalonServices').then(module => ({ default: module.SalonServices })));
+const SalonStaff = lazy(() => import('./pages/dashboards/SalonStaff').then(module => ({ default: module.SalonStaff })));
+const SalonSettings = lazy(() => import('./pages/dashboards/SalonSettings').then(module => ({ default: module.SalonSettings })));
+const SalonDeals = lazy(() => import('./pages/dashboards/SalonDeals').then(module => ({ default: module.SalonDeals })));
+const SalonClients = lazy(() => import('./pages/dashboards/SalonClients').then(module => ({ default: module.SalonClients })));
+const AdminDashboard = lazy(() => import('./pages/dashboards/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
+const AdminSalons = lazy(() => import('./pages/dashboards/AdminSalons').then(module => ({ default: module.AdminSalons })));
+const AdminUsers = lazy(() => import('./pages/dashboards/AdminUsers').then(module => ({ default: module.AdminUsers })));
+const StaffDashboard = lazy(() => import('./pages/dashboards/StaffDashboard').then(module => ({ default: module.StaffDashboard })));
+const StaffProfile = lazy(() => import('./pages/dashboards/StaffProfile').then(module => ({ default: module.StaffProfile })));
+
+const AboutPage = lazy(() => import('./pages/StaticPages').then(module => ({ default: module.AboutPage })));
+const HelpPage = lazy(() => import('./pages/StaticPages').then(module => ({ default: module.HelpPage })));
+const PrivacyPage = lazy(() => import('./pages/StaticPages').then(module => ({ default: module.PrivacyPage })));
+const TermsPage = lazy(() => import('./pages/StaticPages').then(module => ({ default: module.TermsPage })));
 
 // Helper to check for subdomain - supports multiple domain setups
 const getSubdomain = () => {
@@ -121,7 +129,15 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
         <Router>
-        <Routes>
+            <Suspense fallback={
+                <div className="min-h-screen flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mx-auto mb-4"></div>
+                        <p className="text-stone-500">Laden...</p>
+                    </div>
+                </div>
+            }>
+                <Routes>
                         {/* Public Routes */}
                         <Route
                             path="/"
@@ -228,7 +244,8 @@ const App: React.FC = () => {
             
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+                </Routes>
+            </Suspense>
         </Router>
     </AuthProvider>
   );

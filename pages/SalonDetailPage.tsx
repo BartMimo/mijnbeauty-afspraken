@@ -60,20 +60,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const navigate = useNavigate();
     const { user } = useAuth();
     const salonId = subdomain || id;
-    
-    console.log('=== SalonDetailPage Mounted ===');
-    console.log('Subdomain prop:', subdomain);
-    console.log('URL param id:', id);
-    console.log('Final salonId:', salonId);
 
-    const [debug] = React.useState(() => {
-        try {
-            return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
-        } catch {
-            return false;
-        }
-    });
-    
     const [salon, setSalon] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [bookingLoading, setBookingLoading] = useState(false);
@@ -167,7 +154,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 return;
             }
 
-            console.log('=== Fetching salon:', salonId);
+            if (process.env.NODE_ENV === 'development') {
+                console.log('=== Fetching salon:', salonId);
+            }
 
             try {
                 setLoading(true);
@@ -195,7 +184,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     error = result.error;
                 }
 
-                console.log('Query result:', { data, error });
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('Query result:', { data, error });
+                }
 
                 if (error || !data) {
                     console.error('No salon found', error);
@@ -203,7 +194,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     return;
                 }
 
-                console.log('Found salon:', data.name);
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('Found salon:', data.name);
+                }
 
                 setSalon({
                     id: data.slug || data.id,
