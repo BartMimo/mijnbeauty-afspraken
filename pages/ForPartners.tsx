@@ -2,6 +2,11 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, TrendingUp, Calendar, Shield, Zap, Users, Check, Globe } from 'lucide-react';
 import { Button, Card } from '../components/UIComponents';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, Pagination, Autoplay } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
 
 export const ForPartners: React.FC = () => {
   const navigate = useNavigate();
@@ -45,6 +50,65 @@ export const ForPartners: React.FC = () => {
                     </div>
                 </div>
             </div>
+        </div>
+      </section>
+
+      {/* Dashboard Screenshots Slider */}
+      <section className="py-20 bg-stone-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <h2 className="text-3xl font-bold text-stone-900 mb-4">Bekijk het dashboard</h2>
+            <p className="text-stone-500 text-lg">Ontdek hoe eenvoudig het is om je salon te beheren met ons intuïtieve dashboard.</p>
+          </div>
+          
+          <div className="max-w-5xl mx-auto">
+            <Swiper
+              modules={[Navigation, Pagination, Autoplay]}
+              spaceBetween={30}
+              slidesPerView={1}
+              navigation
+              pagination={{ clickable: true }}
+              autoplay={{ delay: 5000, disableOnInteraction: false }}
+              className="rounded-2xl shadow-2xl"
+            >
+              <SwiperSlide>
+                <div className="aspect-video bg-white rounded-2xl overflow-hidden">
+                  <img 
+                    src="/dashboard-screenshot-1.png" 
+                    alt="Dashboard overzicht" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </SwiperSlide>
+              <SwiperSlide>
+                <div className="aspect-video bg-white rounded-2xl overflow-hidden">
+                  <img 
+                    src="/dashboard-screenshot-2.png" 
+                    alt="Agenda beheer" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </SwiperSlide>
+              <SwiperSlide>
+                <div className="aspect-video bg-white rounded-2xl overflow-hidden">
+                  <img 
+                    src="/dashboard-screenshot-3.png" 
+                    alt="Klantenbeheer" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </SwiperSlide>
+              <SwiperSlide>
+                <div className="aspect-video bg-white rounded-2xl overflow-hidden">
+                  <img 
+                    src="/dashboard-screenshot-4.png" 
+                    alt="Statistieken" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </SwiperSlide>
+            </Swiper>
+          </div>
         </div>
       </section>
 
