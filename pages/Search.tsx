@@ -249,7 +249,7 @@ export const SearchPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      {/* Search bar */}
+      {/* Search bar - stays at top */}
       <div className="flex flex-col lg:flex-row gap-4 mb-6">
         <Input
           placeholder="Zoek salon of behandeling"
@@ -272,20 +272,6 @@ export const SearchPage: React.FC = () => {
           className="h-11 rounded-xl border border-stone-200 px-3"
         />
 
-        <select
-          value={category}
-          onChange={e => {
-            setCategory(e.target.value);
-            setPage(1);
-          }}
-          className="h-11 rounded-xl border border-stone-200 px-3 min-w-48"
-        >
-          <option value="all">Alle types salons</option>
-          {SALON_CATEGORIES.map(c => (
-            <option key={c.value} value={c.value}>{c.label}</option>
-          ))}
-        </select>
-
         <datalist id="locs">
           {suggestions.map(s => (
             <option key={s} value={s} />
@@ -295,94 +281,143 @@ export const SearchPage: React.FC = () => {
         <Button onClick={() => setPage(1)}>Zoek</Button>
       </div>
 
-      {/* Results */}
-      <div className="mb-4 flex justify-between">
-        <h1 className="font-bold text-xl">
-          {loading ? 'Laden…' : `${total} salons gevonden`}
-        </h1>
-        <span className="text-sm text-stone-500">
-          Pagina {page} van {pages}
-        </span>
-      </div>
+      {/* Main content grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Sidebar with filters */}
+        <div className="lg:col-span-1">
+          <Card className="p-6 sticky top-6">
+            <h3 className="font-bold text-lg mb-4">Filters</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-2">
+                  Type salon
+                </label>
+                <select
+                  value={category}
+                  onChange={e => {
+                    setCategory(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full h-11 rounded-xl border border-stone-200 px-3"
+                >
+                  <option value="all">Alle types salons</option>
+                  {SALON_CATEGORIES.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="animate-spin" />
+              {/* Additional filters can be added here */}
+              <div className="pt-4 border-t border-stone-200">
+                <Button 
+                  variant="outline" 
+                  onClick={() => { 
+                    setQuery(''); 
+                    setLocation(''); 
+                    setCategory('all'); 
+                    setPage(1); 
+                  }}
+                  className="w-full"
+                >
+                  Reset filters
+                </Button>
+              </div>
+            </div>
+          </Card>
         </div>
-      ) : paged.length === 0 ? (
-        <Card className="p-8 text-center">
-          Geen salons gevonden.
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {paged.map(s => (
-            <Card key={s.id} className="flex flex-col">
-              <div className="h-40 overflow-hidden">
-                <img
-                  src={s.image}
-                  alt={s.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
 
-              <div className="p-4 flex-1 flex flex-col justify-between">
-                <div>
-                  <h3 className="font-bold text-lg">{s.name}</h3>
-                  <p className="text-sm text-stone-500">
-                    <MapPin size={14} className="inline mr-1" />
-                    {s.city}
-                  </p>
+        {/* Results */}
+        <div className="lg:col-span-3">
+          <div className="mb-4 flex justify-between">
+            <h1 className="font-bold text-xl">
+              {loading ? 'Laden…' : `${total} salons gevonden`}
+            </h1>
+            <span className="text-sm text-stone-500">
+              Pagina {page} van {pages}
+            </span>
+          </div>
 
-                  <p className="text-sm mt-2 line-clamp-2 text-stone-600">
-                    {s.description}
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {s.services?.slice(0, 3).map(sv => (
-                      <Badge key={sv.id}>{sv.name}</Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-4 flex justify-between items-center">
-                  <span className="text-sm text-stone-600">
-                    {s.rating} ★ • {s.reviewCount} reviews
-                  </span>
-
-                  <div className="flex gap-2">
-                    <Button onClick={() => navigate(`/salon/${s.id}`)}>
-                      Bekijk
-                    </Button>
-                    <button className="p-2 rounded-full bg-stone-100">
-                      <Heart />
-                    </button>
-                  </div>
-                </div>
-              </div>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="animate-spin" />
+            </div>
+          ) : paged.length === 0 ? (
+            <Card className="p-8 text-center">
+              Geen salons gevonden.
             </Card>
-          ))}
-        </div>
-      )}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {paged.map(s => (
+                <Card key={s.id} className="flex flex-col">
+                  <div className="h-40 overflow-hidden">
+                    <img
+                      src={s.image}
+                      alt={s.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
 
-      {/* Pagination */}
-      <div className="mt-6 flex justify-center gap-2">
-        <Button
-          variant="outline"
-          disabled={page === 1}
-          onClick={() => setPage(p => Math.max(1, p - 1))}
-        >
-          Vorige
-        </Button>
-        <span className="text-sm">
-          {page}/{pages}
-        </span>
-        <Button
-          variant="outline"
-          disabled={page === pages}
-          onClick={() => setPage(p => Math.min(pages, p + 1))}
-        >
-          Volgende
-        </Button>
+                  <div className="p-4 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-bold text-lg">{s.name}</h3>
+                      <p className="text-sm text-stone-500">
+                        <MapPin size={14} className="inline mr-1" />
+                        {s.city}
+                      </p>
+
+                      <p className="text-sm mt-2 line-clamp-2 text-stone-600">
+                        {s.description}
+                      </p>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {s.services?.slice(0, 3).map(sv => (
+                          <Badge key={sv.id}>{sv.name}</Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex justify-between items-center">
+                      <span className="text-sm text-stone-600">
+                        {s.rating} ★ • {s.reviewCount} reviews
+                      </span>
+
+                      <div className="flex gap-2">
+                        <Button onClick={() => navigate(`/salon/${s.id}`)}>
+                          Bekijk
+                        </Button>
+                        <button className="p-2 rounded-full bg-stone-100">
+                          <Heart />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          <div className="mt-6 flex justify-center gap-2">
+            <Button
+              variant="outline"
+              disabled={page === 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+            >
+              Vorige
+            </Button>
+            <span className="text-sm">
+              {page}/{pages}
+            </span>
+            <Button
+              variant="outline"
+              disabled={page === pages}
+              onClick={() => setPage(p => Math.min(pages, p + 1))}
+            >
+              Volgende
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
