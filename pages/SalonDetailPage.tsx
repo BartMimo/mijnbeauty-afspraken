@@ -7,6 +7,18 @@ import { useAuth } from '../context/AuthContext';
 import { Service, Deal } from '../types';
 import { insertAppointmentSafe } from '../lib/appointments';
 
+// Salon categories - matches the categories used in registration
+const SALON_CATEGORIES = [
+    { value: 'Kapper', label: 'Kapsalon', icon: '💇' },
+    { value: 'Nagels', label: 'Nagelsalon', icon: '💅' },
+    { value: 'Wimpers', label: 'Wimper & Brow Studio', icon: '👁️' },
+    { value: 'Massage', label: 'Massagesalon', icon: '💆' },
+    { value: 'Gezichtsbehandeling', label: 'Gezichtssalon', icon: '✨' },
+    { value: 'Huidverzorging', label: 'Huidverzorging', icon: '🧴' },
+    { value: 'Make-up', label: 'Make-up Salon', icon: '💄' },
+    { value: 'Overig', label: 'Overig', icon: '🏪' },
+];
+
 class ErrorBoundary extends React.Component<{children?: React.ReactNode}, {error?: any}> {
     constructor(props: any) {
         super(props);
@@ -200,6 +212,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     city: data.city || '',
                     address: data.address || '',
                     description: data.description || 'Welkom bij onze salon!',
+                    categories: data.categories || [],
                     rating: 4.5,
                     reviewCount: 0,
                     email: data.email,
@@ -347,6 +360,16 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     <div className="flex items-center gap-4 mt-2">
                         <span className="flex items-center text-sm md:text-base"><MapPin size={16} className="mr-1" /> {salon.city}</span>
                         <span className="flex items-center text-sm md:text-base"><Star size={16} className="mr-1 fill-yellow-400 text-yellow-400" /> {salon.rating} ({salon.reviewCount})</span>
+                        {salon.categories && salon.categories.length > 0 && (
+                            <div className="flex items-center gap-1 text-sm md:text-base">
+                                {SALON_CATEGORIES.filter(c => salon.categories.includes(c.value)).map(c => (
+                                    <span key={c.value} className="flex items-center bg-white/20 backdrop-blur-sm rounded-full px-3 py-1">
+                                        <span className="mr-1">{c.icon}</span>
+                                        {c.label}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

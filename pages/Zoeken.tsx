@@ -5,6 +5,18 @@ import { Button, Card, Input, Badge } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 import { ServiceCategory } from '../types';
 
+// Salon categories for filtering
+const SALON_CATEGORIES = [
+    { value: 'Kapper', label: 'Kapsalon' },
+    { value: 'Nagels', label: 'Nagelsalon' },
+    { value: 'Wimpers', label: 'Wimper & Brow Studio' },
+    { value: 'Massage', label: 'Massagesalon' },
+    { value: 'Gezichtsbehandeling', label: 'Gezichtssalon' },
+    { value: 'Huidverzorging', label: 'Huidverzorging' },
+    { value: 'Make-up', label: 'Make-up Salon' },
+    { value: 'Overig', label: 'Overig' },
+];
+
 export const Zoeken: React.FC = () => {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -70,7 +82,7 @@ export const Zoeken: React.FC = () => {
         <div className="w-48">
           <select value={category} onChange={e => { setCategory(e.target.value); setPage(1); }} className="w-full h-11 rounded-xl border border-stone-200 px-3">
             <option value="all">Alle types salons</option>
-            {Object.values(ServiceCategory).map(c => <option key={c} value={c}>{c}</option>)}
+            {SALON_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
         </div>
         <div className="flex gap-2">

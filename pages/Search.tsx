@@ -7,6 +7,21 @@ import { ServiceCategory } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 /* =======================
+   Salon Categories
+======================= */
+
+const SALON_CATEGORIES = [
+    { value: 'Kapper', label: 'Kapsalon' },
+    { value: 'Nagels', label: 'Nagelsalon' },
+    { value: 'Wimpers', label: 'Wimper & Brow Studio' },
+    { value: 'Massage', label: 'Massagesalon' },
+    { value: 'Gezichtsbehandeling', label: 'Gezichtssalon' },
+    { value: 'Huidverzorging', label: 'Huidverzorging' },
+    { value: 'Make-up', label: 'Make-up Salon' },
+    { value: 'Overig', label: 'Overig' },
+];
+
+/* =======================
    Types
 ======================= */
 
@@ -256,6 +271,20 @@ export const SearchPage: React.FC = () => {
           }}
           className="h-11 rounded-xl border border-stone-200 px-3"
         />
+
+        <select
+          value={category}
+          onChange={e => {
+            setCategory(e.target.value);
+            setPage(1);
+          }}
+          className="h-11 rounded-xl border border-stone-200 px-3 min-w-48"
+        >
+          <option value="all">Alle types salons</option>
+          {SALON_CATEGORIES.map(c => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
 
         <datalist id="locs">
           {suggestions.map(s => (
