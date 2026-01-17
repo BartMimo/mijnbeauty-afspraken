@@ -46,6 +46,36 @@ const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800';
 
 /* =======================
+   Helper Functions
+======================= */
+
+// Geocode function - convert address to lat/lng
+const geocodeAddress = async (address: string) => {
+  try {
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Netherlands')}&limit=1`);
+    const data = await response.json();
+    if (data.length > 0) {
+      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    }
+  } catch (err) {
+    console.error('Geocoding error:', err);
+  }
+  return null;
+};
+
+// Calculate distance between two points using Haversine formula
+const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+};
+
+/* =======================
    Component
 ======================= */
 
@@ -63,6 +93,12 @@ export const SearchPage: React.FC = () => {
   const [showDealsOnly, setShowDealsOnly] = useState(
     searchParams.get('filter') === 'deals'
   );
+
+  // Location-based search state
+  const [locationQuery, setLocationQuery] = useState('');
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [searchRadius, setSearchRadius] = useState(10); // km
+  const [locationLoading, setLocationLoading] = useState(false);
 
   const [salons, setSalons] = useState<SalonVM[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,13 +172,40 @@ export const SearchPage: React.FC = () => {
       const matchCategory =
         category === 'all' || s.categories?.includes(category);
 
-      return matchQuery && matchCategory;
+      // Location-based filtering
+      const matchLocation = !userLocation || !s.latitude || !s.longitude ||
+        calculateDistance(userLocation.lat, userLocation.lng, s.latitude, s.longitude) <= searchRadius;
+
+      return matchQuery && matchCategory && matchLocation;
     });
-  }, [salons, query, category, showDealsOnly]);
+  }, [salons, query, category, showDealsOnly, userLocation, searchRadius]);
 
   /* =======================
-     Pagination
+     Location Search Handler
   ======================= */
+
+  const handleLocationSearch = async () => {
+    if (!locationQuery.trim()) {
+      setUserLocation(null);
+      setPage(1);
+      return;
+    }
+
+    setLocationLoading(true);
+    try {
+      const coords = await geocodeAddress(locationQuery.trim());
+      if (coords) {
+        setUserLocation(coords);
+        setPage(1);
+      } else {
+        alert('Adres niet gevonden. Probeer een ander adres.');
+      }
+    } catch (err) {
+      alert('Fout bij het zoeken van het adres. Probeer het opnieuw.');
+    } finally {
+      setLocationLoading(false);
+    }
+  };
 
   const total = filtered.length;
   const pages = Math.max(1, Math.ceil(total / perPage));
@@ -199,6 +262,73 @@ export const SearchPage: React.FC = () => {
                 </select>
               </div>
 
+              {/* Location-based search */}
+              <div className="pt-4 border-t border-stone-200">
+                <label className="block text-sm font-medium text-stone-700 mb-2">
+                  Zoek op locatie
+                </label>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Bijv. Amsterdam, Utrecht..."
+                      value={locationQuery}
+                      onChange={(e) => setLocationQuery(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleLocationSearch()}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={handleLocationSearch}
+                      disabled={locationLoading}
+                      size="sm"
+                    >
+                      {locationLoading ? <Loader2 size={16} className="animate-spin" /> : 'Zoek'}
+                    </Button>
+                  </div>
+
+                  {userLocation && (
+                    <div className="space-y-3">
+                      <div className="text-xs text-green-600 font-medium">
+                        ✓ Locatie gevonden
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-stone-700 mb-2">
+                          Zoekradius: {searchRadius} km
+                        </label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="50"
+                          value={searchRadius}
+                          onChange={(e) => {
+                            setSearchRadius(Number(e.target.value));
+                            setPage(1);
+                          }}
+                          className="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer slider"
+                        />
+                        <div className="flex justify-between text-xs text-stone-500 mt-1">
+                          <span>1 km</span>
+                          <span>50 km</span>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setUserLocation(null);
+                          setLocationQuery('');
+                          setPage(1);
+                        }}
+                        className="w-full"
+                      >
+                        Locatie wissen
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Additional filters can be added here */}
               <div className="pt-4 border-t border-stone-200">
                 <Button 
@@ -206,6 +336,9 @@ export const SearchPage: React.FC = () => {
                   onClick={() => { 
                     setQuery(''); 
                     setCategory('all'); 
+                    setUserLocation(null);
+                    setLocationQuery('');
+                    setSearchRadius(10);
                     setPage(1); 
                   }}
                   className="w-full"
@@ -219,10 +352,17 @@ export const SearchPage: React.FC = () => {
 
         {/* Results */}
         <div className="lg:col-span-3">
-          <div className="mb-4 flex justify-between">
-            <h1 className="font-bold text-xl">
-              {loading ? 'Laden…' : `${total} salons gevonden`}
-            </h1>
+          <div className="mb-4 flex justify-between items-start">
+            <div>
+              <h1 className="font-bold text-xl">
+                {loading ? 'Laden…' : `${total} salons gevonden`}
+              </h1>
+              {userLocation && (
+                <p className="text-sm text-stone-500 mt-1">
+                  Binnen {searchRadius} km van {locationQuery}
+                </p>
+              )}
+            </div>
             <span className="text-sm text-stone-500">
               Pagina {page} van {pages}
             </span>
@@ -254,6 +394,11 @@ export const SearchPage: React.FC = () => {
                       <p className="text-sm text-stone-500">
                         <MapPin size={14} className="inline mr-1" />
                         {s.city}
+                        {userLocation && s.latitude && s.longitude && (
+                          <span className="ml-2 text-blue-600">
+                            • {calculateDistance(userLocation.lat, userLocation.lng, s.latitude, s.longitude).toFixed(1)} km
+                          </span>
+                        )}
                       </p>
 
                       <p className="text-sm mt-2 line-clamp-2 text-stone-600">
