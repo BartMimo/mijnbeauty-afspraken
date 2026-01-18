@@ -103,9 +103,14 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     const [salonImageUrl, setSalonImageUrl] = useState('');
     const [imageUploading, setImageUploading] = useState(false);
 
-    // Step 4: Initial Service (NEW)
+    // Step 4: Service Categories (NEW)
+    const [serviceCategories, setServiceCategories] = useState<{name: string, description: string}[]>([]);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [newCategoryDescription, setNewCategoryDescription] = useState('');
+
+    // Step 5: Initial Service (RENAMED from Step 4)
     const [initialServices, setInitialServices] = useState<InitialService[]>([
-        { name: '', price: 0, duration: 30, category: 'Overig' }
+        { name: '', price: 0, duration: 30, category: '' }
     ]);
 
     // Valid discount codes (case-insensitive)
@@ -255,7 +260,10 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                     address: pendingSalon.address,
                                     latitude: pendingSalon.latitude,
                                     longitude: pendingSalon.longitude,
-                                    phone: pendingSalon.phone
+                                    phone: pendingSalon.phone,
+                                    description: pendingSalon.description,
+                                    categories: pendingSalon.categories,
+                                    image_url: pendingSalon.imageUrl
                                 })
                                 .select()
                                 .single();
@@ -266,6 +274,48 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                 alert('Let op: Je salon kon niet worden aangemaakt. Neem contact op met support. Error: ' + salonError.message);
                             } else {
                                 console.log('Pending salon created successfully:', newSalon);
+
+                                // Create service categories if any
+                                if (pendingSalon.serviceCategories && pendingSalon.serviceCategories.length > 0 && newSalon?.id) {
+                                    const categoriesToInsert = pendingSalon.serviceCategories.map((cat: any) => ({
+                                        salon_id: newSalon.id,
+                                        name: cat.name,
+                                        description: cat.description
+                                    }));
+
+                                    const { error: categoriesError } = await supabase
+                                        .from('service_categories')
+                                        .insert(categoriesToInsert);
+
+                                    if (categoriesError) {
+                                        console.error('Pending categories creation error:', categoriesError);
+                                    } else {
+                                        console.log('Pending categories created successfully');
+                                    }
+                                }
+
+                                // Create initial services if any
+                                if (pendingSalon.services && pendingSalon.services.length > 0 && newSalon?.id) {
+                                    const servicesToInsert = pendingSalon.services.map((s: any) => ({
+                                        salon_id: newSalon.id,
+                                        name: s.name,
+                                        price: s.price,
+                                        duration_minutes: s.duration,
+                                        category: s.category || 'Overig',
+                                        active: true
+                                    }));
+
+                                    const { error: servicesError } = await supabase
+                                        .from('services')
+                                        .insert(servicesToInsert);
+
+                                    if (servicesError) {
+                                        console.error('Pending services creation error:', servicesError);
+                                    } else {
+                                        console.log('Pending services created successfully');
+                                    }
+                                }
+
                                 alert('Je salon is aangemaakt en wacht op goedkeuring van de admin.');
                             }
                         }
@@ -380,6 +430,9 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
             }
         }
         if (salonStep === 4) {
+            // Categories step - no validation required, can skip
+        }
+        if (salonStep === 6) {
             // Validate at least one service
             const validServices = initialServices.filter(s => s.name && s.price > 0);
             if (validServices.length === 0) {
@@ -481,7 +534,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
             alert('Je kunt maximaal 5 diensten toevoegen tijdens registratie. Meer diensten kun je later toevoegen.');
             return;
         }
-        setInitialServices([...initialServices, { name: '', price: 0, duration: 30, category: 'Overig' }]);
+        setInitialServices([...initialServices, { name: '', price: 0, duration: 30, category: '' }]);
     };
 
     // Remove a service from the list
@@ -498,6 +551,25 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         const updated = [...initialServices];
         updated[index] = { ...updated[index], [field]: value };
         setInitialServices(updated);
+    };
+
+    // Category management functions
+    const addCategory = () => {
+        if (!newCategoryName.trim()) {
+            alert('Voer een categorienaam in');
+            return;
+        }
+        if (serviceCategories.some(c => c.name.toLowerCase() === newCategoryName.toLowerCase())) {
+            alert('Deze categorie bestaat al');
+            return;
+        }
+        setServiceCategories(prev => [...prev, { name: newCategoryName.trim(), description: newCategoryDescription.trim() }]);
+        setNewCategoryName('');
+        setNewCategoryDescription('');
+    };
+
+    const removeCategory = (index: number) => {
+        setServiceCategories(prev => prev.filter((_, i) => i !== index));
     };
 
     const handleSalonFinalSubmit = async () => {
@@ -605,6 +677,26 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
 
                 console.log('Salon created successfully:', salonData);
 
+                // Create service categories if any
+                if (serviceCategories.length > 0 && salonData?.id) {
+                    const categoriesToInsert = serviceCategories.map(cat => ({
+                        salon_id: salonData.id,
+                        name: cat.name,
+                        description: cat.description
+                    }));
+
+                    const { error: categoriesError } = await supabase
+                        .from('service_categories')
+                        .insert(categoriesToInsert);
+
+                    if (categoriesError) {
+                        console.error('Categories creation error:', categoriesError);
+                        // Don't fail the whole registration, just log it
+                    } else {
+                        console.log('Categories created successfully');
+                    }
+                }
+
                 // Create initial services
                 const validServices = initialServices.filter(s => s.name && s.price > 0);
                 if (validServices.length > 0 && salonData?.id) {
@@ -646,7 +738,8 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                     imageUrl: salonImageUrl,
                     latitude: validatedCoords?.lat,
                     longitude: validatedCoords?.lng,
-                    services: initialServices.filter(s => s.name && s.price > 0)
+                    services: initialServices.filter(s => s.name && s.price > 0),
+                    serviceCategories: serviceCategories
                 }));
                 
                 alert('Check je email om je account te bevestigen. Daarna kun je inloggen en wordt je salon automatisch aangemaakt.');
@@ -661,11 +754,11 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         }
     };
 
-    // Helper to render the step indicator for salons (5 steps now)
-    const TOTAL_STEPS = 5;
+    // Helper to render the step indicator for salons (6 steps now)
+    const TOTAL_STEPS = 6;
     const StepIndicator = () => (
         <div className="flex items-center justify-center mb-8 space-x-1">
-            {[1, 2, 3, 4, 5].map(step => (
+            {[1, 2, 3, 4, 5, 6].map(step => (
                 <div key={step} className="flex items-center">
                     <div className={`h-2.5 w-2.5 rounded-full transition-colors ${salonStep >= step ? 'bg-brand-400' : 'bg-stone-200'}`} />
                     {step < TOTAL_STEPS && <div className={`h-0.5 w-6 mx-0.5 ${salonStep > step ? 'bg-brand-400' : 'bg-stone-200'}`} />}
@@ -812,7 +905,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                             {role === 'salon' && (
                                 <div>
                                     <StepIndicator />
-                                    <form onSubmit={salonStep === 5 ? (e) => { e.preventDefault(); handleSalonFinalSubmit(); } : handleSalonNextStep}>
+                                    <form onSubmit={salonStep === 6 ? (e) => { e.preventDefault(); handleSalonFinalSubmit(); } : handleSalonNextStep}>
                                         
                                         {/* STEP 1: Account */}
                                         {salonStep === 1 && (
@@ -959,7 +1052,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                             <div className="space-y-5 animate-fadeIn">
                                                 <div className="text-center mb-4">
                                                     <h3 className="text-lg font-bold text-stone-900">Salon Profiel</h3>
-                                                    <p className="text-sm text-stone-500">Stap 3 van 5 - Laat je salon zien!</p>
+                                                    <p className="text-sm text-stone-500">Stap 3 van 6 - Laat je salon zien!</p>
                                                 </div>
 
                                                 {/* Category Selection */}
@@ -1062,12 +1155,88 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                             </div>
                                         )}
 
-                                        {/* STEP 4: Initial Services (NEW) */}
+                                        {/* STEP 4: Service Categories (NEW) */}
                                         {salonStep === 4 && (
                                             <div className="space-y-5 animate-fadeIn">
                                                 <div className="text-center mb-4">
+                                                    <h3 className="text-lg font-bold text-stone-900">Dienst Categorieën</h3>
+                                                    <p className="text-sm text-stone-500">Stap 4 van 6 - Organiseer je diensten (optioneel)</p>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    {/* Add new category */}
+                                                    <div className="p-4 bg-stone-50 rounded-xl border border-stone-200">
+                                                        <h4 className="font-medium text-stone-900 mb-3">Nieuwe categorie toevoegen</h4>
+                                                        <div className="space-y-3">
+                                                            <Input 
+                                                                placeholder="Categorienaam (bijv. Vrouwen knippen)"
+                                                                value={newCategoryName}
+                                                                onChange={e => setNewCategoryName(e.target.value)}
+                                                            />
+                                                            <textarea
+                                                                placeholder="Korte beschrijving (optioneel)"
+                                                                value={newCategoryDescription}
+                                                                onChange={e => setNewCategoryDescription(e.target.value)}
+                                                                rows={2}
+                                                                className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm outline-none focus:ring-2 focus:ring-brand-400 resize-none"
+                                                            />
+                                                            <Button 
+                                                                onClick={addCategory}
+                                                                disabled={!newCategoryName.trim()}
+                                                                className="w-full"
+                                                            >
+                                                                <Plus size={16} className="mr-2" />
+                                                                Categorie toevoegen
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Existing categories */}
+                                                    {serviceCategories.length > 0 && (
+                                                        <div className="space-y-3">
+                                                            <h4 className="font-medium text-stone-900">Jouw categorieën</h4>
+                                                            {serviceCategories.map((category, index) => (
+                                                                <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-stone-200">
+                                                                    <div>
+                                                                        <span className="font-medium text-stone-900">{category.name}</span>
+                                                                        {category.description && (
+                                                                            <p className="text-sm text-stone-500 mt-1">{category.description}</p>
+                                                                        )}
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => removeCategory(index)}
+                                                                        className="p-2 text-red-500 hover:bg-red-50 rounded"
+                                                                    >
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    <p className="text-xs text-stone-400 text-center">
+                                                        Je kunt categorieën later altijd nog toevoegen of wijzigen in je dashboard
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex gap-3 mt-6">
+                                                    <Button type="button" variant="outline" onClick={() => setSalonStep(3)}>
+                                                        <ArrowLeft size={16} />
+                                                    </Button>
+                                                    <Button type="submit" className="flex-1">
+                                                        {serviceCategories.length > 0 ? 'Volgende' : 'Overslaan'} <ArrowRight size={16} className="ml-2" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* STEP 5: Initial Services (RENAMED from Step 4) */}
+                                        {salonStep === 5 && (
+                                            <div className="space-y-5 animate-fadeIn">
+                                                <div className="text-center mb-4">
                                                     <h3 className="text-lg font-bold text-stone-900">Je Diensten</h3>
-                                                    <p className="text-sm text-stone-500">Stap 4 van 5 - Voeg minimaal 1 dienst toe</p>
+                                                    <p className="text-sm text-stone-500">Stap 5 van 6 - Voeg minimaal 1 dienst toe</p>
                                                 </div>
 
                                                 <div className="space-y-4">
@@ -1094,6 +1263,18 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                                     onChange={e => updateService(index, 'name', e.target.value)}
                                                                     className="w-full h-10 px-3 rounded-lg border border-stone-200 text-sm outline-none focus:ring-2 focus:ring-brand-400"
                                                                 />
+                                                                
+                                                                <select
+                                                                    value={service.category}
+                                                                    onChange={e => updateService(index, 'category', e.target.value)}
+                                                                    className="w-full h-10 px-3 rounded-lg border border-stone-200 text-sm outline-none focus:ring-2 focus:ring-brand-400 bg-white"
+                                                                >
+                                                                    <option value="">Selecteer categorie...</option>
+                                                                    {serviceCategories.map(cat => (
+                                                                        <option key={cat.name} value={cat.name}>{cat.name}</option>
+                                                                    ))}
+                                                                    <option value="Overig">Overig</option>
+                                                                </select>
                                                                 
                                                                 <div className="grid grid-cols-2 gap-3">
                                                                     <div className="relative">
@@ -1139,7 +1320,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                 </p>
 
                                                 <div className="flex gap-3 mt-6">
-                                                    <Button type="button" variant="outline" onClick={() => setSalonStep(3)}>
+                                                    <Button type="button" variant="outline" onClick={() => setSalonStep(4)}>
                                                         <ArrowLeft size={16} />
                                                     </Button>
                                                     <Button type="submit" className="flex-1">
@@ -1150,13 +1331,13 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                         )}
 
                                         {/* STEP 5: Confirmation */}
-                                        {salonStep === 5 && (
+                                        {salonStep === 6 && (
                                             <div className="space-y-6 animate-fadeIn">
                                                  <div className="text-center mb-2">
                                                     <h3 className="text-lg font-bold text-stone-900">
                                                         {PAYMENT_REQUIRED ? 'Activeer Abonnement' : 'Bevestig Registratie'}
                                                     </h3>
-                                                    <p className="text-sm text-stone-500">Stap 5 van 5 - Controleer je gegevens</p>
+                                                    <p className="text-sm text-stone-500">Stap 6 van 6 - Controleer je gegevens</p>
                                                 </div>
 
                                                 {/* Summary Card */}
