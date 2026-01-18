@@ -22,12 +22,13 @@ export const SalonSettings: React.FC = () => {
         phone: '',
         email: '',
         openings: {
-            ma: { start: '09:00', end: '18:00' },
-            di: { start: '09:00', end: '18:00' },
-            wo: { start: '09:00', end: '18:00' },
-            do: { start: '09:00', end: '18:00' },
-            vr: { start: '09:00', end: '18:00' },
-            za: { start: '10:00', end: '17:00' }
+            ma: { start: '09:00', end: '18:00', closed: false },
+            di: { start: '09:00', end: '18:00', closed: false },
+            wo: { start: '09:00', end: '18:00', closed: false },
+            do: { start: '09:00', end: '18:00', closed: false },
+            vr: { start: '09:00', end: '18:00', closed: false },
+            za: { start: '10:00', end: '17:00', closed: false },
+            zo: { start: '00:00', end: '00:00', closed: true }
         },
         portfolio: [] as string[]
     });
@@ -64,7 +65,8 @@ export const SalonSettings: React.FC = () => {
                         city: addressParts ? addressParts[3] : salon.city || '',
                         phone: salon.phone || '',
                         email: salon.email || '',
-                        portfolio: salon.image_url ? [salon.image_url] : []
+                        portfolio: salon.image_url ? [salon.image_url] : [],
+                        openings: salon.opening_hours || prev.openings
                     }));
                 }
             } catch (err) {
@@ -95,7 +97,8 @@ export const SalonSettings: React.FC = () => {
                     zip_code: settings.zipCode,
                     phone: settings.phone,
                     email: settings.email,
-                    image_url: settings.portfolio[0] || null
+                    image_url: settings.portfolio[0] || null,
+                    opening_hours: settings.openings
                 })
                 .eq('id', salonId);
 
@@ -119,6 +122,16 @@ export const SalonSettings: React.FC = () => {
             openings: {
                 ...settings.openings,
                 [day]: { ...settings.openings[day], [type]: value }
+            }
+        });
+    };
+
+    const handleClosedChange = (day: string, closed: boolean) => {
+        setSettings({
+            ...settings,
+            openings: {
+                ...settings.openings,
+                [day]: { ...settings.openings[day], closed }
             }
         });
     };
@@ -241,23 +254,36 @@ export const SalonSettings: React.FC = () => {
                             <Clock size={20} className="mr-2 text-brand-500"/> Openingstijden
                         </h2>
                         <div className="space-y-2">
-                            {['ma', 'di', 'wo', 'do', 'vr', 'za'].map(day => (
+                            {['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'].map(day => (
                                 <div key={day} className="flex items-center justify-between py-2 border-b border-stone-50 last:border-0">
-                                    <span className="font-medium text-stone-700 w-24 capitalize">{day === 'ma' ? 'maandag' : day + 'terdag' && day + 'dag'}</span>
-                                    <div className="flex gap-2 items-center">
-                                        <input 
-                                            type="time" 
-                                            className="border rounded px-2 py-1 text-sm" 
-                                            value={settings.openings[day]?.start || '09:00'}
-                                            onChange={(e) => handleTimeChange(day, 'start', e.target.value)}
-                                        />
-                                        <span className="text-stone-400">-</span>
-                                        <input 
-                                            type="time" 
-                                            className="border rounded px-2 py-1 text-sm" 
-                                            value={settings.openings[day]?.end || '18:00'}
-                                            onChange={(e) => handleTimeChange(day, 'end', e.target.value)}
-                                        />
+                                    <span className="font-medium text-stone-700 w-24 capitalize">{day === 'ma' ? 'maandag' : day === 'di' ? 'dinsdag' : day === 'wo' ? 'woensdag' : day === 'do' ? 'donderdag' : day === 'vr' ? 'vrijdag' : day === 'za' ? 'zaterdag' : 'zondag'}</span>
+                                    <div className="flex gap-3 items-center">
+                                        <label className="flex items-center gap-2 text-sm">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.openings[day]?.closed || false}
+                                                onChange={(e) => handleClosedChange(day, e.target.checked)}
+                                                className="rounded border-stone-300 text-brand-500 focus:ring-brand-400"
+                                            />
+                                            Gesloten
+                                        </label>
+                                        <div className="flex gap-2 items-center">
+                                            <input
+                                                type="time"
+                                                className="border rounded px-2 py-1 text-sm disabled:bg-stone-100 disabled:text-stone-400"
+                                                value={settings.openings[day]?.start || '09:00'}
+                                                onChange={(e) => handleTimeChange(day, 'start', e.target.value)}
+                                                disabled={settings.openings[day]?.closed}
+                                            />
+                                            <span className="text-stone-400">-</span>
+                                            <input
+                                                type="time"
+                                                className="border rounded px-2 py-1 text-sm disabled:bg-stone-100 disabled:text-stone-400"
+                                                value={settings.openings[day]?.end || '18:00'}
+                                                onChange={(e) => handleTimeChange(day, 'end', e.target.value)}
+                                                disabled={settings.openings[day]?.closed}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             ))}

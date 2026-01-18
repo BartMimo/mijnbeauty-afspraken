@@ -471,7 +471,21 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                             </div>
                             <div>
                                 <h4 className="font-semibold text-stone-900 mb-2">Openingstijden</h4>
-                                <p className="text-stone-500">Ma - Vr: 09:00 - 18:00<br/>Za: 10:00 - 17:00</p>
+                                <div className="text-stone-500 text-sm space-y-1">
+                                    {(() => {
+                                        const hours = salon.opening_hours || {};
+                                        const days = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
+                                        const dayNames = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+
+                                        return days.map((day, index) => {
+                                            const dayData = hours[day];
+                                            if (dayData?.closed) {
+                                                return <div key={day}>{dayNames[index]}: Gesloten</div>;
+                                            }
+                                            return <div key={day}>{dayNames[index]}: {dayData?.start || '09:00'} - {dayData?.end || '18:00'}</div>;
+                                        });
+                                    })()}
+                                </div>
                             </div>
                         </div>
                     </Card>
