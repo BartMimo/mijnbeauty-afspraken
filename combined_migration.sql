@@ -73,7 +73,8 @@ CREATE OR REPLACE FUNCTION public.claim_and_create_appointment(
     p_time text,
     p_price numeric,
     p_customer_name text,
-    p_staff_id uuid DEFAULT NULL
+    p_staff_id uuid DEFAULT NULL,
+    p_duration_minutes integer DEFAULT NULL
 )
 RETURNS uuid AS $$
 DECLARE
@@ -92,8 +93,8 @@ BEGIN
         RETURN NULL; -- signal that the deal couldn't be claimed
     END IF;
 
-    -- Use deal duration, fallback to 60 minutes if not set
-    v_duration_minutes := COALESCE(v_duration_minutes, 60);
+    -- Use deal duration, fallback to p_duration_minutes, then to 60 minutes if not set
+    v_duration_minutes := COALESCE(v_duration_minutes, p_duration_minutes, 60);
 
     -- Insert the appointment
     INSERT INTO appointments (
@@ -117,4 +118,4 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Update grant to include new parameter signature
-GRANT EXECUTE ON FUNCTION public.claim_and_create_appointment(uuid, uuid, uuid, uuid, text, date, text, numeric, text, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_and_create_appointment(uuid, uuid, uuid, uuid, text, date, text, numeric, text, uuid, integer) TO authenticated;
