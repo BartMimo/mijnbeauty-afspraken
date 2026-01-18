@@ -1033,15 +1033,27 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                 const { insertAppointmentSafe } = await import('../lib/appointments');
                                                 // If this is a deal booking, use the DB RPC so claim+insert happen atomically server-side
                                                 if (selectedDeal) {
+                                                    // Find the service_id for this deal's service
+                                                    const { data: serviceData, error: serviceErr } = await supabase
+                                                        .from('services')
+                                                        .select('id')
+                                                        .eq('salon_id', salon.supabaseId)
+                                                        .eq('name', selectedDeal.serviceName)
+                                                        .single();
+
+                                                    if (serviceErr || !serviceData) {
+                                                        throw new Error(`Service "${selectedDeal.serviceName}" niet gevonden voor deze salon`);
+                                                    }
+
                                                     const { data, error: rpcErr } = await supabase.rpc('claim_and_create_appointment', {
                                                         p_deal_id: selectedDeal.id,
                                                         p_user_id: user?.id || null,  // Set to user.id if logged in
                                                         p_salon_id: salon.supabaseId,
-                                                        p_service_id: null,
+                                                        p_service_id: serviceData.id,
                                                         p_service_name: selectedDeal.serviceName,
                                                         p_date: selectedDeal.date,
                                                         p_time: selectedDeal.rawTime,
-                                                        p_duration_minutes: null,
+                                                        p_duration_minutes: selectedDeal.durationMinutes || null,
                                                         p_price: selectedDeal.discountPrice,
                                                         p_customer_name: user?.user_metadata?.full_name || user?.email || 'Gast',
                                                         p_staff_id: selectedStaff?.id || null
