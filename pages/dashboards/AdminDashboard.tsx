@@ -25,7 +25,7 @@ export const AdminDashboard: React.FC = () => {
             try {
                 const [{ data: salonsData }, { data: apptsData }, { data: profilesData }] = await Promise.all([
                     supabase.from('salons').select('id, name, city, created_at'),
-                    supabase.from('appointments').select('id, date, price'),
+                    supabase.from('appointments').select('id, date, price, status').in('status', ['confirmed', 'completed']),
                     supabase.from('profiles').select('id, created_at')
                 ]);
 

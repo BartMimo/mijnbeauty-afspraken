@@ -100,9 +100,10 @@ export const SalonDashboard: React.FC = () => {
 
                 const { data: monthlyAppointments, count } = await supabase
                     .from('appointments')
-                    .select('price', { count: 'exact' })
+                    .select('price, status', { count: 'exact' })
                     .eq('salon_id', salon.id)
-                    .gte('date', startOfMonth.toISOString().split('T')[0]);
+                    .gte('date', startOfMonth.toISOString().split('T')[0])
+                    .in('status', ['confirmed', 'completed']);
 
                 const revenue = monthlyAppointments?.reduce((sum, a) => sum + (a.price || 0), 0) || 0;
                 
