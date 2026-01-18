@@ -83,9 +83,6 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     const [subdomainStatus, setSubdomainStatus] = useState<'idle' | 'available' | 'taken'>('idle');
 
     // Step 2: Address fields
-    const [regStreet, setRegStreet] = useState('');
-    const [regHouseNumber, setRegHouseNumber] = useState('');
-    const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
     const [locations, setLocations] = useState<Location[]>([]);
     const [regPhone, setRegPhone] = useState('');
 
@@ -129,8 +126,6 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         };
         fetchLocations();
     }, []);
-
-    const selectedLocation = locations.find(loc => loc.id === selectedLocationId);
 
     const checkDiscountCode = (code: string) => {
         const normalizedCode = code.toLowerCase().trim();
@@ -545,14 +540,10 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 throw new Error('Gebruiker kon niet worden aangemaakt');
             }
 
-            // Get selected location details
-            const selectedLocation = locations.find(loc => loc.id === selectedLocationId);
-            if (!selectedLocation) {
-                throw new Error('Selecteer een geldige locatie');
+            // Validate that address has been validated
+            if (!addressValidated || !validatedCoords || !fullAddress.trim()) {
+                throw new Error('Adres moet worden gevalideerd voordat je kunt registreren');
             }
-
-            // Build full address from form fields
-            const fullAddress = `${regStreet} ${regHouseNumber}, ${selectedLocation.postcode} ${selectedLocation.city}`;
             
             // 2. Wait for the database trigger to create the profile
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1184,7 +1175,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                         </div>
                                                     </div>
                                                     <div className="text-sm text-stone-600 space-y-1">
-                                                        <p>📍 {regStreet} {regHouseNumber}, {selectedLocation ? `${selectedLocation.postcode} ${selectedLocation.city}` : ''}</p>
+                                                        <p>📍 {fullAddress}</p>
                                                         <p>📧 {regEmail}</p>
                                                         <p>📞 {regPhone}</p>
                                                         <p>🌐 {regSubdomain}.mijnbeautyafspraken.nl</p>
