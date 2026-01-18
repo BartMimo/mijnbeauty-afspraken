@@ -424,6 +424,20 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         }
     }, [salon?.openingHours, selectedDate]);
 
+    // Auto-select staff member when entering staff step
+    useEffect(() => {
+        if (bookingStep === 'staff' && staff.length > 0 && !selectedStaff) {
+            if (staff.length === 1) {
+                // If only one staff member, auto-select and proceed
+                setSelectedStaff(staff[0]);
+                setBookingStep(selectedDeal ? 'confirm' : 'service');
+            } else {
+                // Multiple staff members, let user choose
+                setSelectedStaff(staff[0]); // Still pre-select first one for convenience
+            }
+        }
+    }, [bookingStep, staff, selectedStaff, selectedDeal]);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
@@ -760,8 +774,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         <Card className="p-6 border-brand-100 shadow-lg transition-all duration-300">
                             <h3 className="text-lg font-bold mb-4 border-b border-stone-100 pb-2">Je afspraak</h3>
                             
-                            {/* STAFF SELECTION STEP */}
-                            {bookingStep === 'staff' && (
+                            {/* STAFF SELECTION STEP - only show if multiple staff members */}
+                            {bookingStep === 'staff' && staff.length > 1 && (
                                 <div className="space-y-4 animate-fadeIn">
                                     <div className="text-center mb-4">
                                         <h4 className="font-semibold text-stone-900 mb-2">Kies een medewerker</h4>
@@ -769,26 +783,6 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                     </div>
 
                                     <div className="space-y-3">
-                                        {/* All staff option */}
-                                        <button
-                                            onClick={() => {
-                                                setSelectedStaff(null);
-                                                setBookingStep(selectedDeal ? 'confirm' : 'service');
-                                                scrollToWidget();
-                                            }}
-                                            className="w-full p-4 border-2 border-stone-200 rounded-xl hover:border-brand-300 hover:bg-brand-50 transition-colors text-left"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-stone-100 rounded-full flex items-center justify-center">
-                                                    <span className="text-stone-600 font-medium">AL</span>
-                                                </div>
-                                                <div>
-                                                    <div className="font-medium text-stone-900">Alle medewerkers</div>
-                                                    <div className="text-sm text-stone-500">Toon alle beschikbare diensten</div>
-                                                </div>
-                                            </div>
-                                        </button>
-
                                         {/* Individual staff members */}
                                         {staff.map((member) => (
                                             <button
