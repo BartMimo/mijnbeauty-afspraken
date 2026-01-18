@@ -608,9 +608,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                 }
                                 acc[category].push(service);
                                 return acc;
-                            }, {} as Record<string, typeof salon.services>);
+                            }, {} as Record<string, Service[]>);
 
-                            return Object.entries(servicesByCategory).map(([category, services]) => (
+                            return Object.entries(servicesByCategory).map(([category, services]: [string, Service[]]) => (
                                 <div key={category} className="mb-8">
                                     <h2 className="text-xl font-bold mb-4 px-2">{category}</h2>
                                     <div className="space-y-4">
