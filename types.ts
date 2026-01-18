@@ -89,7 +89,8 @@ export interface Deal {
   originalPrice: number;
   discountPrice: number;
   date: string;
-  time: string;
+  time: string; // Formatted display time (e.g., "20 jan, 12:00")
+  rawTime: string; // Raw time for database operations (e.g., "12:00")
   description: string;
   status?: string; // e.g., 'active', 'claimed', 'expired'
 }

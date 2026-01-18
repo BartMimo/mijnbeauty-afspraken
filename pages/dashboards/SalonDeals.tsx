@@ -48,7 +48,8 @@ export const SalonDeals: React.FC = () => {
                     service: d.service_name,
                     price: d.discount_price,
                     original: d.original_price,
-                    time: d.time ? `${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${d.time}` : new Date(d.date).toLocaleDateString('nl-NL'),
+                    time: d.time && d.date ? `${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${d.time}` : (d.date ? new Date(d.date).toLocaleDateString('nl-NL') : 'Geen datum'),
+                    rawTime: d.time || '',
                     date: d.date,
                     status: d.status || 'active'
                 })) || []);
@@ -71,7 +72,14 @@ export const SalonDeals: React.FC = () => {
     // Actions
     const handleEdit = (deal: any) => {
         setEditingDeal(deal);
-        setForm({ ...deal, date: deal.date || new Date().toISOString().split('T')[0] });
+        // Extract time from formatted string (e.g., "20 jan, 12:00" -> "12:00")
+        const timeMatch = deal.time?.match(/, (\d{1,2}:\d{2})$/);
+        const extractedTime = timeMatch ? timeMatch[1] : '';
+        setForm({ 
+            ...deal, 
+            time: extractedTime,
+            date: deal.date || new Date().toISOString().split('T')[0] 
+        });
         setIsModalOpen(true);
     };
 
@@ -118,7 +126,8 @@ export const SalonDeals: React.FC = () => {
                 setDeals(prev => prev.map(d => d.id === editingDeal.id ? { 
                     ...d, 
                     ...form,
-                    time: `${new Date(dealDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${form.time}`
+                    time: `${new Date(dealDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${form.time}`,
+                    rawTime: form.time
                 } : d));
             } else {
                 // Create new deal
@@ -143,6 +152,7 @@ export const SalonDeals: React.FC = () => {
                     price: data.discount_price,
                     original: data.original_price,
                     time: `${new Date(dealDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${form.time}`,
+                    rawTime: form.time,
                     date: dealDate,
                     status: data.status
                 }]);

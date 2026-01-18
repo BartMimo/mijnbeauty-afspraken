@@ -143,7 +143,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         originalPrice: d.original_price,
                         discountPrice: d.discount_price,
                         date: d.date,
-                        time: d.time,
+                        time: d.time && d.date ? `${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${d.time}` : (d.date ? new Date(d.date).toLocaleDateString('nl-NL') : d.time || 'Geen tijd'),
+                        rawTime: d.time || '',
                         description: d.description || '',
                         status: d.status
                     })));
@@ -703,7 +704,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             salon_name: salon.name,
                                                             service_name: selectedDeal.serviceName,
                                                             date: selectedDeal.date,
-                                                            time: selectedDeal.time,
+                                                            time: selectedDeal.rawTime,
                                                             status: 'confirmed',
                                                             price: selectedDeal.discountPrice,
                                                             customer_name: user?.user_metadata?.full_name || (user?.email || 'Gast'),
@@ -718,7 +719,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             p_service_id: null,
                                                             p_service_name: selectedDeal.serviceName,
                                                             p_date: selectedDeal.date,
-                                                            p_time: selectedDeal.time,
+                                                            p_time: selectedDeal.rawTime,
                                                             p_duration_minutes: null,
                                                             p_price: selectedDeal.discountPrice,
                                                             p_customer_name: user?.user_metadata?.full_name || (user?.email || 'Gast')
