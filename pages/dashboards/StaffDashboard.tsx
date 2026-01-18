@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, CheckCircle } from 'lucide-react';
-import { Button, Card, Badge } from '../../components/UIComponents';
+import { Button, Card, Badge, Modal } from '../../components/UIComponents';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 
@@ -15,6 +15,8 @@ export const StaffDashboard: React.FC = () => {
 
     // Appointments state
     const [appointments, setAppointments] = useState<any[]>([]);
+    const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+    const [appointmentDetails, setAppointmentDetails] = useState<any>(null);
 
     useEffect(() => {
         const fetchAppointments = async () => {
@@ -83,6 +85,29 @@ export const StaffDashboard: React.FC = () => {
         const matchesStaff = a.staff === firstName; 
         return matchesDate && matchesStaff;
     });
+
+    const handleViewAppointmentDetails = async (appointment: any) => {
+        setSelectedAppointment(appointment);
+        
+        try {
+            // Fetch detailed appointment info
+            const { data, error } = await supabase
+                .from('appointments')
+                .select(`
+                    *,
+                    profiles:user_id (full_name, email),
+                    services:service_id (name, category),
+                    salons:salon_id (name, address, city, phone, email)
+                `)
+                .eq('id', appointment.id)
+                .single();
+
+            if (error) throw error;
+            setAppointmentDetails(data);
+        } catch (err) {
+            console.error('Error fetching appointment details:', err);
+        }
+    };
 
     // Time slots for grid
     const timeSlots = [];
@@ -160,8 +185,9 @@ export const StaffDashboard: React.FC = () => {
                             return (
                                 <div 
                                     key={apt.id}
-                                    className={`absolute left-2 right-2 md:left-4 md:right-4 md:w-[95%] rounded-lg border-l-4 p-3 shadow-sm hover:shadow-md transition-all ${apt.color} cursor-default`}
+                                    className={`absolute left-2 right-2 md:left-4 md:right-4 md:w-[95%] rounded-lg border-l-4 p-3 shadow-sm hover:shadow-md transition-all ${apt.color} cursor-pointer`}
                                     style={style}
+                                    onClick={() => handleViewAppointmentDetails(apt)}
                                 >
                                     <div className="flex justify-between items-start">
                                         <div>
@@ -187,6 +213,88 @@ export const StaffDashboard: React.FC = () => {
                     </div>
                 </div>
             </Card>
+
+            {/* Appointment Details Modal */}
+            <Modal 
+                isOpen={!!appointmentDetails} 
+                onClose={() => {
+                    setAppointmentDetails(null);
+                    setSelectedAppointment(null);
+                }}
+                title="Afspraak Details"
+            >
+                {appointmentDetails && (
+                    <div className="space-y-6">
+                        {/* Header */}
+                        <div className="text-center pb-4 border-b border-stone-100">
+                            <h3 className="text-xl font-bold text-stone-900">{appointmentDetails.services?.name || appointmentDetails.service_name}</h3>
+                            <p className="text-stone-600">{appointmentDetails.services?.category || 'Dienst'}</p>
+                        </div>
+
+                        {/* Client Info */}
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                            <h4 className="font-semibold text-blue-900 mb-2 flex items-center">
+                                <User className="mr-2" size={16} />
+                                Klant Informatie
+                            </h4>
+                            <div className="space-y-1 text-sm">
+                                <p className="font-medium text-blue-800">{appointmentDetails.profiles?.full_name || appointmentDetails.customer_name || 'Onbekend'}</p>
+                                {appointmentDetails.profiles?.email && <p className="text-blue-600">✉️ {appointmentDetails.profiles.email}</p>}
+                            </div>
+                        </div>
+
+                        {/* Salon Info */}
+                        <div className="bg-purple-50 p-4 rounded-lg">
+                            <h4 className="font-semibold text-purple-900 mb-2 flex items-center">
+                                <div className="w-4 h-4 bg-purple-500 rounded-full mr-2"></div>
+                                Salon Informatie
+                            </h4>
+                            <div className="space-y-1 text-sm">
+                                <p className="font-medium text-purple-800">{appointmentDetails.salons?.name}</p>
+                                <p className="text-purple-600">{appointmentDetails.salons?.address}, {appointmentDetails.salons?.city}</p>
+                                {appointmentDetails.salons?.phone && <p className="text-purple-600">📞 {appointmentDetails.salons.phone}</p>}
+                                {appointmentDetails.salons?.email && <p className="text-purple-600">✉️ {appointmentDetails.salons.email}</p>}
+                            </div>
+                        </div>
+
+                        {/* Appointment Details */}
+                        <div className="grid gap-4">
+                            <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                                <CalendarIcon className="text-stone-400" size={20} />
+                                <div>
+                                    <p className="font-medium text-stone-900">{appointmentDetails.date}</p>
+                                    <p className="text-sm text-stone-500">Datum</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                                <Clock className="text-stone-400" size={20} />
+                                <div>
+                                    <p className="font-medium text-stone-900">{appointmentDetails.time}</p>
+                                    <p className="text-sm text-stone-500">Tijd ({appointmentDetails.duration_minutes} minuten)</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                                <div className="w-5 h-5 bg-stone-300 rounded-full flex items-center justify-center text-xs font-medium text-stone-600">💰</div>
+                                <div>
+                                    <p className="font-medium text-stone-900">€{appointmentDetails.price}</p>
+                                    <p className="text-sm text-stone-500">Prijs</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Status */}
+                        <div className="pt-4 border-t border-stone-100">
+                            <Badge variant={appointmentDetails.status === 'confirmed' ? 'success' : appointmentDetails.status === 'completed' ? 'default' : 'warning'}>
+                                {appointmentDetails.status === 'confirmed' ? 'Bevestigd' : 
+                                 appointmentDetails.status === 'completed' ? 'Voltooid' : 
+                                 appointmentDetails.status === 'cancelled' ? 'Geannuleerd' : 'In afwachting'}
+                            </Badge>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };

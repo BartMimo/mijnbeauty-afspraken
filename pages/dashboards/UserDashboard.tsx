@@ -12,6 +12,8 @@ export const UserDashboard: React.FC = () => {
     const [appointments, setAppointments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [notification, setNotification] = useState<string | null>(null);
+    const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+    const [appointmentDetails, setAppointmentDetails] = useState<any>(null);
 
     // Fetch appointments from Supabase
     useEffect(() => {
@@ -100,6 +102,29 @@ export const UserDashboard: React.FC = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    };
+
+    const handleViewAppointmentDetails = async (appointment: any) => {
+        setSelectedAppointment(appointment);
+        
+        try {
+            // Fetch detailed appointment info including staff and salon details
+            const { data, error } = await supabase
+                .from('appointments')
+                .select(`
+                    *,
+                    service:services(name, category),
+                    salon:salons(name, address, city, phone, email),
+                    staff:staff(name, email, phone)
+                `)
+                .eq('id', appointment.id)
+                .single();
+
+            if (error) throw error;
+            setAppointmentDetails(data);
+        } catch (err) {
+            console.error('Error fetching appointment details:', err);
+        }
     };
 
     const handleCancel = async (id: string) => {
@@ -250,7 +275,7 @@ export const UserDashboard: React.FC = () => {
                 </h2>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {upcoming.length > 0 ? upcoming.map((apt: any) => (
-                        <Card key={apt.id} className="p-5 border-l-4 border-l-brand-400 flex flex-col justify-between h-full">
+                        <Card key={apt.id} className="p-5 border-l-4 border-l-brand-400 flex flex-col justify-between h-full cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleViewAppointmentDetails(apt)}>
                             <div>
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
@@ -324,14 +349,17 @@ export const UserDashboard: React.FC = () => {
                             </thead>
                             <tbody className="divide-y divide-stone-100">
                                 {history.map((apt: any) => (
-                                    <tr key={apt.id} className="hover:bg-stone-50/50">
+                                    <tr key={apt.id} className="hover:bg-stone-50/50 cursor-pointer" onClick={() => handleViewAppointmentDetails(apt)}>
                                         <td className="px-6 py-4 text-stone-500">{apt.date}</td>
                                         <td className="px-6 py-4 font-medium text-stone-900">{apt.salonName}</td>
                                         <td className="px-6 py-4 text-stone-600">{apt.serviceName}</td>
                                         <td className="px-6 py-4 text-stone-600">€{apt.price}</td>
                                         <td className="px-6 py-4 text-right">
                                             <button 
-                                                onClick={() => handleRebook(apt.salonId)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation(); // Prevent row click
+                                                    handleRebook(apt.salonId);
+                                                }}
                                                 className="inline-flex items-center text-brand-500 hover:text-brand-600 font-medium text-xs bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors"
                                             >
                                                 <RotateCcw size={12} className="mr-1" /> Opnieuw boeken
@@ -372,6 +400,91 @@ export const UserDashboard: React.FC = () => {
                         <Button onClick={saveEdit}>Bevestigen</Button>
                     </div>
                 </div>
+            </Modal>
+
+            {/* Appointment Details Modal */}
+            <Modal 
+                isOpen={!!appointmentDetails} 
+                onClose={() => {
+                    setAppointmentDetails(null);
+                    setSelectedAppointment(null);
+                }}
+                title="Afspraak Details"
+            >
+                {appointmentDetails && (
+                    <div className="space-y-6">
+                        {/* Header */}
+                        <div className="text-center pb-4 border-b border-stone-100">
+                            <h3 className="text-xl font-bold text-stone-900">{appointmentDetails.service?.name}</h3>
+                            <p className="text-brand-600 font-medium">{appointmentDetails.salon?.name}</p>
+                        </div>
+
+                        {/* Details Grid */}
+                        <div className="grid gap-4">
+                            <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                                <Calendar className="text-stone-400" size={20} />
+                                <div>
+                                    <p className="font-medium text-stone-900">{appointmentDetails.date}</p>
+                                    <p className="text-sm text-stone-500">Datum</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                                <Clock className="text-stone-400" size={20} />
+                                <div>
+                                    <p className="font-medium text-stone-900">{appointmentDetails.time}</p>
+                                    <p className="text-sm text-stone-500">Tijd ({appointmentDetails.duration_minutes} minuten)</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                                <MapPin className="text-stone-400" size={20} />
+                                <div>
+                                    <p className="font-medium text-stone-900">{appointmentDetails.salon?.address}, {appointmentDetails.salon?.city}</p>
+                                    <p className="text-sm text-stone-500">Locatie</p>
+                                </div>
+                            </div>
+
+                            {appointmentDetails.staff && (
+                                <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                                    <div className="w-5 h-5 bg-stone-300 rounded-full flex items-center justify-center text-xs font-medium text-stone-600">👤</div>
+                                    <div>
+                                        <p className="font-medium text-stone-900">{appointmentDetails.staff.name}</p>
+                                        <p className="text-sm text-stone-500">Behandelaar</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                                <div className="w-5 h-5 bg-stone-300 rounded-full flex items-center justify-center text-xs font-medium text-stone-600">💰</div>
+                                <div>
+                                    <p className="font-medium text-stone-900">€{appointmentDetails.price}</p>
+                                    <p className="text-sm text-stone-500">Prijs</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Status */}
+                        <div className="pt-4 border-t border-stone-100">
+                            <Badge variant={appointmentDetails.status === 'confirmed' ? 'success' : appointmentDetails.status === 'completed' ? 'default' : 'warning'}>
+                                {appointmentDetails.status === 'confirmed' ? 'Bevestigd' : 
+                                 appointmentDetails.status === 'completed' ? 'Voltooid' : 
+                                 appointmentDetails.status === 'cancelled' ? 'Geannuleerd' : 'In afwachting'}
+                            </Badge>
+                        </div>
+
+                        {/* Contact Info */}
+                        {appointmentDetails.salon && (
+                            <div className="pt-4 border-t border-stone-100">
+                                <h4 className="font-semibold text-stone-900 mb-2">Contactgegevens Salon</h4>
+                                <div className="space-y-1 text-sm text-stone-600">
+                                    {appointmentDetails.salon.phone && <p>📞 {appointmentDetails.salon.phone}</p>}
+                                    {appointmentDetails.salon.email && <p>✉️ {appointmentDetails.salon.email}</p>}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </Modal>
         </div>
     );

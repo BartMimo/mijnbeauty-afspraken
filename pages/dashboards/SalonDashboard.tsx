@@ -28,6 +28,8 @@ export const SalonDashboard: React.FC = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredAppointments, setFilteredAppointments] = useState<any[]>([]);
+    const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+    const [appointmentDetails, setAppointmentDetails] = useState<any>(null);
 
     // Fetch salon data on mount
     useEffect(() => {
@@ -207,6 +209,29 @@ export const SalonDashboard: React.FC = () => {
         setAptForm({ client: '', service: '', time: '09:00', date: '', price: '' });
     };
 
+    const handleViewAppointmentDetails = async (appointment: any) => {
+        setSelectedAppointment(appointment);
+        
+        try {
+            // Fetch detailed appointment info including user and staff details
+            const { data, error } = await supabase
+                .from('appointments')
+                .select(`
+                    *,
+                    profiles:user_id (full_name, email),
+                    services:service_id (name, category),
+                    staff:staff_id (name, email, phone)
+                `)
+                .eq('id', appointment.id)
+                .single();
+
+            if (error) throw error;
+            setAppointmentDetails(data);
+        } catch (err) {
+            console.error('Error fetching appointment details:', err);
+        }
+    };
+
     // Stats display data
     const statsDisplay = [
         { label: 'Totaal Boekingen', value: stats.totalBookings.toString(), trend: '+12%', icon: Calendar },
@@ -325,7 +350,7 @@ export const SalonDashboard: React.FC = () => {
                         {/* Appointments list */}
                         <div className="divide-y divide-stone-100 max-h-96 overflow-y-auto">
                             {filteredAppointments.length > 0 ? filteredAppointments.map((apt, i) => (
-                                <div key={i} className="p-4 md:p-6 hover:bg-stone-50 transition-colors flex items-center justify-between cursor-pointer">
+                                <div key={i} className="p-4 md:p-6 hover:bg-stone-50 transition-colors flex items-center justify-between cursor-pointer" onClick={() => handleViewAppointmentDetails(apt)}>
                                     <div className="flex items-center gap-4">
                                         <div className="font-mono text-stone-500 font-medium">{apt.time}</div>
                                         {viewMode === 'week' && (
@@ -472,6 +497,97 @@ export const SalonDashboard: React.FC = () => {
                         <Button onClick={handleSaveApt}>Toevoegen</Button>
                     </div>
                 </div>
+            </Modal>
+
+            {/* Appointment Details Modal */}
+            <Modal 
+                isOpen={!!appointmentDetails} 
+                onClose={() => {
+                    setAppointmentDetails(null);
+                    setSelectedAppointment(null);
+                }}
+                title="Afspraak Details"
+            >
+                {appointmentDetails && (
+                    <div className="space-y-6">
+                        {/* Header */}
+                        <div className="text-center pb-4 border-b border-stone-100">
+                            <h3 className="text-xl font-bold text-stone-900">{appointmentDetails.services?.name || appointmentDetails.service_name}</h3>
+                            <p className="text-stone-600">{appointmentDetails.services?.category || 'Dienst'}</p>
+                        </div>
+
+                        {/* Client Info */}
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                            <h4 className="font-semibold text-blue-900 mb-2 flex items-center">
+                                <Users className="mr-2" size={16} />
+                                Klant Informatie
+                            </h4>
+                            <div className="space-y-1 text-sm">
+                                <p className="font-medium text-blue-800">{appointmentDetails.profiles?.full_name || appointmentDetails.customer_name || 'Onbekend'}</p>
+                                {appointmentDetails.profiles?.email && <p className="text-blue-600">✉️ {appointmentDetails.profiles.email}</p>}
+                            </div>
+                        </div>
+
+                        {/* Staff Info */}
+                        {appointmentDetails.staff && (
+                            <div className="bg-green-50 p-4 rounded-lg">
+                                <h4 className="font-semibold text-green-900 mb-2 flex items-center">
+                                    <div className="w-4 h-4 bg-green-500 rounded-full mr-2"></div>
+                                    Behandelaar
+                                </h4>
+                                <div className="space-y-1 text-sm">
+                                    <p className="font-medium text-green-800">{appointmentDetails.staff.name}</p>
+                                    {appointmentDetails.staff.email && <p className="text-green-600">✉️ {appointmentDetails.staff.email}</p>}
+                                    {appointmentDetails.staff.phone && <p className="text-green-600">📞 {appointmentDetails.staff.phone}</p>}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Appointment Details */}
+                        <div className="grid gap-4">
+                            <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                                <Calendar className="text-stone-400" size={20} />
+                                <div>
+                                    <p className="font-medium text-stone-900">{appointmentDetails.date}</p>
+                                    <p className="text-sm text-stone-500">Datum</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                                <Clock className="text-stone-400" size={20} />
+                                <div>
+                                    <p className="font-medium text-stone-900">{appointmentDetails.time}</p>
+                                    <p className="text-sm text-stone-500">Tijd ({appointmentDetails.duration_minutes} minuten)</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-lg">
+                                <div className="w-5 h-5 bg-stone-300 rounded-full flex items-center justify-center text-xs font-medium text-stone-600">💰</div>
+                                <div>
+                                    <p className="font-medium text-stone-900">€{appointmentDetails.price}</p>
+                                    <p className="text-sm text-stone-500">Prijs</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Status */}
+                        <div className="pt-4 border-t border-stone-100">
+                            <Badge variant={appointmentDetails.status === 'confirmed' ? 'success' : appointmentDetails.status === 'completed' ? 'default' : 'warning'}>
+                                {appointmentDetails.status === 'confirmed' ? 'Bevestigd' : 
+                                 appointmentDetails.status === 'completed' ? 'Voltooid' : 
+                                 appointmentDetails.status === 'cancelled' ? 'Geannuleerd' : 'In afwachting'}
+                            </Badge>
+                        </div>
+
+                        {/* Notes */}
+                        {appointmentDetails.notes && (
+                            <div className="pt-4 border-t border-stone-100">
+                                <h4 className="font-semibold text-stone-900 mb-2">Notities</h4>
+                                <p className="text-stone-600 text-sm">{appointmentDetails.notes}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
             </Modal>
         </div>
     );
