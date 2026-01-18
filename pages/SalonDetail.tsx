@@ -38,6 +38,26 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
     };
 
+    // Helper to normalize time format for database (ensure HH:MM:SS format)
+    const normalizeTimeForDB = (timeStr: string) => {
+        if (!timeStr) return timeStr;
+        // If already in HH:MM:SS format, return as is
+        if (timeStr.length === 8 && timeStr.includes(':')) return timeStr;
+        // If in HH:MM format, add :00 seconds
+        if (timeStr.length === 5 && timeStr.includes(':')) return timeStr + ':00';
+        // Return as is for other formats
+        return timeStr;
+    };
+
+    // Helper to normalize time for comparison (remove seconds if present)
+    const normalizeTimeForComparison = (timeStr: string) => {
+        if (!timeStr) return timeStr;
+        // If in HH:MM:SS format, return HH:MM
+        if (timeStr.length === 8 && timeStr.includes(':')) return timeStr.substring(0, 5);
+        // Return as is for other formats
+        return timeStr;
+    };
+
     // Fetch booked times for a date
     const fetchBookedTimes = async (date: Date) => {
         const dateStr = toLocalDateString(date);
@@ -46,7 +66,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             .select('time')
             .eq('salon_id', salon.supabaseId)
             .eq('date', dateStr);
-        setBookedTimes(data?.map(a => a.time) || []);
+        setBookedTimes(data?.map(a => normalizeTimeForComparison(a.time)) || []);
     };
     const [hoverRating, setHoverRating] = useState(0);
 
@@ -774,7 +794,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             salon_name: salon.name,
                                                             service_name: selectedDeal.serviceName,
                                                             date: selectedDeal.date,
-                                                            time: selectedDeal.rawTime,
+                                                            time: normalizeTimeForDB(selectedDeal.rawTime),
                                                             status: 'confirmed',
                                                             price: selectedDeal.discountPrice,
                                                             customer_name: user?.user_metadata?.full_name || (user?.email || 'Gast'),
@@ -789,7 +809,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             p_service_id: null,
                                                             p_service_name: selectedDeal.serviceName,
                                                             p_date: selectedDeal.date,
-                                                            p_time: selectedDeal.rawTime,
+                                                            p_time: normalizeTimeForDB(selectedDeal.rawTime),
                                                             p_price: selectedDeal.discountPrice,
                                                             p_customer_name: user?.user_metadata?.full_name || (user?.email || 'Gast')
                                                         });
@@ -815,7 +835,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             service_id: currentService?.id || null,
                                                             service_name: currentService?.name || '',
                                                             date: selectedDate ? toLocalDateString(selectedDate) : null,
-                                                            time: selectedTime,
+                                                            time: normalizeTimeForDB(selectedTime),
                                                             status: 'confirmed',
                                                             price: currentService?.price || 0,
                                                             customer_name: (await supabase.auth.getUser()).data?.user?.user_metadata?.full_name || 'Gast',
