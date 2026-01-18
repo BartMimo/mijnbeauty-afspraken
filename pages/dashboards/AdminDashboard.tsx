@@ -25,7 +25,7 @@ export const AdminDashboard: React.FC = () => {
             try {
                 const [{ data: salonsData }, { data: apptsData }, { data: profilesData }] = await Promise.all([
                     supabase.from('salons').select('id, name, city, created_at'),
-                    supabase.from('appointments').select('id, date, price, status').in('status', ['confirmed', 'completed']),
+                    supabase.from('appointments').select('id, date, price, status').or('status.eq.confirmed,status.eq.completed').lte('date', new Date().toISOString().split('T')[0]),
                     supabase.from('profiles').select('id, created_at')
                 ]);
 
@@ -105,6 +105,10 @@ export const AdminDashboard: React.FC = () => {
                     const weekBookings = appointments.filter((a: any) => {
                         if (!a.date) return false;
                         const appointmentDate = new Date(a.date);
+                        // For current week, only count appointments up to today
+                        const today = new Date();
+                        today.setHours(23, 59, 59, 999);
+                        if (appointmentDate > today) return false;
                         return appointmentDate >= week.start && appointmentDate <= week.end;
                     });
                     
@@ -126,6 +130,10 @@ export const AdminDashboard: React.FC = () => {
                     const monthBookings = appointments.filter((a: any) => {
                         if (!a.date) return false;
                         const appointmentDate = new Date(a.date);
+                        // For current month, only count appointments up to today
+                        const today = new Date();
+                        today.setHours(23, 59, 59, 999);
+                        if (appointmentDate > today) return false;
                         return appointmentDate >= monthStart && appointmentDate <= monthEnd;
                     });
                     

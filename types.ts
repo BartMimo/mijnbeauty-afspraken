@@ -91,6 +91,7 @@ export interface Deal {
   date: string;
   time: string; // Formatted display time (e.g., "20 jan, 12:00")
   rawTime: string; // Raw time for database operations (e.g., "12:00")
+  durationMinutes: number; // Duration of the service in minutes
   description: string;
   status?: string; // e.g., 'active', 'claimed', 'expired'
 }

@@ -9,7 +9,7 @@ export const SalonDeals: React.FC = () => {
     const [salonId, setSalonId] = useState<string | null>(null);
     const [deals, setDeals] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'claimed'>('active');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'claimed' | 'expired'>('active');
 
     // Fetch salon and deals on mount
     useEffect(() => {
@@ -51,6 +51,7 @@ export const SalonDeals: React.FC = () => {
                     time: d.time && d.date ? `${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${d.time}` : (d.date ? new Date(d.date).toLocaleDateString('nl-NL') : 'Geen datum'),
                     rawTime: d.time || '',
                     date: d.date,
+                    durationMinutes: d.duration_minutes || 60,
                     status: d.status || 'active'
                 })) || []);
 
@@ -67,7 +68,7 @@ export const SalonDeals: React.FC = () => {
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDeal, setEditingDeal] = useState<any>(null);
-    const [form, setForm] = useState({ service: '', price: '', original: '', time: '', date: '', status: 'active' });
+    const [form, setForm] = useState({ service: '', price: '', original: '', time: '', date: '', status: 'active', durationMinutes: 60 });
 
     // Actions
     const handleEdit = (deal: any) => {
@@ -78,14 +79,15 @@ export const SalonDeals: React.FC = () => {
         setForm({ 
             ...deal, 
             time: extractedTime,
-            date: deal.date || new Date().toISOString().split('T')[0] 
+            date: deal.date || new Date().toISOString().split('T')[0],
+            durationMinutes: deal.durationMinutes || 60
         });
         setIsModalOpen(true);
     };
 
     const handleCreate = () => {
         setEditingDeal(null);
-        setForm({ service: '', price: '', original: '', time: '', date: new Date().toISOString().split('T')[0], status: 'active' });
+        setForm({ service: '', price: '', original: '', time: '', date: new Date().toISOString().split('T')[0], status: 'active', durationMinutes: 60 });
         setIsModalOpen(true);
     };
 
@@ -118,6 +120,7 @@ export const SalonDeals: React.FC = () => {
                         discount_price: parseFloat(form.price),
                         date: dealDate,
                         time: form.time,
+                        duration_minutes: form.durationMinutes,
                         status: form.status
                     })
                     .eq('id', editingDeal.id);
@@ -140,6 +143,7 @@ export const SalonDeals: React.FC = () => {
                         discount_price: parseFloat(form.price),
                         date: dealDate,
                         time: form.time,
+                        duration_minutes: form.durationMinutes,
                         status: form.status
                     })
                     .select()
@@ -154,6 +158,7 @@ export const SalonDeals: React.FC = () => {
                     time: `${new Date(dealDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${form.time}`,
                     rawTime: form.time,
                     date: dealDate,
+                    durationMinutes: data.duration_minutes || 60,
                     status: data.status
                 }]);
             }
@@ -168,23 +173,42 @@ export const SalonDeals: React.FC = () => {
         const deal = deals.find(d => d.id === id);
         if (!deal) return;
 
-        const newStatus = deal.status === 'active' ? 'inactive' : 'active';
-        const { error } = await supabase
-            .from('deals')
-            .update({ status: newStatus })
-            .eq('id', id);
+        // Instead of toggling to 'inactive' (which may violate constraint),
+        // ask user if they want to delete the deal
+        if (deal.status === 'active') {
+            if (window.confirm('Deze deal deactiveren? Dit verwijdert de deal permanent.')) {
+                const { error } = await supabase
+                    .from('deals')
+                    .delete()
+                    .eq('id', id);
 
-        if (error) {
-            console.error('Status toggle failed:', error);
-            return;
-        }
+                if (error) {
+                    console.error('Delete failed:', error);
+                    alert('Verwijderen mislukt');
+                    return;
+                }
 
-        setDeals(prev => prev.map(d => {
-            if (d.id === id) {
-                return { ...d, status: newStatus };
+                setDeals(prev => prev.filter(d => d.id !== id));
             }
-            return d;
-        }));
+        } else {
+            // If somehow a deal has a different status, toggle it back to active
+            const { error } = await supabase
+                .from('deals')
+                .update({ status: 'active' })
+                .eq('id', id);
+
+            if (error) {
+                console.error('Status update failed:', error);
+                return;
+            }
+
+            setDeals(prev => prev.map(d => {
+                if (d.id === id) {
+                    return { ...d, status: 'active' };
+                }
+                return d;
+            }));
+        }
     };
 
     if (loading) {
@@ -206,6 +230,7 @@ export const SalonDeals: React.FC = () => {
                     <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)} className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm">
                         <option value="active">Actief</option>
                         <option value="claimed">Geclaimd</option>
+                        <option value="expired">Verlopen</option>
                         <option value="all">Alles</option>
                     </select>
                     <Button onClick={handleCreate}>
@@ -248,9 +273,18 @@ export const SalonDeals: React.FC = () => {
                                         <td className="px-6 py-4">
                                             <button 
                                                 onClick={() => toggleStatus(deal.id)}
-                                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${deal.status === 'active' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}`}
+                                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                                                    deal.status === 'active' 
+                                                        ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                                                        : deal.status === 'claimed'
+                                                            ? 'bg-stone-100 text-stone-500 cursor-not-allowed'
+                                                            : deal.status === 'expired'
+                                                                ? 'bg-stone-100 text-stone-500 cursor-not-allowed'
+                                                                : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                }`}
+                                                disabled={deal.status === 'claimed' || deal.status === 'expired'}
                                             >
-                                                {deal.status === 'active' ? 'Actief' : 'Inactief'}
+                                                {deal.status === 'active' ? 'Deactiveren' : deal.status === 'claimed' ? 'Geclaimd' : deal.status === 'expired' ? 'Verlopen' : 'Activeren'}
                                             </button>
                                         </td>
                                         <td className="px-6 py-4 text-right">
@@ -336,16 +370,20 @@ export const SalonDeals: React.FC = () => {
                         </div>
                     </div>
 
-                     <div className="flex items-center pt-2">
-                        <input 
-                            type="checkbox" 
-                            id="active" 
-                            className="mr-2 h-4 w-4 text-brand-600 rounded border-stone-300"
-                            checked={form.status === 'active'}
-                            onChange={e => setForm({...form, status: e.target.checked ? 'active' : 'inactive'})}
-                        />
-                        <label htmlFor="active" className="text-sm font-medium text-stone-700">Deal direct online zetten</label>
-                    </div>
+                    {/* Duration input */}
+                    <Input 
+                        label="Duur (minuten)" 
+                        type="number"
+                        value={form.durationMinutes}
+                        onChange={e => setForm({...form, durationMinutes: parseInt(e.target.value) || 60})}
+                        placeholder="60"
+                        min="15"
+                        max="480"
+                    />
+
+                     <p className="text-sm text-stone-600 pt-2">
+                        Deals zijn standaard actief en zichtbaar voor klanten. Gebruik de "Deactiveren" knop om een deal te verwijderen.
+                     </p>
                     <div className="flex justify-end pt-4 gap-2">
                         <Button variant="outline" onClick={() => setIsModalOpen(false)}>Annuleren</Button>
                         <Button 

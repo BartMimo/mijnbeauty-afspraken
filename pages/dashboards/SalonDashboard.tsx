@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Users, CreditCard, Calendar, ArrowUpRight, Tag, Plus, Clock, Trash2, Edit2 } from 'lucide-react';
+import { Users, CreditCard, Calendar, ArrowUpRight, Tag, Plus, Clock, Trash2, Edit2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, Badge, Button, Modal, Input, Select } from '../../components/UIComponents';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -22,6 +22,12 @@ export const SalonDashboard: React.FC = () => {
         newClients: 0
     });
     const [loading, setLoading] = useState(true);
+
+    // Agenda state
+    const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filteredAppointments, setFilteredAppointments] = useState<any[]>([]);
 
     // Fetch salon data on mount
     useEffect(() => {
@@ -68,42 +74,65 @@ export const SalonDashboard: React.FC = () => {
                     })));
                 }
 
-                // Fetch today's appointments
-                const today = new Date().toISOString().split('T')[0];
-                const { data: appointmentsData } = await supabase
+                // Fetch appointments based on view mode
+                let appointmentsQuery = supabase
                     .from('appointments')
                     .select(`
                         *,
                         profiles:user_id (full_name),
                         services:service_id (name, price)
                     `)
-                    .eq('salon_id', salon.id)
-                    .eq('date', today)
-                    .order('time', { ascending: true })
-                    .limit(5);
+                    .eq('salon_id', salon.id);
 
-                if (appointmentsData) {
-                    setAppointments(appointmentsData.map(a => ({
-                        id: a.id,
-                        time: a.time,
-                        client: a.profiles?.full_name || 'Onbekend',
-                        service: a.services?.name || 'Dienst',
-                        price: a.price || a.services?.price || 0,
-                        status: a.status
-                    })));
+                if (viewMode === 'day') {
+                    // Only today's appointments
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    appointmentsQuery = appointmentsQuery.eq('date', todayStr);
+                } else {
+                    // Week view: get appointments for the current week
+                    const startOfWeek = new Date(currentDate);
+                    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay()); // Start of week (Sunday)
+                    const endOfWeek = new Date(startOfWeek);
+                    endOfWeek.setDate(startOfWeek.getDate() + 6); // End of week (Saturday)
+
+                    appointmentsQuery = appointmentsQuery
+                        .gte('date', startOfWeek.toISOString().split('T')[0])
+                        .lte('date', endOfWeek.toISOString().split('T')[0]);
                 }
 
-                // Calculate stats
+                const { data: appointmentsData } = await appointmentsQuery
+                    .order('date', { ascending: true })
+                    .order('time', { ascending: true });
+
+                if (appointmentsData) {
+                    const formattedAppointments = appointmentsData.map(a => ({
+                        id: a.id,
+                        date: a.date,
+                        time: a.time,
+                        client: a.profiles?.full_name || a.customer_name || 'Onbekend',
+                        service: a.services?.name || a.service_name || 'Dienst',
+                        price: a.price || a.services?.price || 0,
+                        status: a.status
+                    }));
+
+                    setAppointments(formattedAppointments);
+                    setFilteredAppointments(formattedAppointments);
+                }
+
+                // Calculate stats - only count completed appointments and confirmed appointments that have already occurred
+                const now = new Date();
+                const today = now.toISOString().split('T')[0];
                 const startOfMonth = new Date();
                 startOfMonth.setDate(1);
                 startOfMonth.setHours(0, 0, 0, 0);
 
                 const { data: monthlyAppointments, count } = await supabase
                     .from('appointments')
-                    .select('price, status', { count: 'exact' })
+                    .select('price, status, date', { count: 'exact' })
                     .eq('salon_id', salon.id)
                     .gte('date', startOfMonth.toISOString().split('T')[0])
-                    .in('status', ['confirmed', 'completed']);
+                    .lte('date', today) // Only appointments up to today
+                    .or('status.eq.confirmed,status.eq.completed'); // Only confirmed or completed appointments
 
                 const revenue = monthlyAppointments?.reduce((sum, a) => sum + (a.price || 0), 0) || 0;
                 
@@ -121,11 +150,40 @@ export const SalonDashboard: React.FC = () => {
         };
 
         fetchSalonData();
-    }, [user]);
+    }, [user, viewMode, currentDate]);
+
+    // Filter appointments based on search query
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setFilteredAppointments(appointments);
+        } else {
+            const filtered = appointments.filter(apt =>
+                apt.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                apt.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                apt.time.includes(searchQuery)
+            );
+            setFilteredAppointments(filtered);
+        }
+    }, [appointments, searchQuery]);
+
+    // Navigation functions
+    const navigateDate = (direction: 'prev' | 'next') => {
+        const newDate = new Date(currentDate);
+        if (viewMode === 'day') {
+            newDate.setDate(currentDate.getDate() + (direction === 'next' ? 1 : -1));
+        } else {
+            newDate.setDate(currentDate.getDate() + (direction === 'next' ? 7 : -7));
+        }
+        setCurrentDate(newDate);
+    };
+
+    const goToToday = () => {
+        setCurrentDate(new Date());
+    };
 
     // --- MODAL STATES ---
     const [isAptModalOpen, setIsAptModalOpen] = useState(false);
-    const [aptForm, setAptForm] = useState({ client: '', service: '', time: '09:00', price: '' });
+    const [aptForm, setAptForm] = useState({ client: '', service: '', time: '09:00', date: '', price: '' });
 
     // --- ACTIONS: APPOINTMENTS ---
     
@@ -133,18 +191,20 @@ export const SalonDashboard: React.FC = () => {
         if (!salonId) return;
 
         // For now, just add to local state - full implementation would create in Supabase
-        const newApt = { 
-            id: Date.now().toString(), 
+        const appointmentDate = aptForm.date || new Date().toISOString().split('T')[0];
+        const newApt = {
+            id: Date.now().toString(),
+            date: appointmentDate,
             time: aptForm.time,
             client: aptForm.client,
             service: aptForm.service,
             price: parseFloat(aptForm.price) || 0,
-            status: 'pending'
+            status: 'confirmed'
         };
-        
+
         setAppointments(prev => [newApt, ...prev]);
         setIsAptModalOpen(false);
-        setAptForm({ client: '', service: '', time: '09:00', price: '' });
+        setAptForm({ client: '', service: '', time: '09:00', date: '', price: '' });
     };
 
     // Stats display data
@@ -202,18 +262,77 @@ export const SalonDashboard: React.FC = () => {
             </div>
 
             <div className="grid gap-8 lg:grid-cols-3">
-                {/* Schedule Today */}
+                {/* Schedule */}
                 <div className="lg:col-span-2 space-y-8">
                     <Card className="h-auto">
-                        <div className="p-6 border-b border-stone-100 flex justify-between items-center">
-                            <h3 className="font-bold text-stone-900">Agenda Vandaag</h3>
-                            <span className="text-sm text-stone-500">{new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</span>
+                        {/* Header with controls */}
+                        <div className="p-6 border-b border-stone-100">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                                <div className="flex items-center gap-4">
+                                    <h3 className="font-bold text-stone-900">Agenda</h3>
+                                    <div className="flex bg-stone-100 rounded-lg p-1">
+                                        <button
+                                            onClick={() => setViewMode('day')}
+                                            className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                                                viewMode === 'day' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:text-stone-900'
+                                            }`}
+                                        >
+                                            Dag
+                                        </button>
+                                        <button
+                                            onClick={() => setViewMode('week')}
+                                            className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                                                viewMode === 'week' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:text-stone-900'
+                                            }`}
+                                        >
+                                            Week
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button variant="ghost" size="sm" onClick={() => navigateDate('prev')}>
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="sm" onClick={goToToday}>
+                                        Vandaag
+                                    </Button>
+                                    <Button variant="ghost" size="sm" onClick={() => navigateDate('next')}>
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Date display and search */}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div className="relative flex-1 max-w-md">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-stone-400 h-4 w-4" />
+                                    <Input
+                                        placeholder="Zoek op naam, dienst of tijd..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="pl-10"
+                                    />
+                                </div>
+                                <span className="text-sm text-stone-500 font-medium">
+                                    {viewMode === 'day'
+                                        ? currentDate.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                                        : `Week van ${new Date(currentDate.getTime() - currentDate.getDay() * 24 * 60 * 60 * 1000).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} - ${new Date(currentDate.getTime() + (6 - currentDate.getDay()) * 24 * 60 * 60 * 1000).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                                    }
+                                </span>
+                            </div>
                         </div>
-                        <div className="divide-y divide-stone-100">
-                            {appointments.length > 0 ? appointments.map((apt, i) => (
+
+                        {/* Appointments list */}
+                        <div className="divide-y divide-stone-100 max-h-96 overflow-y-auto">
+                            {filteredAppointments.length > 0 ? filteredAppointments.map((apt, i) => (
                                 <div key={i} className="p-4 md:p-6 hover:bg-stone-50 transition-colors flex items-center justify-between cursor-pointer">
                                     <div className="flex items-center gap-4">
                                         <div className="font-mono text-stone-500 font-medium">{apt.time}</div>
+                                        {viewMode === 'week' && (
+                                            <div className="text-xs text-stone-400 font-medium">
+                                                {new Date(apt.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                                            </div>
+                                        )}
                                         <div>
                                             <p className="font-bold text-stone-900">{apt.client}</p>
                                             <p className="text-sm text-stone-500">{apt.service}</p>
@@ -221,21 +340,27 @@ export const SalonDashboard: React.FC = () => {
                                     </div>
                                     <div className="text-right">
                                         {apt.price && <span className="font-medium text-stone-900 block">€{apt.price}</span>}
-                                        <Badge variant="default">Bevestigd</Badge>
+                                        <Badge variant={apt.status === 'confirmed' ? 'success' : apt.status === 'completed' ? 'default' : 'warning'}>
+                                            {apt.status === 'confirmed' ? 'Bevestigd' : apt.status === 'completed' ? 'Voltooid' : apt.status === 'cancelled' ? 'Geannuleerd' : 'In afwachting'}
+                                        </Badge>
                                     </div>
                                 </div>
                             )) : (
-                                <div className="p-6 text-center text-stone-500 italic">Geen afspraken vandaag.</div>
+                                <div className="p-6 text-center text-stone-500 italic">
+                                    {searchQuery ? 'Geen afspraken gevonden voor deze zoekopdracht.' : 'Geen afspraken gevonden.'}
+                                </div>
                             )}
-                            <div className="p-4 text-center">
-                                <Button 
-                                    variant="ghost" 
-                                    className="text-brand-500"
-                                    onClick={() => navigate(`${basePath}/schedule`)}
-                                >
-                                    Bekijk volledige agenda
-                                </Button>
-                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 text-center border-t border-stone-100">
+                            <Button
+                                variant="ghost"
+                                className="text-brand-500"
+                                onClick={() => navigate(`${basePath}/schedule`)}
+                            >
+                                Bekijk volledige agenda
+                            </Button>
                         </div>
                     </Card>
                 </div>
@@ -311,31 +436,37 @@ export const SalonDashboard: React.FC = () => {
                 title="Nieuwe Afspraak"
             >
                 <div className="space-y-4">
-                     <Input 
-                        label="Klant Naam" 
+                     <Input
+                        label="Klant Naam"
                         value={aptForm.client}
                         onChange={e => setAptForm({...aptForm, client: e.target.value})}
                     />
-                    <Input 
-                        label="Dienst" 
+                    <Input
+                        label="Dienst"
                         value={aptForm.service}
                         onChange={e => setAptForm({...aptForm, service: e.target.value})}
                         placeholder="bv. Knippen"
                     />
                     <div className="grid grid-cols-2 gap-4">
-                        <Input 
-                            label="Tijd" 
+                        <Input
+                            label="Datum"
+                            type="date"
+                            value={aptForm.date || new Date().toISOString().split('T')[0]}
+                            onChange={e => setAptForm({...aptForm, date: e.target.value})}
+                        />
+                        <Input
+                            label="Tijd"
                             type="time"
                             value={aptForm.time}
                             onChange={e => setAptForm({...aptForm, time: e.target.value})}
                         />
-                         <Input 
-                            label="Prijs (€) (Optioneel)" 
-                            type="number"
-                            value={aptForm.price}
-                            onChange={e => setAptForm({...aptForm, price: e.target.value})}
-                        />
                     </div>
+                    <Input
+                        label="Prijs (€) (Optioneel)"
+                        type="number"
+                        value={aptForm.price}
+                        onChange={e => setAptForm({...aptForm, price: e.target.value})}
+                    />
                     <div className="flex justify-end pt-4 gap-2">
                         <Button variant="outline" onClick={() => setIsAptModalOpen(false)}>Annuleren</Button>
                         <Button onClick={handleSaveApt}>Toevoegen</Button>

@@ -145,6 +145,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         date: d.date,
                         time: d.time && d.date ? `${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${d.time}` : (d.date ? new Date(d.date).toLocaleDateString('nl-NL') : d.time || 'Geen tijd'),
                         rawTime: d.time || '',
+                        durationMinutes: d.duration_minutes || 60,
                         description: d.description || '',
                         status: d.status
                     })));
@@ -720,7 +721,6 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             p_service_name: selectedDeal.serviceName,
                                                             p_date: selectedDeal.date,
                                                             p_time: selectedDeal.rawTime,
-                                                            p_duration_minutes: null,
                                                             p_price: selectedDeal.discountPrice,
                                                             p_customer_name: user?.user_metadata?.full_name || (user?.email || 'Gast')
                                                         });
