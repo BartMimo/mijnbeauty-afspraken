@@ -788,6 +788,23 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                     const { data: authUser } = await supabase.auth.getUser();
                                                     const user = authUser?.user || null;
                                                     if (selectedDeal) {
+                                                        // First claim the deal atomically
+                                                        const { data: claimResult, error: claimError } = await supabase
+                                                            .from('deals')
+                                                            .update({ status: 'claimed' })
+                                                            .eq('id', selectedDeal.id)
+                                                            .eq('status', 'active')
+                                                            .select('id')
+                                                            .maybeSingle();
+
+                                                        if (claimError) throw claimError;
+                                                        if (!claimResult) {
+                                                            alert('Deze deal is helaas al geclaimd. Ververs de pagina en probeer een andere deal.');
+                                                            setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
+                                                            setSelectedDeal(null);
+                                                            return;
+                                                        }
+
                                                         // Create appointment for the deal
                                                         const insertData: any = {
                                                             salon_id: salon.id,
@@ -795,33 +812,15 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                             service_name: selectedDeal.serviceName,
                                                             date: selectedDeal.date,
                                                             time: normalizeTimeForDB(selectedDeal.rawTime),
+                                                            duration_minutes: selectedDeal.durationMinutes || 60,
                                                             status: 'confirmed',
                                                             price: selectedDeal.discountPrice,
                                                             customer_name: user?.user_metadata?.full_name || (user?.email || 'Gast'),
                                                             user_id: user?.id || null,
                                                         };
                                                         const { insertAppointmentSafe } = await import('../lib/appointments');
-                                                        // Use the DB RPC to do an atomic claim + insert server-side
-                                                        const { data, error: rpcErr } = await supabase.rpc('claim_and_create_appointment', {
-                                                            p_deal_id: selectedDeal.id,
-                                                            p_user_id: user?.id || null,  // Set to user.id if logged in
-                                                            p_salon_id: salon.id,
-                                                            p_service_id: null,
-                                                            p_service_name: selectedDeal.serviceName,
-                                                            p_date: selectedDeal.date,
-                                                            p_time: normalizeTimeForDB(selectedDeal.rawTime),
-                                                            p_price: selectedDeal.discountPrice,
-                                                            p_customer_name: user?.user_metadata?.full_name || (user?.email || 'Gast')
-                                                        });
-                                                        if (rpcErr) throw rpcErr;
-
-                                                        const returnedId = Array.isArray(data) ? data[0] : data;
-                                                        if (!returnedId) {
-                                                            alert('Deze deal is helaas al geclaimd. Ververs de pagina en probeer een andere deal.');
-                                                            setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
-                                                            setSelectedDeal(null);
-                                                            return;
-                                                        }
+                                                        const { error: insertErr } = await insertAppointmentSafe(insertData);
+                                                        if (insertErr) throw insertErr;
 
                                                         // Success
                                                         setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
