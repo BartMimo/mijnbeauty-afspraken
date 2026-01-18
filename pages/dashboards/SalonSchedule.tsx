@@ -181,6 +181,187 @@ export const SalonSchedule: React.FC = () => {
     const displayAppointments = getFilteredAppointments();
     const uniqueStaff = Array.from(new Set([...displayAppointments.map(a => a.staff), 'Sarah', 'Mike']));
 
+    // Render functions for different views
+    const renderDayView = () => {
+        const dayAppointments = displayAppointments.filter(a => a.date === toDateString(currentDate));
+        const timeSlots = [];
+        for (let hour = 9; hour <= 18; hour++) {
+            for (let minute = 0; minute < 60; minute += 30) {
+                timeSlots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+            }
+        }
+
+        return (
+            <div className="h-full flex flex-col">
+                <div className="p-4 border-b border-stone-100">
+                    <h3 className="text-lg font-semibold text-stone-900">
+                        {currentDate.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </h3>
+                    <p className="text-stone-500 text-sm">{dayAppointments.length} afspraak{dayAppointments.length !== 1 ? 'en' : ''}</p>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                    <div className="space-y-2">
+                        {timeSlots.map(timeSlot => {
+                            const appointment = dayAppointments.find(a => a.time === timeSlot);
+                            return (
+                                <div key={timeSlot} className="flex items-center h-12 border-l-4 border-stone-200 pl-4">
+                                    <span className="text-sm font-medium text-stone-600 w-16">{timeSlot}</span>
+                                    {appointment ? (
+                                        <div className="flex-1 ml-4 p-3 bg-brand-50 border border-brand-200 rounded-lg">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="font-medium text-stone-900">{appointment.client}</p>
+                                                    <p className="text-sm text-stone-600">{appointment.service}</p>
+                                                    <p className="text-xs text-stone-500">{appointment.staff}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs bg-brand-100 text-brand-800 px-2 py-1 rounded">
+                                                        {appointment.duration}min
+                                                    </span>
+                                                    <button className="text-stone-400 hover:text-stone-600">
+                                                        <MoreVertical size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 ml-4 h-full border-2 border-dashed border-stone-200 rounded-lg opacity-50"></div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderWeekView = () => {
+        const weekStart = new Date(currentDate);
+        weekStart.setDate(currentDate.getDate() - currentDate.getDay());
+        const weekDays = [];
+        for (let i = 0; i < 7; i++) {
+            const day = new Date(weekStart);
+            day.setDate(weekStart.getDate() + i);
+            weekDays.push(day);
+        }
+
+        return (
+            <div className="h-full flex flex-col">
+                <div className="p-4 border-b border-stone-100">
+                    <h3 className="text-lg font-semibold text-stone-900">
+                        Week van {weekStart.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}
+                    </h3>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                    <div className="grid grid-cols-7 gap-1 p-4">
+                        {weekDays.map(day => {
+                            const dayAppointments = displayAppointments.filter(a => a.date === toDateString(day));
+                            const isCurrentDay = isToday(day);
+
+                            return (
+                                <div key={day.toISOString()} className={`min-h-[120px] p-2 border rounded-lg ${isCurrentDay ? 'bg-brand-50 border-brand-300' : 'border-stone-200'}`}>
+                                    <div className="text-center mb-2">
+                                        <p className={`text-sm font-medium ${isCurrentDay ? 'text-brand-900' : 'text-stone-700'}`}>
+                                            {day.toLocaleDateString('nl-NL', { weekday: 'short' })}
+                                        </p>
+                                        <p className={`text-lg font-bold ${isCurrentDay ? 'text-brand-900' : 'text-stone-900'}`}>
+                                            {day.getDate()}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {dayAppointments.slice(0, 3).map(appointment => (
+                                            <div key={appointment.id} className="text-xs p-1 bg-brand-100 text-brand-800 rounded truncate">
+                                                {appointment.time} {appointment.client}
+                                            </div>
+                                        ))}
+                                        {dayAppointments.length > 3 && (
+                                            <div className="text-xs text-stone-500 text-center">
+                                                +{dayAppointments.length - 3} meer
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderMonthView = () => {
+        const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const startDate = new Date(monthStart);
+        startDate.setDate(startDate.getDate() - startDate.getDay());
+
+        const endDate = new Date(monthEnd);
+        endDate.setDate(endDate.getDate() + (6 - endDate.getDay()));
+
+        const calendarDays = [];
+        const current = new Date(startDate);
+        while (current <= endDate) {
+            calendarDays.push(new Date(current));
+            current.setDate(current.getDate() + 1);
+        }
+
+        return (
+            <div className="h-full flex flex-col">
+                <div className="p-4 border-b border-stone-100">
+                    <h3 className="text-lg font-semibold text-stone-900">
+                        {currentDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}
+                    </h3>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                    <div className="grid grid-cols-7 gap-1 mb-2">
+                        {['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'].map(day => (
+                            <div key={day} className="text-center text-sm font-medium text-stone-500 py-2">
+                                {day}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1">
+                        {calendarDays.map(day => {
+                            const dayAppointments = displayAppointments.filter(a => a.date === toDateString(day));
+                            const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                            const isCurrentDay = isToday(day);
+
+                            return (
+                                <div
+                                    key={day.toISOString()}
+                                    className={`min-h-[80px] p-1 border rounded-lg ${
+                                        isCurrentMonth
+                                            ? isCurrentDay
+                                                ? 'bg-brand-50 border-brand-300'
+                                                : 'border-stone-200'
+                                            : 'border-stone-100 bg-stone-50'
+                                    }`}
+                                >
+                                    <div className={`text-sm font-medium mb-1 ${isCurrentMonth ? (isCurrentDay ? 'text-brand-900' : 'text-stone-900') : 'text-stone-400'}`}>
+                                        {day.getDate()}
+                                    </div>
+                                    <div className="space-y-1">
+                                        {dayAppointments.slice(0, 2).map(appointment => (
+                                            <div key={appointment.id} className="text-xs p-1 bg-brand-100 text-brand-800 rounded truncate">
+                                                {appointment.time}
+                                            </div>
+                                        ))}
+                                        {dayAppointments.length > 2 && (
+                                            <div className="text-xs text-stone-500">
+                                                +{dayAppointments.length - 2}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="flex flex-col h-[calc(100vh-8rem)]">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
@@ -274,11 +455,9 @@ export const SalonSchedule: React.FC = () => {
             </div>
 
             <Card className="flex-1 overflow-hidden border-stone-200 shadow-sm relative bg-white rounded-2xl">
-                <div className="h-full p-6 text-center text-stone-500">
-                    <CalendarIcon size={48} className="mx-auto mb-4 opacity-50" />
-                    <h3 className="text-lg font-medium mb-2">Agenda</h3>
-                    <p>De agenda functionaliteit wordt uitgebreid met dag-, week- en maandweergaven.</p>
-                </div>
+                {viewMode === 'day' && renderDayView()}
+                {viewMode === 'week' && renderWeekView()}
+                {viewMode === 'month' && renderMonthView()}
             </Card>
         </div>
     );

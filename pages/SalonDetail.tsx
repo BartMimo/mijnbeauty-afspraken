@@ -74,7 +74,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     .from('salons')
                     .select(`
                         *,
-                        services(*)
+                        services(*),
+                        opening_hours
                     `)
                     .eq('slug', salonId)
                     .maybeSingle();
@@ -85,7 +86,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         .from('salons')
                         .select(`
                             *,
-                            services(*)
+                            services(*),
+                            opening_hours
                         `)
                         .eq('id', salonId)
                         .maybeSingle();
@@ -123,7 +125,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         duration: s.duration_minutes,
                         category: 'Nails'
                     })),
-                    image: data.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'
+                    image: data.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800',
+                    openingHours: data.opening_hours
                 });
 
                 // Fetch deals
@@ -192,6 +195,15 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
 
         fetchSalon();
     }, [salonId, user]);
+
+    // Reset selected date/time if salon opening hours change and selected date is no longer available
+    useEffect(() => {
+        if (selectedDate && salon?.openingHours && !isDateAvailable(selectedDate)) {
+            setSelectedDate(null);
+            setSelectedTime(null);
+            setBookedTimes([]);
+        }
+    }, [salon?.openingHours, selectedDate]);
 
     const toggleFavorite = async () => {
         if (!salon || !user) {
@@ -367,7 +379,62 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         return d < today;
     };
 
-    const availableTimes = ['09:00', '09:30', '10:00', '11:15', '13:00', '14:30', '16:00', '16:45'];
+    // Function to check if salon is open on a given date
+    const isSalonOpen = (date: Date) => {
+        if (!salon?.openingHours) {
+            return true; // Assume open if no opening hours data
+        }
+
+        const days = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
+        const dayOfWeek = days[date.getDay()];
+
+        const dayHours = salon.openingHours[dayOfWeek];
+        return dayHours && !dayHours.closed;
+    };
+
+    // Function to check if a date is available for booking
+    const isDateAvailable = (date: Date) => {
+        return !isPast(date) && isSalonOpen(date);
+    };
+
+    // Function to get available times based on opening hours
+    const getAvailableTimes = (date: Date) => {
+        if (!salon?.openingHours) {
+            // Fallback to default times if no opening hours
+            return ['09:00', '09:30', '10:00', '11:15', '13:00', '14:30', '16:00', '16:45'];
+        }
+
+        // Get day of week in Dutch format (ma, di, wo, do, vr, za, zo)
+        const days = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
+        const dayOfWeek = days[date.getDay()];
+
+        const dayHours = salon.openingHours[dayOfWeek];
+        if (!dayHours || dayHours.closed) {
+            return []; // Salon is closed on this day
+        }
+
+        // Generate time slots every 30 minutes between start and end time
+        const times = [];
+        const [startHour, startMinute] = dayHours.start.split(':').map(Number);
+        const [endHour, endMinute] = dayHours.end.split(':').map(Number);
+
+        let currentHour = startHour;
+        let currentMinute = startMinute;
+
+        while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
+            const timeString = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+            times.push(timeString);
+
+            // Add 30 minutes
+            currentMinute += 30;
+            if (currentMinute >= 60) {
+                currentHour += 1;
+                currentMinute = 0;
+            }
+        }
+
+        return times;
+    };
 
     const formatDateDutch = (date: Date) => {
         return new Intl.DateTimeFormat('nl-NL', { weekday: 'short', day: 'numeric', month: 'long' }).format(date);
@@ -628,12 +695,14 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                     const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), d);
                                                     const isSelected = selectedDate && isSameDay(selectedDate, dateObj);
                                                     const isPastDate = isPast(dateObj);
+                                                    const isClosed = !isSalonOpen(dateObj);
+                                                    const isDisabled = isPastDate || isClosed;
                                                     return (
                                                         <button 
                                                             key={d}
-                                                            disabled={isPastDate}
-                                                                onClick={() => { setSelectedDate(dateObj); setSelectedTime(null); fetchBookedTimes(dateObj); }}
-                                                            className={`h-9 w-9 rounded-full flex items-center justify-center text-sm transition-all ${isSelected ? 'bg-brand-500 text-white font-bold shadow-md' : isPastDate ? 'text-stone-300 cursor-not-allowed' : 'text-stone-700 hover:bg-brand-50 hover:text-brand-600'}`}
+                                                            disabled={isDisabled}
+                                                            onClick={() => { setSelectedDate(dateObj); setSelectedTime(null); fetchBookedTimes(dateObj); }}
+                                                            className={`h-9 w-9 rounded-full flex items-center justify-center text-sm transition-all ${isSelected ? 'bg-brand-500 text-white font-bold shadow-md' : isDisabled ? 'text-stone-300 cursor-not-allowed' : 'text-stone-700 hover:bg-brand-50 hover:text-brand-600'}`}
                                                         >
                                                             {d}
                                                         </button>
@@ -646,7 +715,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                 <div className="border-t border-stone-100 pt-4 animate-fadeIn">
                                                     <p className="text-sm font-medium text-stone-700 mb-3">Tijdstip:</p>
                                                     <div className="grid grid-cols-3 gap-2">
-                                                        {availableTimes.filter(time => !bookedTimes.includes(time)).map(time => (
+                                                        {(selectedDate ? getAvailableTimes(selectedDate) : []).filter(time => !bookedTimes.includes(time)).map(time => (
                                                             <button 
                                                                 key={time} 
                                                                 onClick={() => setSelectedTime(time)}

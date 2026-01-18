@@ -49,6 +49,14 @@ export interface Location {
   province: string;
 }
 
+export interface OpeningHours {
+  [key: string]: {
+    start: string;
+    end: string;
+    closed: boolean;
+  };
+}
+
 export interface Salon {
   id: string;
   subdomain: string; // Unique identifier for subdomain routing (e.g., 'glow' for glow.mijnbeautyafspraken.nl)
@@ -65,6 +73,7 @@ export interface Salon {
   services: Service[];
   email?: string;
   phone?: string;
+  openingHours?: OpeningHours;
 }
 
 export interface Appointment {

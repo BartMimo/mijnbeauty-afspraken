@@ -169,7 +169,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     .from('salons')
                     .select(`
                         *,
-                        services(*)
+                        services(*),
+                        opening_hours
                     `)
                     .eq('slug', salonId)
                     .maybeSingle();
@@ -179,7 +180,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         .from('salons')
                         .select(`
                             *,
-                            services(*)
+                            services(*),
+                            opening_hours
                         `)
                         .eq('id', salonId)
                         .maybeSingle();
@@ -221,7 +223,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         durationMinutes: s.duration_minutes,
                         category: 'Nails'
                     })),
-                    image: data.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800'
+                    image: data.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800',
+                    openingHours: data.opening_hours
                 });
 
                 // Check if user has this salon as favorite
@@ -471,19 +474,30 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                 <p className="text-stone-500">{salon.address}<br/>{salon.zipCode} {salon.city}</p>
                             </div>
                             <div>
-                                <h4 className="font-semibold text-stone-900 mb-2">Openingstijden</h4>
-                                <div className="text-stone-500 text-sm space-y-1">
+                                <h4 className="font-semibold text-stone-900 mb-3 flex items-center">
+                                    <Clock className="mr-2" size={16} />
+                                    Openingstijden
+                                </h4>
+                                <div className="space-y-2">
                                     {(() => {
-                                        const hours = salon.opening_hours || {};
+                                        const hours = salon.openingHours || {};
                                         const days = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
-                                        const dayNames = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+                                        const dayNames = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag'];
 
                                         return days.map((day, index) => {
                                             const dayData = hours[day];
-                                            if (dayData?.closed) {
-                                                return <div key={day}>{dayNames[index]}: Gesloten</div>;
-                                            }
-                                            return <div key={day}>{dayNames[index]}: {dayData?.start || '09:00'} - {dayData?.end || '18:00'}</div>;
+                                            const isClosed = dayData?.closed;
+
+                                            return (
+                                                <div key={day} className="flex justify-between items-center py-1">
+                                                    <span className={`text-sm font-medium ${isClosed ? 'text-stone-400' : 'text-stone-700'}`}>
+                                                        {dayNames[index]}
+                                                    </span>
+                                                    <span className={`text-sm ${isClosed ? 'text-stone-400 italic' : 'text-stone-600'}`}>
+                                                        {isClosed ? 'Gesloten' : `${dayData?.start || '09:00'} - ${dayData?.end || '18:00'}`}
+                                                    </span>
+                                                </div>
+                                            );
                                         });
                                     })()}
                                 </div>
