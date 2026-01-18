@@ -95,6 +95,7 @@ export const SalonSchedule: React.FC = () => {
                         services:service_id (name, duration_minutes)
                     `)
                     .eq('salon_id', salon.id)
+                    .neq('status', 'cancelled')
                     .order('date', { ascending: true })
                     .order('time', { ascending: true });
 
@@ -293,11 +294,18 @@ export const SalonSchedule: React.FC = () => {
     const renderMonthView = () => {
         const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
         const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-        const startDate = new Date(monthStart);
-        startDate.setDate(startDate.getDate() - startDate.getDay());
 
+        // Calculate start date (first Monday before or on monthStart)
+        const startDate = new Date(monthStart);
+        const startDayOfWeek = startDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const daysToSubtract = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; // Monday = 1, so subtract 0 for Monday, 6 for Sunday
+        startDate.setDate(startDate.getDate() - daysToSubtract);
+
+        // Calculate end date (last Sunday after or on monthEnd)
         const endDate = new Date(monthEnd);
-        endDate.setDate(endDate.getDate() + (6 - endDate.getDay()));
+        const endDayOfWeek = endDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const daysToAdd = endDayOfWeek === 0 ? 0 : 7 - endDayOfWeek; // Sunday = 0, so add 0 for Sunday, 6 for Monday
+        endDate.setDate(endDate.getDate() + daysToAdd);
 
         const calendarDays = [];
         const current = new Date(startDate);
