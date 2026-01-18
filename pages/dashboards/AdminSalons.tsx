@@ -279,7 +279,7 @@ export const AdminSalons: React.FC = () => {
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-stone-900">
                                             <button 
-                                                onClick={() => window.open(`/${salon.id}`, '_blank')}
+                                                onClick={() => openEditModal(salon)}
                                                 className="text-brand-600 hover:text-brand-700 hover:underline"
                                             >
                                                 {salon.name}
@@ -319,6 +319,13 @@ export const AdminSalons: React.FC = () => {
                                                 </>
                                             ) : (
                                                 <>
+                                                    <button 
+                                                        onClick={() => window.open(`/${salon.id}`, '_blank')}
+                                                        className="p-1.5 text-stone-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        title="Publieke pagina bekijken"
+                                                    >
+                                                        <CheckCircle size={16} />
+                                                    </button>
                                                     <button 
                                                         onClick={() => openEditModal(salon)}
                                                         className="p-1.5 text-stone-400 hover:text-brand-500 hover:bg-brand-50 rounded-lg transition-colors"
