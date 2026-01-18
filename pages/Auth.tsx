@@ -52,6 +52,7 @@ interface InitialService {
     price: number;
     duration: number;
     category: string;
+    assignedToStaff: boolean;
 }
 
 export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ initialMode = 'login' }) => {
@@ -82,7 +83,12 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     const [regSubdomain, setRegSubdomain] = useState('');
     const [subdomainStatus, setSubdomainStatus] = useState<'idle' | 'available' | 'taken'>('idle');
 
-    // Step 2: Address fields
+    // Step 2: Staff Member (NEW)
+    const [staffName, setStaffName] = useState('');
+    const [staffEmail, setStaffEmail] = useState('');
+    const [staffPhone, setStaffPhone] = useState('');
+
+    // Step 3: Address fields
     const [locations, setLocations] = useState<Location[]>([]);
     const [regPhone, setRegPhone] = useState('');
 
@@ -108,9 +114,9 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     const [newCategoryName, setNewCategoryName] = useState('');
     const [newCategoryDescription, setNewCategoryDescription] = useState('');
 
-    // Step 5: Initial Service (RENAMED from Step 4)
+    // Step 7: Initial Service
     const [initialServices, setInitialServices] = useState<InitialService[]>([
-        { name: '', price: 0, duration: 30, category: '' }
+        { name: '', price: 0, duration: 30, category: '', assignedToStaff: true }
     ]);
 
     // Valid discount codes (case-insensitive)
@@ -162,6 +168,15 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
             setSubdomainStatus('idle');
         }
     }, [regSalonName]);
+
+    // Handle URL parameters for role
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const roleParam = urlParams.get('role');
+        if (roleParam === 'salon') {
+            setRole('salon');
+        }
+    }, []);
 
     const checkAvailability = async (slug: string) => {
         if (!slug) {
@@ -340,21 +355,66 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                         } else {
                                             console.log('Pending owner staff member created successfully');
 
-                                            // Create service_staff assignments for all created services
+                                            // Create the staff member from pending registration
+                                            let staffMemberId = null;
+                                            if (pendingSalon.staffMember) {
+                                                try {
+                                                    const { data: newStaffMember, error: newStaffError } = await supabase
+                                                        .from('staff')
+                                                        .insert({
+                                                            salon_id: newSalon.id,
+                                                            name: pendingSalon.staffMember.name,
+                                                            email: pendingSalon.staffMember.email,
+                                                            phone: pendingSalon.staffMember.phone,
+                                                            role: 'staff',
+                                                            is_active: true
+                                                        })
+                                                        .select()
+                                                        .single();
+
+                                                    if (newStaffError) {
+                                                        console.error('Pending staff member creation error:', newStaffError);
+                                                    } else {
+                                                        console.log('Pending staff member created successfully');
+                                                        staffMemberId = newStaffMember.id;
+                                                    }
+                                                } catch (newStaffErr) {
+                                                    console.error('Error creating pending staff member:', newStaffErr);
+                                                }
+                                            }
+
+                                            // Create service_staff assignments
                                             if (createdServices.length > 0) {
-                                                const serviceStaffInserts = createdServices.map(service => ({
-                                                    service_id: service.id,
-                                                    staff_id: staffMember.id
-                                                }));
+                                                const serviceStaffInserts: any[] = [];
 
-                                                const { error: ssError } = await supabase
-                                                    .from('service_staff')
-                                                    .insert(serviceStaffInserts);
+                                                createdServices.forEach((service, index) => {
+                                                    const serviceData = pendingSalon.services[index];
+                                                    
+                                                    // Always assign to owner
+                                                    serviceStaffInserts.push({
+                                                        service_id: service.id,
+                                                        staff_id: staffMember.id
+                                                    });
 
-                                                if (ssError) {
-                                                    console.error('Pending service-staff assignments error:', ssError);
-                                                } else {
-                                                    console.log('Pending service-staff assignments created successfully');
+                                                    // Also assign to staff member if checked
+                                                    if (serviceData.assignedToStaff && staffMemberId) {
+                                                        serviceStaffInserts.push({
+                                                            service_id: service.id,
+                                                            staff_id: staffMemberId
+                                                        });
+                                                    }
+                                                });
+
+                                                if (serviceStaffInserts.length > 0) {
+                                                    const { error: ssError } = await supabase
+                                                        .from('service_staff')
+                                                        .insert(serviceStaffInserts);
+
+                                                    if (ssError) {
+                                                        console.error('Pending service-staff assignments error:', ssError);
+                                                    } else {
+                                                        console.log('Pending service-staff assignments created successfully');
+                                                    }
                                                 }
                                             }
                                         }
@@ -455,7 +515,22 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
             }
         }
         if (salonStep === 2) {
-            // Validate step 2 fields
+            // Validate staff member fields
+            if (!staffName.trim()) {
+                alert("Vul de naam van de medewerker in.");
+                return;
+            }
+            if (!staffEmail.trim()) {
+                alert("Vul het e-mailadres van de medewerker in.");
+                return;
+            }
+            if (!staffPhone.trim()) {
+                alert("Vul het telefoonnummer van de medewerker in.");
+                return;
+            }
+        }
+        if (salonStep === 3) {
+            // Validate step 3 fields (was step 2)
             if (!fullAddress.trim() || !addressValidated || !validatedCoords) {
                 alert("Voer een geldig adres in en klik op 'Controleren' om het te valideren.");
                 return;
@@ -465,8 +540,8 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 return;
             }
         }
-        if (salonStep === 3) {
-            // Validate salon profile
+        if (salonStep === 4) {
+            // Validate salon profile (was step 3)
             if (salonCategories.length === 0) {
                 alert("Selecteer een categorie voor je salon.");
                 return;
@@ -476,11 +551,11 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 return;
             }
         }
-        if (salonStep === 4) {
-            // Categories step - no validation required, can skip
+        if (salonStep === 5) {
+            // Categories step - no validation required, can skip (was step 4)
         }
-        if (salonStep === 6) {
-            // Validate at least one service
+        if (salonStep === 7) {
+            // Validate at least one service (was step 6)
             const validServices = initialServices.filter(s => s.name && s.price > 0);
             if (validServices.length === 0) {
                 alert("Voeg minimaal 1 dienst toe met naam en prijs.");
@@ -581,7 +656,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
             alert('Je kunt maximaal 5 diensten toevoegen tijdens registratie. Meer diensten kun je later toevoegen.');
             return;
         }
-        setInitialServices([...initialServices, { name: '', price: 0, duration: 30, category: '' }]);
+        setInitialServices([...initialServices, { name: '', price: 0, duration: 30, category: '', assignedToStaff: true }]);
     };
 
     // Remove a service from the list
@@ -594,7 +669,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
     };
 
     // Update a service in the list
-    const updateService = (index: number, field: keyof InitialService, value: string | number) => {
+    const updateService = (index: number, field: keyof InitialService, value: string | number | boolean) => {
         const updated = [...initialServices];
         updated[index] = { ...updated[index], [field]: value };
         setInitialServices(updated);
@@ -793,21 +868,66 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                         } else {
                             console.log('Owner staff member created successfully');
 
-                            // Create service_staff assignments for all created services
+                            // Create the staff member from registration
+                            let staffMemberId = null;
+                            if (staffName && staffEmail && staffPhone) {
+                                try {
+                                    const { data: newStaffMember, error: newStaffError } = await supabase
+                                        .from('staff')
+                                        .insert({
+                                            salon_id: salonData.id,
+                                            name: staffName,
+                                            email: staffEmail,
+                                            phone: staffPhone,
+                                            role: 'staff',
+                                            is_active: true
+                                        })
+                                        .select()
+                                        .single();
+
+                                    if (newStaffError) {
+                                        console.error('Staff member creation error:', newStaffError);
+                                    } else {
+                                        console.log('Staff member created successfully');
+                                        staffMemberId = newStaffMember.id;
+                                    }
+                                } catch (newStaffErr) {
+                                    console.error('Error creating staff member:', newStaffErr);
+                                }
+                            }
+
+                            // Create service_staff assignments
                             if (createdServices.length > 0) {
-                                const serviceStaffInserts = createdServices.map(service => ({
-                                    service_id: service.id,
-                                    staff_id: staffMember.id
-                                }));
+                                const serviceStaffInserts: any[] = [];
 
-                                const { error: ssError } = await supabase
-                                    .from('service_staff')
-                                    .insert(serviceStaffInserts);
+                                createdServices.forEach((service, index) => {
+                                    const serviceData = validServices[index];
+                                    
+                                    // Always assign to owner
+                                    serviceStaffInserts.push({
+                                        service_id: service.id,
+                                        staff_id: staffMember.id
+                                    });
 
-                                if (ssError) {
-                                    console.error('Service-staff assignments error:', ssError);
-                                } else {
-                                    console.log('Service-staff assignments created successfully');
+                                    // Also assign to staff member if checked
+                                    if (serviceData.assignedToStaff && staffMemberId) {
+                                        serviceStaffInserts.push({
+                                            service_id: service.id,
+                                            staff_id: staffMemberId
+                                        });
+                                    }
+                                });
+
+                                if (serviceStaffInserts.length > 0) {
+                                    const { error: ssError } = await supabase
+                                        .from('service_staff')
+                                        .insert(serviceStaffInserts);
+
+                                    if (ssError) {
+                                        console.error('Service-staff assignments error:', ssError);
+                                    } else {
+                                        console.log('Service-staff assignments created successfully');
+                                    }
                                 }
                             }
                         }
@@ -836,7 +956,12 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                     latitude: validatedCoords?.lat,
                     longitude: validatedCoords?.lng,
                     services: initialServices.filter(s => s.name && s.price > 0),
-                    serviceCategories: serviceCategories
+                    serviceCategories: serviceCategories,
+                    staffMember: staffName && staffEmail && staffPhone ? {
+                        name: staffName,
+                        email: staffEmail,
+                        phone: staffPhone
+                    } : null
                 }));
                 
                 alert('Check je email om je account te bevestigen. Daarna kun je inloggen en wordt je salon automatisch aangemaakt.');
@@ -851,8 +976,8 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
         }
     };
 
-    // Helper to render the step indicator for salons (6 steps now)
-    const TOTAL_STEPS = 6;
+    // Helper to render the step indicator for salons (7 steps now)
+    const TOTAL_STEPS = 7;
     const StepIndicator = () => (
         <div className="flex items-center justify-center mb-8 space-x-1">
             {[1, 2, 3, 4, 5, 6].map(step => (
@@ -1002,7 +1127,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                             {role === 'salon' && (
                                 <div>
                                     <StepIndicator />
-                                    <form onSubmit={salonStep === 6 ? (e) => { e.preventDefault(); handleSalonFinalSubmit(); } : handleSalonNextStep}>
+                                    <form onSubmit={salonStep === 7 ? (e) => { e.preventDefault(); handleSalonFinalSubmit(); } : handleSalonNextStep}>
                                         
                                         {/* STEP 1: Account */}
                                         {salonStep === 1 && (
@@ -1074,10 +1199,71 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                             </div>
                                         )}
 
-                                        {/* STEP 2: Address */}
+                                        {/* STEP 2: Staff Member */}
                                         {salonStep === 2 && (
                                             <div className="space-y-5 animate-fadeIn">
+                                                <div className="text-center mb-4">
+                                                    <h3 className="text-lg font-bold text-stone-900">Je Medewerker</h3>
+                                                    <p className="text-sm text-stone-500">Stap 2 van 7 - Voeg je eerste medewerker toe</p>
+                                                </div>
+
+                                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="text-blue-600 mt-0.5">
+                                                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                                            </svg>
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-sm font-medium text-blue-900">Waarom een medewerker?</h4>
+                                                            <p className="text-sm text-blue-700 mt-1">
+                                                                Elke salon heeft minimaal één medewerker nodig. Dit kan jezelf zijn of iemand anders die diensten uitvoert.
+                                                                Later kun je meer medewerkers toevoegen in je dashboard.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <Input 
+                                                    label="Naam medewerker" 
+                                                    placeholder="Voor- en achternaam"
+                                                    required 
+                                                    value={staffName}
+                                                    onChange={e => setStaffName(e.target.value)}
+                                                />
+                                                <Input 
+                                                    label="E-mailadres medewerker" 
+                                                    type="email"
+                                                    placeholder="naam@voorbeeld.nl"
+                                                    required 
+                                                    value={staffEmail}
+                                                    onChange={e => setStaffEmail(e.target.value)}
+                                                />
+                                                <Input 
+                                                    label="Telefoonnummer medewerker" 
+                                                    placeholder="06 12345678"
+                                                    required 
+                                                    value={staffPhone}
+                                                    onChange={e => setStaffPhone(e.target.value)}
+                                                />
+
+                                                <div className="flex gap-3 mt-6">
+                                                    <Button type="button" variant="outline" onClick={() => setSalonStep(1)}>
+                                                        <ArrowLeft size={16} className="mr-2" /> Terug
+                                                    </Button>
+                                                    <Button type="submit" className="flex-1">
+                                                        Volgende <ArrowRight size={16} className="ml-2" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* STEP 3: Address */}
+                                        {salonStep === 3 && (
+                                            <div className="space-y-5 animate-fadeIn">
                                                  <div className="text-center mb-4">
+                                                    <h3 className="text-lg font-bold text-stone-900">Salon Adres</h3>
+                                                    <p className="text-sm text-stone-500">Stap 3 van 7 - Waar kunnen klanten je vinden?</p>
                                                     <h3 className="text-lg font-bold text-stone-900">Salon Locatie</h3>
                                                     <p className="text-sm text-stone-500">Stap 2 van 5 - Waar kunnen klanten je vinden?</p>
                                                 </div>
@@ -1144,12 +1330,12 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                             </div>
                                         )}
 
-                                        {/* STEP 3: Salon Profile (NEW) */}
-                                        {salonStep === 3 && (
+                                        {/* STEP 4: Salon Profile */}
+                                        {salonStep === 4 && (
                                             <div className="space-y-5 animate-fadeIn">
                                                 <div className="text-center mb-4">
                                                     <h3 className="text-lg font-bold text-stone-900">Salon Profiel</h3>
-                                                    <p className="text-sm text-stone-500">Stap 3 van 6 - Laat je salon zien!</p>
+                                                    <p className="text-sm text-stone-500">Stap 4 van 7 - Laat je salon zien!</p>
                                                 </div>
 
                                                 {/* Category Selection */}
@@ -1252,12 +1438,12 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                             </div>
                                         )}
 
-                                        {/* STEP 4: Service Categories (NEW) */}
-                                        {salonStep === 4 && (
+                                        {/* STEP 5: Service Categories */}
+                                        {salonStep === 5 && (
                                             <div className="space-y-5 animate-fadeIn">
                                                 <div className="text-center mb-4">
                                                     <h3 className="text-lg font-bold text-stone-900">Dienst Categorieën</h3>
-                                                    <p className="text-sm text-stone-500">Stap 4 van 6 - Organiseer je diensten (optioneel)</p>
+                                                    <p className="text-sm text-stone-500">Stap 5 van 7 - Organiseer je diensten (optioneel)</p>
                                                 </div>
 
                                                 <div className="space-y-4">
@@ -1328,12 +1514,12 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                             </div>
                                         )}
 
-                                        {/* STEP 5: Initial Services (RENAMED from Step 4) */}
-                                        {salonStep === 5 && (
+                                        {/* STEP 6: Initial Services */}
+                                        {salonStep === 6 && (
                                             <div className="space-y-5 animate-fadeIn">
                                                 <div className="text-center mb-4">
                                                     <h3 className="text-lg font-bold text-stone-900">Je Diensten</h3>
-                                                    <p className="text-sm text-stone-500">Stap 5 van 6 - Voeg minimaal 1 dienst toe</p>
+                                                    <p className="text-sm text-stone-500">Stap 6 van 7 - Voeg minimaal 1 dienst toe</p>
                                                 </div>
 
                                                 <div className="space-y-4">
@@ -1397,6 +1583,19 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                                         </select>
                                                                     </div>
                                                                 </div>
+
+                                                                <div className="flex items-center gap-2 pt-2">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        id={`staff-assign-${index}`}
+                                                                        checked={service.assignedToStaff}
+                                                                        onChange={e => updateService(index, 'assignedToStaff', e.target.checked)}
+                                                                        className="w-4 h-4 text-brand-600 bg-stone-100 border-stone-300 rounded focus:ring-brand-500"
+                                                                    />
+                                                                    <label htmlFor={`staff-assign-${index}`} className="text-sm text-stone-700">
+                                                                        Koppel aan {staffName || 'medewerker'}
+                                                                    </label>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     ))}
@@ -1427,14 +1626,14 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                             </div>
                                         )}
 
-                                        {/* STEP 5: Confirmation */}
-                                        {salonStep === 6 && (
+                                        {/* STEP 7: Confirmation */}
+                                        {salonStep === 7 && (
                                             <div className="space-y-6 animate-fadeIn">
                                                  <div className="text-center mb-2">
                                                     <h3 className="text-lg font-bold text-stone-900">
                                                         {PAYMENT_REQUIRED ? 'Activeer Abonnement' : 'Bevestig Registratie'}
                                                     </h3>
-                                                    <p className="text-sm text-stone-500">Stap 6 van 6 - Controleer je gegevens</p>
+                                                    <p className="text-sm text-stone-500">Stap 7 van 7 - Controleer je gegevens</p>
                                                 </div>
 
                                                 {/* Summary Card */}
@@ -1568,7 +1767,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                 )}
                                                 
                                                 <div className="flex gap-3">
-                                                    <Button type="button" variant="outline" onClick={() => setSalonStep(4)}>
+                                                    <Button type="button" variant="outline" onClick={() => setSalonStep(6)}>
                                                         <ArrowLeft size={16} />
                                                     </Button>
                                                     <Button 
