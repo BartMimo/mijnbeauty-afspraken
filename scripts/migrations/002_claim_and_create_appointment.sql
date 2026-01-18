@@ -42,7 +42,7 @@ BEGIN
     INSERT INTO appointments (
         id, user_id, salon_id, service_id, service_name, date, time, duration_minutes, price, status, customer_name
     ) VALUES (
-        gen_random_uuid(), p_user_id, p_salon_id, p_service_id, p_service_name, p_date, p_time, v_duration_minutes, p_price, 'confirmed', p_customer_name
+        gen_random_uuid(), p_user_id, p_salon_id, p_service_id, p_service_name, p_date, p_time::time, v_duration_minutes, p_price, 'confirmed', p_customer_name
     )
     RETURNING id INTO v_app_id;
 

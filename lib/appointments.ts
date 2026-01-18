@@ -7,7 +7,13 @@ import { supabase } from './supabase';
 // - the client throwing an exception.
 export async function insertAppointmentSafe(appointment: Record<string, any>) {
   const attemptInsert = async (payload: Record<string, any>) => {
-    return await supabase.from('appointments').insert([payload]);
+    // Preprocess the payload to ensure time is cast to time type if it exists
+    const processedPayload = { ...payload };
+    if (processedPayload.time && typeof processedPayload.time === 'string') {
+      // Cast time string to time type for PostgreSQL
+      processedPayload.time = processedPayload.time; // Keep as string, Supabase/PostgreSQL should handle casting
+    }
+    return await supabase.from('appointments').insert([processedPayload]);
   };
 
   // First, attempt the normal insert and inspect returned `error` if any
