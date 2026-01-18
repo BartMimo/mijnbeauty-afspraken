@@ -87,6 +87,12 @@ export interface Salon {
   email?: string;
   phone?: string;
   openingHours?: OpeningHours;
+  paymentMethods?: {
+    cash: boolean;
+    online: boolean;
+  };
+  stripeAccountId?: string;
+  stripePublishableKey?: string;
 }
 
 export interface Appointment {
@@ -100,6 +106,9 @@ export interface Appointment {
   status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
   price: number;
   customerName: string;
+  paymentMethod?: 'cash' | 'online';
+  paymentStatus?: 'pending' | 'paid' | 'refunded';
+  staffId?: string | null;
 }
 
 export interface Deal {
@@ -117,6 +126,17 @@ export interface Deal {
   description: string;
   status?: string; // e.g., 'active', 'claimed', 'expired'
   staffId?: string | null; // Optional staff member assigned to this deal
+}
+
+export interface Payment {
+  id: string;
+  appointmentId: string;
+  amount: number;
+  paymentMethod: 'cash' | 'online';
+  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  stripePaymentIntentId?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DashboardStats {

@@ -31,6 +31,8 @@ export const SalonSchedule: React.FC = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingApt, setEditingApt] = useState<ScheduleAppointment | null>(null);
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [selectedAppointment, setSelectedAppointment] = useState<ScheduleAppointment | null>(null);
     const [loading, setLoading] = useState(true);
     const [services, setServices] = useState<Service[]>([]);
 
@@ -92,7 +94,8 @@ export const SalonSchedule: React.FC = () => {
                     .select(`
                         *,
                         profiles:user_id (full_name),
-                        services:service_id (name, duration_minutes)
+                        services:service_id (name, duration_minutes),
+                        staff:staff_id (name)
                     `)
                     .eq('salon_id', salon.id)
                     .neq('status', 'cancelled')
@@ -106,13 +109,13 @@ export const SalonSchedule: React.FC = () => {
                 setAppointments(appointmentsData?.map(a => ({
                     id: a.id,
                     type: 'appointment' as const,
-                    client: a.profiles?.full_name || 'Onbekend',
+                    client: a.profiles?.full_name || a.customer_name || 'Onbekend',
                     service: a.services?.name || a.service_name || 'Dienst',
                     serviceId: a.service_id,
                     date: a.date,
                     time: a.time,
                     duration: a.duration_minutes || a.services?.duration_minutes || 30,
-                    staff: a.staff_name || 'Medewerker',
+                    staff: a.staff?.name || 'Medewerker',
                     color: 'bg-brand-50 border-brand-300 text-brand-800'
                 })) || []);
 
@@ -208,7 +211,13 @@ export const SalonSchedule: React.FC = () => {
                                 <div key={timeSlot} className="flex items-center h-12 border-l-4 border-stone-200 pl-4">
                                     <span className="text-sm font-medium text-stone-600 w-16">{timeSlot}</span>
                                     {appointment ? (
-                                        <div className="flex-1 ml-4 p-3 bg-brand-50 border border-brand-200 rounded-lg">
+                                        <div 
+                                            className="flex-1 ml-4 p-3 bg-brand-50 border border-brand-200 rounded-lg cursor-pointer hover:bg-brand-100 transition-colors"
+                                            onClick={() => {
+                                                setSelectedAppointment(appointment);
+                                                setIsDetailsModalOpen(true);
+                                            }}
+                                        >
                                             <div className="flex justify-between items-start">
                                                 <div>
                                                     <p className="font-medium text-stone-900">{appointment.client}</p>
@@ -467,6 +476,44 @@ export const SalonSchedule: React.FC = () => {
                 {viewMode === 'week' && renderWeekView()}
                 {viewMode === 'month' && renderMonthView()}
             </Card>
+
+            {/* Appointment Details Modal */}
+            <Modal isOpen={isDetailsModalOpen} onClose={() => setIsDetailsModalOpen(false)} title="Afspraak Details">
+                {selectedAppointment && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-sm font-medium text-stone-700">Klant</label>
+                                <p className="text-stone-900">{selectedAppointment.client}</p>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-stone-700">Medewerker</label>
+                                <p className="text-stone-900">{selectedAppointment.staff}</p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-sm font-medium text-stone-700">Dienst</label>
+                                <p className="text-stone-900">{selectedAppointment.service}</p>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-stone-700">Duur</label>
+                                <p className="text-stone-900">{selectedAppointment.duration} minuten</p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-sm font-medium text-stone-700">Datum</label>
+                                <p className="text-stone-900">{new Date(selectedAppointment.date).toLocaleDateString('nl-NL')}</p>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-stone-700">Tijd</label>
+                                <p className="text-stone-900">{selectedAppointment.time}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };

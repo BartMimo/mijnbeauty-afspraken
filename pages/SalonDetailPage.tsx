@@ -69,7 +69,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
     const [selectedService, setSelectedService] = useState<string | null>(null);
     const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
-    const [bookingStep, setBookingStep] = useState<'staff' | 'service' | 'time' | 'confirm'>('staff');
+    const [bookingStep, setBookingStep] = useState<'staff' | 'service' | 'time' | 'payment' | 'confirm'>('staff');
     const [existingAppointments, setExistingAppointments] = useState<Appointment[]>([]);
     
     // Favorite State
@@ -79,6 +79,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const [currentDate, setCurrentDate] = useState(new Date()); 
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cash' | 'online' | null>(null);
 
     // Derived current service (always compute, even if null)
     const currentService = salon?.services?.find((s: any) => s.id === selectedService) || null;
@@ -933,8 +934,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                 </div>
                                             )}
 
-                                            <Button className="w-full mt-6" onClick={() => setBookingStep('confirm')} disabled={!selectedDate || !selectedTime}>
-                                                Verder naar gegevens
+                                            <Button className="w-full mt-6" onClick={() => setBookingStep('payment')} disabled={!selectedDate || !selectedTime}>
+                                                Verder naar betaling
                                             </Button>
                                         </div>
                                     )}
@@ -942,6 +943,86 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                             )}
 
                         </Card>
+
+                        {/* PAYMENT METHOD SELECTION */}
+                        {bookingStep === 'payment' && ((selectedService && selectedStaff !== undefined) || selectedDeal) && (
+                            <Card className="p-6 border-brand-100 shadow-lg transition-all duration-300 mt-4">
+                                <h3 className="text-lg font-bold mb-4 border-b border-stone-100 pb-2">Betaalmethode kiezen</h3>
+                                <div className="space-y-4 animate-fadeIn">
+                                    <p className="text-stone-600 text-sm">Kies hoe je wilt betalen voor je afspraak.</p>
+                                    
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {salon?.paymentMethods?.cash && (
+                                            <button
+                                                onClick={() => setSelectedPaymentMethod('cash')}
+                                                className={`p-4 border-2 rounded-xl text-left transition-all duration-200 ${
+                                                    selectedPaymentMethod === 'cash'
+                                                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                                        : 'border-stone-200 hover:border-stone-300 bg-white'
+                                                }`}
+                                            >
+                                                <div className="flex items-center space-x-3">
+                                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                                        selectedPaymentMethod === 'cash' ? 'border-brand-500' : 'border-stone-300'
+                                                    }`}>
+                                                        {selectedPaymentMethod === 'cash' && (
+                                                            <div className="w-2 h-2 bg-brand-500 rounded-full"></div>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-medium">Contant betalen</div>
+                                                        <div className="text-sm text-stone-500">Betaal ter plekke bij aankomst</div>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        )}
+                                        
+                                        {salon?.paymentMethods?.online && (
+                                            <button
+                                                onClick={() => setSelectedPaymentMethod('online')}
+                                                className={`p-4 border-2 rounded-xl text-left transition-all duration-200 ${
+                                                    selectedPaymentMethod === 'online'
+                                                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                                        : 'border-stone-200 hover:border-stone-300 bg-white'
+                                                }`}
+                                            >
+                                                <div className="flex items-center space-x-3">
+                                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                                        selectedPaymentMethod === 'online' ? 'border-brand-500' : 'border-stone-300'
+                                                    }`}>
+                                                        {selectedPaymentMethod === 'online' && (
+                                                            <div className="w-2 h-2 bg-brand-500 rounded-full"></div>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-medium">Online betalen</div>
+                                                        <div className="text-sm text-stone-500">Veilig betalen met creditcard</div>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="flex space-x-3 pt-4">
+                                        <Button 
+                                            variant="outline" 
+                                            onClick={() => setBookingStep('time')}
+                                            className="flex-1"
+                                        >
+                                            <ChevronLeft className="w-4 h-4 mr-2" />
+                                            Terug
+                                        </Button>
+                                        <Button 
+                                            className="flex-1" 
+                                            onClick={() => setBookingStep('confirm')} 
+                                            disabled={!selectedPaymentMethod}
+                                        >
+                                            Verder naar bevestiging
+                                        </Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        )}
 
                         {/* CONFIRMATION SCREEN - Outside booking widget card */}
                         {bookingStep === 'confirm' && ((selectedService && selectedStaff !== undefined) || selectedDeal) && (
@@ -969,6 +1050,12 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                             <span className="text-stone-500">Tijd</span>
                                             <span className="font-medium text-stone-900">
                                                 {selectedDeal ? selectedDeal.time : selectedTime}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-stone-500">Betaalmethode</span>
+                                            <span className="font-medium text-stone-900">
+                                                {selectedPaymentMethod === 'cash' ? 'Contant' : 'Online'}
                                             </span>
                                         </div>
                                         <div className="border-t border-stone-200 pt-2 flex justify-between font-bold text-base">
@@ -1002,7 +1089,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                     duration_minutes: serviceDuration,
                                                     price: selectedDeal ? selectedDeal.discountPrice : currentService?.price,
                                                     status: 'confirmed',
-                                                    staff_id: selectedStaff?.id?.startsWith('owner-') ? null : selectedStaff?.id || null
+                                                    staff_id: selectedStaff?.id?.startsWith('owner-') ? null : selectedStaff?.id || null,
+                                                    payment_method: selectedPaymentMethod,
+                                                    payment_status: selectedPaymentMethod === 'online' ? 'pending' : 'pending'
                                                 };
 
                                                 // lazy import to avoid circular deps during module init
@@ -1032,7 +1121,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                         p_duration_minutes: selectedDeal.durationMinutes || null,
                                                         p_price: selectedDeal.discountPrice,
                                                         p_customer_name: user?.user_metadata?.full_name || user?.email || 'Gast',
-                                                        p_staff_id: selectedStaff?.id?.startsWith('owner-') ? null : selectedStaff?.id || null
+                                                        p_staff_id: selectedStaff?.id?.startsWith('owner-') ? null : selectedStaff?.id || null,
+                                                        p_payment_method: selectedPaymentMethod,
+                                                        p_payment_status: selectedPaymentMethod === 'online' ? 'pending' : 'pending'
                                                     });
                                                     if (rpcErr) throw rpcErr;
 

@@ -9,6 +9,7 @@ export const SalonServices: React.FC = () => {
     const [salonId, setSalonId] = useState<string | null>(null);
     const [services, setServices] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
+    const [staff, setStaff] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Fetch salon and services on mount
@@ -37,7 +38,10 @@ export const SalonServices: React.FC = () => {
                 // Fetch services for this salon
                 const { data: servicesData, error } = await supabase
                     .from('services')
-                    .select('*')
+                    .select(`
+                        *,
+                        service_staff(staff_id)
+                    `)
                     .eq('salon_id', salon.id)
                     .order('name');
 
@@ -49,7 +53,8 @@ export const SalonServices: React.FC = () => {
                     category: s.category || 'Overig',
                     duration: s.duration_minutes,
                     price: s.price,
-                    active: s.active
+                    active: s.active,
+                    staffIds: s.service_staff?.map((ss: any) => ss.staff_id) || []
                 })) || []);
 
                 // Fetch categories for this salon
@@ -62,6 +67,18 @@ export const SalonServices: React.FC = () => {
                 if (catError) throw catError;
 
                 setCategories(categoriesData || []);
+
+                // Fetch staff for this salon
+                const { data: staffData, error: staffError } = await supabase
+                    .from('staff')
+                    .select('id, name')
+                    .eq('salon_id', salon.id)
+                    .eq('is_active', true)
+                    .order('name');
+
+                if (staffError) throw staffError;
+
+                setStaff(staffData || []);
 
             } catch (err) {
                 console.error('Error fetching services:', err);
@@ -76,7 +93,7 @@ export const SalonServices: React.FC = () => {
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingService, setEditingService] = useState<any>(null);
-    const [form, setForm] = useState({ name: '', category: '', duration: 30, price: 0, active: true });
+    const [form, setForm] = useState({ name: '', category: '', duration: 30, price: 0, active: true, staffIds: [] as string[] });
 
     // Category Modal State
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -92,7 +109,7 @@ export const SalonServices: React.FC = () => {
 
     const handleCreate = () => {
         setEditingService(null);
-        setForm({ name: '', category: categories.length > 0 ? categories[0].name : '', duration: 30, price: 0, active: true });
+        setForm({ name: '', category: categories.length > 0 ? categories[0].name : '', duration: 30, price: 0, active: true, staffIds: [] });
         setIsModalOpen(true);
     };
 
@@ -189,6 +206,28 @@ export const SalonServices: React.FC = () => {
                     .eq('id', editingService.id);
 
                 if (error) throw error;
+
+                // Update service-staff assignments
+                // First delete existing assignments
+                await supabase
+                    .from('service_staff')
+                    .delete()
+                    .eq('service_id', editingService.id);
+
+                // Then insert new assignments
+                if (form.staffIds.length > 0) {
+                    const assignments = form.staffIds.map(staffId => ({
+                        service_id: editingService.id,
+                        staff_id: staffId
+                    }));
+
+                    const { error: assignError } = await supabase
+                        .from('service_staff')
+                        .insert(assignments);
+
+                    if (assignError) throw assignError;
+                }
+
                 setServices(prev => prev.map(s => s.id === editingService.id ? { ...s, ...form } : s));
             } else {
                 // Create new service
@@ -206,13 +245,29 @@ export const SalonServices: React.FC = () => {
                     .single();
 
                 if (error) throw error;
+
+                // Create service-staff assignments
+                if (form.staffIds.length > 0) {
+                    const assignments = form.staffIds.map(staffId => ({
+                        service_id: data.id,
+                        staff_id: staffId
+                    }));
+
+                    const { error: assignError } = await supabase
+                        .from('service_staff')
+                        .insert(assignments);
+
+                    if (assignError) throw assignError;
+                }
+
                 setServices(prev => [...prev, { 
                     id: data.id, 
                     name: data.name,
                     category: data.category,
                     duration: data.duration_minutes,
                     price: data.price,
-                    active: data.active
+                    active: data.active,
+                    staffIds: form.staffIds
                 }]);
             }
             setIsModalOpen(false);
@@ -411,6 +466,35 @@ export const SalonServices: React.FC = () => {
                             onChange={e => setForm({...form, price: Number(e.target.value)})} 
                         />
                     </div>
+
+                    {/* Staff Assignment */}
+                    <div className="border-t border-stone-100 pt-4">
+                        <h3 className="font-bold text-stone-800 mb-3">Medewerkers</h3>
+                        <p className="text-sm text-stone-600 mb-4">Selecteer welke medewerkers deze dienst kunnen uitvoeren.</p>
+                        <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                            {staff.map(member => (
+                                <label key={member.id} className="flex items-center space-x-2 p-2 hover:bg-stone-50 rounded-lg cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.staffIds.includes(member.id)}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setForm({...form, staffIds: [...form.staffIds, member.id]});
+                                            } else {
+                                                setForm({...form, staffIds: form.staffIds.filter(id => id !== member.id)});
+                                            }
+                                        }}
+                                        className="h-4 w-4 text-brand-600 rounded border-stone-300 focus:ring-brand-500"
+                                    />
+                                    <span className="text-sm text-stone-700">{member.name}</span>
+                                </label>
+                            ))}
+                        </div>
+                        {staff.length === 0 && (
+                            <p className="text-sm text-stone-500 italic">Geen medewerkers beschikbaar. Voeg eerst medewerkers toe.</p>
+                        )}
+                    </div>
+
                     <div className="flex items-center pt-2">
                         <input 
                             type="checkbox" 

@@ -26,12 +26,21 @@ CREATE TABLE IF NOT EXISTS public.service_staff (
 ALTER TABLE public.appointments
 ADD COLUMN IF NOT EXISTS staff_id uuid REFERENCES public.staff(id);
 
+-- Add payment columns to appointments
+ALTER TABLE public.appointments
+ADD COLUMN IF NOT EXISTS payment_method text CHECK (payment_method IN ('cash', 'online'));
+
+ALTER TABLE public.appointments
+ADD COLUMN IF NOT EXISTS payment_status text DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'refunded'));
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_staff_salon_id ON staff(salon_id);
 CREATE INDEX IF NOT EXISTS idx_staff_user_id ON staff(user_id);
 CREATE INDEX IF NOT EXISTS idx_service_staff_service_id ON service_staff(service_id);
 CREATE INDEX IF NOT EXISTS idx_service_staff_staff_id ON service_staff(staff_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_staff_id ON appointments(staff_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_payment_method ON appointments(payment_method);
+CREATE INDEX IF NOT EXISTS idx_appointments_payment_status ON appointments(payment_status);
 
 -- Enable RLS
 ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
@@ -61,7 +70,7 @@ CREATE POLICY "service_staff salon access"
 
 -- Grant permissions
 GRANT ALL ON public.staff TO authenticated;
-GRANT ALL ON public.service_staff TO authenticated;-- Migration: Update claim_and_create_appointment RPC to include staff_id parameter
+GRANT ALL ON public.service_staff TO authenticated;-- Migration: Update claim_and_create_appointment RPC to include payment parameters
 
 CREATE OR REPLACE FUNCTION public.claim_and_create_appointment(
     p_deal_id uuid,
@@ -74,7 +83,9 @@ CREATE OR REPLACE FUNCTION public.claim_and_create_appointment(
     p_price numeric,
     p_customer_name text,
     p_staff_id uuid DEFAULT NULL,
-    p_duration_minutes integer DEFAULT NULL
+    p_duration_minutes integer DEFAULT NULL,
+    p_payment_method text DEFAULT NULL,
+    p_payment_status text DEFAULT 'pending'
 )
 RETURNS uuid AS $$
 DECLARE
@@ -98,9 +109,9 @@ BEGIN
 
     -- Insert the appointment
     INSERT INTO appointments (
-        id, user_id, salon_id, service_id, service_name, date, time, duration_minutes, price, status, customer_name, staff_id
+        id, user_id, salon_id, service_id, service_name, date, time, duration_minutes, price, status, customer_name, staff_id, payment_method, payment_status
     ) VALUES (
-        gen_random_uuid(), p_user_id, p_salon_id, p_service_id, p_service_name, p_date, p_time::time, v_duration_minutes, p_price, 'confirmed', p_customer_name, p_staff_id
+        gen_random_uuid(), p_user_id, p_salon_id, p_service_id, p_service_name, p_date, p_time::time, v_duration_minutes, p_price, 'confirmed', p_customer_name, p_staff_id, p_payment_method, p_payment_status
     )
     RETURNING id INTO v_app_id;
 
@@ -118,7 +129,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Update grant to include new parameter signature
-GRANT EXECUTE ON FUNCTION public.claim_and_create_appointment(uuid, uuid, uuid, uuid, text, date, text, numeric, text, uuid, integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_and_create_appointment(uuid, uuid, uuid, uuid, text, date, text, numeric, text, uuid, integer, text, text) TO authenticated;
 
 -- Migration: Add staff_id to deals table
 -- Allows deals to be assigned to specific staff members
@@ -129,6 +140,13 @@ ADD COLUMN IF NOT EXISTS staff_id uuid REFERENCES public.staff(id);
 -- Add index for performance
 CREATE INDEX IF NOT EXISTS idx_deals_staff_id ON deals(staff_id);
 
+-- Add status column to deals table for tracking claim status
+ALTER TABLE public.deals
+ADD COLUMN IF NOT EXISTS status text DEFAULT 'active' CHECK (status IN ('active', 'claimed', 'expired'));
+
+-- Add index for status
+CREATE INDEX IF NOT EXISTS idx_deals_status ON deals(status);
+
 -- Update RLS policies for deals to include staff access
 DROP POLICY IF EXISTS "deals salon access" ON public.deals;
 CREATE POLICY "deals salon access"
@@ -138,11 +156,53 @@ CREATE POLICY "deals salon access"
     SELECT id FROM public.salons WHERE owner_id = auth.uid()
   ));
 
--- Allow staff members to view deals assigned to them
-DROP POLICY IF EXISTS "deals staff access" ON public.deals;
-CREATE POLICY "deals staff access"
-  ON public.deals FOR SELECT
+-- Migration: Add payment settings for salons
+-- Allows salons to configure payment methods (cash/online)
+
+ALTER TABLE public.salons
+ADD COLUMN IF NOT EXISTS payment_methods jsonb DEFAULT '{"cash": true, "online": false}',
+ADD COLUMN IF NOT EXISTS stripe_account_id text,
+ADD COLUMN IF NOT EXISTS stripe_publishable_key text;
+
+-- Create payments table to track payment transactions
+CREATE TABLE IF NOT EXISTS public.payments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  appointment_id uuid REFERENCES public.appointments(id) ON DELETE CASCADE,
+  amount numeric NOT NULL,
+  currency text DEFAULT 'EUR',
+  method text NOT NULL CHECK (method IN ('cash', 'online')),
+  status text DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'cancelled')),
+  stripe_payment_intent_id text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Indexes for payments
+CREATE INDEX IF NOT EXISTS idx_payments_appointment_id ON payments(appointment_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+
+-- Enable RLS for payments
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+
+-- RLS policies for payments
+DROP POLICY IF EXISTS "payments salon access" ON public.payments;
+CREATE POLICY "payments salon access"
+  ON public.payments FOR ALL
   TO authenticated
-  USING (staff_id IN (
-    SELECT id FROM public.staff WHERE user_id = auth.uid()
+  USING (appointment_id IN (
+    SELECT a.id FROM public.appointments a
+    JOIN public.salons s ON a.salon_id = s.id
+    WHERE s.owner_id = auth.uid()
   ));
+
+-- Allow customers to view their own payments
+DROP POLICY IF EXISTS "payments customer access" ON public.payments;
+CREATE POLICY "payments customer access"
+  ON public.payments FOR SELECT
+  TO authenticated
+  USING (appointment_id IN (
+    SELECT id FROM public.appointments WHERE user_id = auth.uid()
+  ));
+
+-- Grant permissions
+GRANT ALL ON public.payments TO authenticated;

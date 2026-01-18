@@ -51,8 +51,9 @@ export const SalonStaff: React.FC = () => {
     // State - for now using local state since we don't have a staff table
     // In a production app, you'd create a salon_staff table
     const [staff, setStaff] = useState<any[]>([]);
+    const [services, setServices] = useState<any[]>([]);
 
-    // Fetch salon and create owner as staff
+    // Fetch salon and staff
     useEffect(() => {
         const fetchData = async () => {
             if (!user) {
@@ -70,25 +71,51 @@ export const SalonStaff: React.FC = () => {
                 if (salon) {
                     setSalonId(salon.id);
                     
-                    // Add owner as the first staff member
-                    setStaff([{
-                        id: user.id,
-                        name: profile?.full_name || user.email?.split('@')[0] || 'Eigenaar',
-                        role: 'Eigenaar',
-                        email: user.email || '',
-                        schedule: defaultSchedule,
-                        permissions: { canManageSchedule: true, canSeeRevenue: true, canManageSettings: true }
-                    }]);
+                    // Fetch real staff from database
+                    const { data: staffData, error: staffError } = await supabase
+                        .from('staff')
+                        .select(`
+                            *,
+                            service_staff(service_id)
+                        `)
+                        .eq('salon_id', salon.id)
+                        .order('name');
+
+                    if (staffError) throw staffError;
+
+                    // Fetch services for staff assignment
+                    const { data: servicesData, error: servicesError } = await supabase
+                        .from('services')
+                        .select('id, name')
+                        .eq('salon_id', salon.id)
+                        .eq('active', true)
+                        .order('name');
+
+                    if (servicesError) throw servicesError;
+                    setServices(servicesData || []);
+
+                    // Map staff data
+                    const mappedStaff = staffData?.map(s => ({
+                        id: s.id,
+                        name: s.name,
+                        role: s.role === 'owner' ? 'Eigenaar' : 'Medewerker',
+                        email: s.email || '',
+                        phone: s.phone || '',
+                        isActive: s.is_active,
+                        serviceIds: s.service_staff?.map((ss: any) => ss.service_id) || []
+                    })) || [];
+
+                    setStaff(mappedStaff);
                 }
             } catch (err) {
-                console.error('Error fetching salon:', err);
+                console.error('Error fetching data:', err);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchData();
-    }, [user, profile]);
+    }, [user]);
 
     // Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -98,6 +125,8 @@ export const SalonStaff: React.FC = () => {
     const [formName, setFormName] = useState('');
     const [formRole, setFormRole] = useState('');
     const [formEmail, setFormEmail] = useState('');
+    const [formPhone, setFormPhone] = useState('');
+    const [formServiceIds, setFormServiceIds] = useState<string[]>([]);
     const [formSchedule, setFormSchedule] = useState<WeeklySchedule>(defaultSchedule);
     const [formPermissions, setFormPermissions] = useState<Permissions>(defaultPermissions);
 
@@ -107,6 +136,8 @@ export const SalonStaff: React.FC = () => {
         setFormName(member.name);
         setFormRole(member.role);
         setFormEmail(member.email);
+        setFormPhone(member.phone || '');
+        setFormServiceIds(member.serviceIds || []);
         setFormSchedule(member.schedule || defaultSchedule);
         setFormPermissions(member.permissions || defaultPermissions);
         setIsModalOpen(true);
@@ -115,35 +146,129 @@ export const SalonStaff: React.FC = () => {
     const handleCreate = () => {
         setEditingStaff(null);
         setFormName('');
-        setFormRole('');
+        setFormRole('Medewerker');
         setFormEmail('');
+        setFormPhone('');
+        setFormServiceIds([]);
         setFormSchedule(defaultSchedule);
         setFormPermissions(defaultPermissions);
         setIsModalOpen(true);
     };
 
-    const handleDelete = (id: number) => {
-        if(window.confirm('Medewerker verwijderen?')) {
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('Medewerker verwijderen? Dit kan niet ongedaan worden gemaakt.')) return;
+
+        try {
+            const { error } = await supabase
+                .from('staff')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+
             setStaff(prev => prev.filter(s => s.id !== id));
+        } catch (err: any) {
+            console.error('Delete failed:', err);
+            alert('Verwijderen mislukt: ' + err.message);
         }
     };
 
-    const handleSave = () => {
-        const staffMember = {
-            id: editingStaff ? editingStaff.id : Date.now(),
-            name: formName,
-            role: formRole,
-            email: formEmail,
-            schedule: formSchedule,
-            permissions: formPermissions
-        };
+    const handleSave = async () => {
+        if (!salonId) return;
 
-         if (editingStaff) {
-            setStaff(prev => prev.map(s => s.id === editingStaff.id ? staffMember : s));
-        } else {
-            setStaff(prev => [...prev, staffMember]);
+        try {
+            if (editingStaff) {
+                // Update existing staff
+                const { error: updateError } = await supabase
+                    .from('staff')
+                    .update({
+                        name: formName,
+                        email: formEmail,
+                        phone: formPhone,
+                        is_active: true
+                    })
+                    .eq('id', editingStaff.id);
+
+                if (updateError) throw updateError;
+
+                // Update service assignments
+                // First delete existing assignments
+                await supabase
+                    .from('service_staff')
+                    .delete()
+                    .eq('staff_id', editingStaff.id);
+
+                // Then insert new assignments
+                if (formServiceIds.length > 0) {
+                    const assignments = formServiceIds.map(serviceId => ({
+                        service_id: serviceId,
+                        staff_id: editingStaff.id
+                    }));
+
+                    const { error: assignError } = await supabase
+                        .from('service_staff')
+                        .insert(assignments);
+
+                    if (assignError) throw assignError;
+                }
+
+                // Update local state
+                setStaff(prev => prev.map(s => s.id === editingStaff.id ? {
+                    ...s,
+                    name: formName,
+                    email: formEmail,
+                    phone: formPhone,
+                    serviceIds: formServiceIds
+                } : s));
+
+            } else {
+                // Create new staff
+                const { data: newStaff, error: insertError } = await supabase
+                    .from('staff')
+                    .insert({
+                        salon_id: salonId,
+                        name: formName,
+                        email: formEmail,
+                        phone: formPhone,
+                        role: 'staff',
+                        is_active: true
+                    })
+                    .select()
+                    .single();
+
+                if (insertError) throw insertError;
+
+                // Create service assignments
+                if (formServiceIds.length > 0) {
+                    const assignments = formServiceIds.map(serviceId => ({
+                        service_id: serviceId,
+                        staff_id: newStaff.id
+                    }));
+
+                    const { error: assignError } = await supabase
+                        .from('service_staff')
+                        .insert(assignments);
+
+                    if (assignError) throw assignError;
+                }
+
+                // Add to local state
+                setStaff(prev => [...prev, {
+                    id: newStaff.id,
+                    name: formName,
+                    role: 'Medewerker',
+                    email: formEmail,
+                    phone: formPhone,
+                    isActive: true,
+                    serviceIds: formServiceIds
+                }]);
+            }
+
+            setIsModalOpen(false);
+        } catch (err: any) {
+            console.error('Save failed:', err);
+            alert('Opslaan mislukt: ' + err.message);
         }
-        setIsModalOpen(false);
     };
 
     const handleScheduleChange = (day: string, field: keyof DaySchedule, value: any) => {
@@ -263,12 +388,48 @@ export const SalonStaff: React.FC = () => {
                             onChange={e => setFormRole(e.target.value)} 
                             placeholder="bv. Stylist"
                         />
-                        <Input 
-                            label="E-mail" 
-                            type="email"
-                            value={formEmail} 
-                            onChange={e => setFormEmail(e.target.value)} 
-                        />
+                        <div className="grid grid-cols-2 gap-4">
+                            <Input 
+                                label="E-mail" 
+                                type="email"
+                                value={formEmail} 
+                                onChange={e => setFormEmail(e.target.value)} 
+                            />
+                            <Input 
+                                label="Telefoon" 
+                                type="tel"
+                                value={formPhone} 
+                                onChange={e => setFormPhone(e.target.value)} 
+                            />
+                        </div>
+                    </div>
+
+                    {/* Services */}
+                    <div className="border-t border-stone-100 pt-4">
+                        <h3 className="font-bold text-stone-800 mb-3">Diensten</h3>
+                        <p className="text-sm text-stone-600 mb-4">Selecteer welke diensten deze medewerker kan uitvoeren.</p>
+                        <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                            {services.map(service => (
+                                <label key={service.id} className="flex items-center space-x-2 p-2 hover:bg-stone-50 rounded-lg cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formServiceIds.includes(service.id)}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setFormServiceIds(prev => [...prev, service.id]);
+                                            } else {
+                                                setFormServiceIds(prev => prev.filter(id => id !== service.id));
+                                            }
+                                        }}
+                                        className="h-4 w-4 text-brand-600 rounded border-stone-300 focus:ring-brand-500"
+                                    />
+                                    <span className="text-sm text-stone-700">{service.name}</span>
+                                </label>
+                            ))}
+                        </div>
+                        {services.length === 0 && (
+                            <p className="text-sm text-stone-500 italic">Geen diensten beschikbaar. Voeg eerst diensten toe.</p>
+                        )}
                     </div>
                     
                     {/* Permissions */}

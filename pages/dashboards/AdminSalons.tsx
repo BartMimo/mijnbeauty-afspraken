@@ -277,7 +277,14 @@ export const AdminSalons: React.FC = () => {
                             ) : filteredSalons.map(salon => (
                                 <tr key={salon.id} className={`hover:bg-stone-50/50 ${salon.status === 'pending' ? 'bg-amber-50/30' : ''}`}>
                                     <td className="px-6 py-4">
-                                        <div className="font-medium text-stone-900">{salon.name}</div>
+                                        <div className="font-medium text-stone-900">
+                                            <button 
+                                                onClick={() => window.open(`/${salon.id}`, '_blank')}
+                                                className="text-brand-600 hover:text-brand-700 hover:underline"
+                                            >
+                                                {salon.name}
+                                            </button>
+                                        </div>
                                         <div className="text-xs text-stone-500">KVK: {salon.kvk || '-'}</div>
                                     </td>
                                     <td className="px-6 py-4 text-stone-600">
