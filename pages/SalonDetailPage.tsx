@@ -288,7 +288,10 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 // Fetch deals separately
                 const { data: dealsData } = await supabase
                     .from('deals')
-                    .select('*')
+                    .select(`
+                        *,
+                        staff:staff_id (id, name)
+                    `)
                     .eq('salon_id', data.id)
                     .eq('status', 'active');
 
@@ -305,7 +308,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         time: d.time && d.date ? `${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${d.time}` : (d.date ? new Date(d.date).toLocaleDateString('nl-NL') : d.time || 'Geen tijd'),
                         rawTime: d.time || '',
                         description: d.description || '',
-                        status: d.status
+                        status: d.status,
+                        staffId: d.staff_id,
+                        staff: d.staff
                     })));
                 }
 
@@ -356,52 +361,24 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     }));
                 }
 
-                // If no staff found, try to add the salon owner as a staff member
+                // If no staff found, try to add the salon owner as a staff member (fallback for old salons)
                 if (processedStaff.length === 0 && data.owner_id) {
+                    console.warn('No staff members found for salon, creating fallback owner entry');
                     try {
-                        // If current user is the owner, use their name
-                        let ownerName = 'Eigenaar';
-                        if (user && user.id === data.owner_id) {
-                            ownerName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Eigenaar';
-                        } else {
-                            // Try to get owner info from users table if it exists
-                            const { data: ownerData } = await supabase
-                                .from('users')
-                                .select('name, email')
-                                .eq('id', data.owner_id)
-                                .maybeSingle();
-                            
-                            if (ownerData) {
-                                ownerName = ownerData.name || ownerData.email?.split('@')[0] || 'Eigenaar';
-                            }
-                        }
-                        
-                        // Create a temporary staff entry for the owner
+                        // Create a fallback owner entry for salons without staff members
                         processedStaff = [{
                             id: `owner-${data.owner_id}`,
                             salonId: data.id,
                             userId: data.owner_id,
-                            name: ownerName,
-                            email: data.email || '',
-                            phone: data.phone || '',
-                            role: 'owner',
-                            isActive: true,
-                            serviceIds: data.services?.map((s: any) => s.id) || [] // Owner can do all services
-                        }];
-                    } catch (err) {
-                        console.warn('Could not fetch owner info:', err);
-                        // Fallback: create basic owner entry
-                        processedStaff = [{
-                            id: `owner-${data.owner_id}`,
-                            salonId: data.id,
-                            userId: data.owner_id,
-                            name: 'Eigenaar',
+                            name: `${data.name} Eigenaar`,
                             email: data.email || '',
                             phone: data.phone || '',
                             role: 'owner',
                             isActive: true,
                             serviceIds: data.services?.map((s: any) => s.id) || []
                         }];
+                    } catch (err) {
+                        console.warn('Could not create fallback owner entry:', err);
                     }
                 }
 
@@ -427,14 +404,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     // Auto-select staff member when entering staff step
     useEffect(() => {
         if (bookingStep === 'staff' && staff.length > 0 && !selectedStaff) {
-            if (staff.length === 1) {
-                // If only one staff member, auto-select and proceed
-                setSelectedStaff(staff[0]);
-                setBookingStep(selectedDeal ? 'confirm' : 'service');
-            } else {
-                // Multiple staff members, let user choose
-                setSelectedStaff(staff[0]); // Still pre-select first one for convenience
-            }
+            // Always let user choose staff member, even if there's only one
+            // No auto-selection to ensure proper flow
         }
     }, [bookingStep, staff, selectedStaff, selectedDeal]);
 
@@ -678,7 +649,18 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                 <Zap className="text-brand-500 mr-2 fill-brand-500" size={20}/> Actieve Deals
                             </h2>
                             <div className="grid sm:grid-cols-2 gap-4">
-                                {activeDeals.map(deal => {
+                                {activeDeals
+                                    .filter(deal => {
+                                        // If no staff selected, show all deals
+                                        if (!selectedStaff) return true;
+                                        // If staff selected, show deals for that staff or deals for all staff (staffId is null)
+                                        // For owner entries (temporary), show deals with no specific staff assignment
+                                        if (selectedStaff.id?.startsWith('owner-')) {
+                                            return !deal.staffId;
+                                        }
+                                        return !deal.staffId || deal.staffId === selectedStaff.id;
+                                    })
+                                    .map(deal => {
                                     const discount = Math.round(((deal.originalPrice - deal.discountPrice) / deal.originalPrice) * 100);
                                     return (
                                         <div key={deal.id} className="bg-white rounded-2xl p-4 border border-brand-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
@@ -774,8 +756,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         <Card className="p-6 border-brand-100 shadow-lg transition-all duration-300">
                             <h3 className="text-lg font-bold mb-4 border-b border-stone-100 pb-2">Je afspraak</h3>
                             
-                            {/* STAFF SELECTION STEP - only show if multiple staff members */}
-                            {bookingStep === 'staff' && staff.length > 1 && (
+                            {/* STAFF SELECTION STEP - always show staff selection first */}
+                            {bookingStep === 'staff' && (
                                 <div className="space-y-4 animate-fadeIn">
                                     <div className="text-center mb-4">
                                         <h4 className="font-semibold text-stone-900 mb-2">Kies een medewerker</h4>
@@ -1020,7 +1002,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                     duration_minutes: serviceDuration,
                                                     price: selectedDeal ? selectedDeal.discountPrice : currentService?.price,
                                                     status: 'confirmed',
-                                                    staff_id: selectedStaff?.id || null
+                                                    staff_id: selectedStaff?.id?.startsWith('owner-') ? null : selectedStaff?.id || null
                                                 };
 
                                                 // lazy import to avoid circular deps during module init
@@ -1050,7 +1032,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                         p_duration_minutes: selectedDeal.durationMinutes || null,
                                                         p_price: selectedDeal.discountPrice,
                                                         p_customer_name: user?.user_metadata?.full_name || user?.email || 'Gast',
-                                                        p_staff_id: selectedStaff?.id || null
+                                                        p_staff_id: selectedStaff?.id?.startsWith('owner-') ? null : selectedStaff?.id || null
                                                     });
                                                     if (rpcErr) throw rpcErr;
 

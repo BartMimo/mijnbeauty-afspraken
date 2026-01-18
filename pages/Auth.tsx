@@ -295,6 +295,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                 }
 
                                 // Create initial services if any
+                                let createdServices: any[] = [];
                                 if (pendingSalon.services && pendingSalon.services.length > 0 && newSalon?.id) {
                                     const servicesToInsert = pendingSalon.services.map((s: any) => ({
                                         salon_id: newSalon.id,
@@ -305,14 +306,60 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                         active: true
                                     }));
 
-                                    const { error: servicesError } = await supabase
+                                    const { data: servicesData, error: servicesError } = await supabase
                                         .from('services')
-                                        .insert(servicesToInsert);
+                                        .insert(servicesToInsert)
+                                        .select();
 
                                     if (servicesError) {
                                         console.error('Pending services creation error:', servicesError);
                                     } else {
                                         console.log('Pending services created successfully');
+                                        createdServices = servicesData || [];
+                                    }
+                                }
+
+                                // Create owner as staff member
+                                if (newSalon?.id) {
+                                    try {
+                                        const { data: staffMember, error: staffError } = await supabase
+                                            .from('staff')
+                                            .insert({
+                                                salon_id: newSalon.id,
+                                                user_id: data.user.id,
+                                                name: pendingSalon.ownerName,
+                                                email: pendingSalon.email || data.user.email,
+                                                phone: pendingSalon.phone,
+                                                role: 'owner'
+                                            })
+                                            .select()
+                                            .single();
+
+                                        if (staffError) {
+                                            console.error('Pending staff creation error:', staffError);
+                                        } else {
+                                            console.log('Pending owner staff member created successfully');
+
+                                            // Create service_staff assignments for all created services
+                                            if (createdServices.length > 0) {
+                                                const serviceStaffInserts = createdServices.map(service => ({
+                                                    service_id: service.id,
+                                                    staff_id: staffMember.id
+                                                }));
+
+                                                const { error: ssError } = await supabase
+                                                    .from('service_staff')
+                                                    .insert(serviceStaffInserts);
+
+                                                if (ssError) {
+                                                    console.error('Pending service-staff assignments error:', ssError);
+                                                } else {
+                                                    console.log('Pending service-staff assignments created successfully');
+                                                }
+                                            }
+                                        }
+                                    } catch (staffErr) {
+                                        console.error('Error creating pending owner staff member:', staffErr);
                                     }
                                 }
 
@@ -699,6 +746,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
 
                 // Create initial services
                 const validServices = initialServices.filter(s => s.name && s.price > 0);
+                let createdServices: any[] = [];
                 if (validServices.length > 0 && salonData?.id) {
                     const servicesToInsert = validServices.map(s => ({
                         salon_id: salonData.id,
@@ -709,15 +757,63 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                         active: true
                     }));
 
-                    const { error: servicesError } = await supabase
+                    const { data: servicesData, error: servicesError } = await supabase
                         .from('services')
-                        .insert(servicesToInsert);
+                        .insert(servicesToInsert)
+                        .select();
 
                     if (servicesError) {
                         console.error('Services creation error:', servicesError);
                         // Don't fail the whole registration, just log it
                     } else {
                         console.log('Services created successfully');
+                        createdServices = servicesData || [];
+                    }
+                }
+
+                // Create owner as staff member
+                if (salonData?.id) {
+                    try {
+                        const { data: staffMember, error: staffError } = await supabase
+                            .from('staff')
+                            .insert({
+                                salon_id: salonData.id,
+                                user_id: data.user.id,
+                                name: regName, // Use the name provided during registration
+                                email: regEmail,
+                                phone: regPhone,
+                                role: 'owner'
+                            })
+                            .select()
+                            .single();
+
+                        if (staffError) {
+                            console.error('Staff creation error:', staffError);
+                            // Don't fail registration, just log it
+                        } else {
+                            console.log('Owner staff member created successfully');
+
+                            // Create service_staff assignments for all created services
+                            if (createdServices.length > 0) {
+                                const serviceStaffInserts = createdServices.map(service => ({
+                                    service_id: service.id,
+                                    staff_id: staffMember.id
+                                }));
+
+                                const { error: ssError } = await supabase
+                                    .from('service_staff')
+                                    .insert(serviceStaffInserts);
+
+                                if (ssError) {
+                                    console.error('Service-staff assignments error:', ssError);
+                                } else {
+                                    console.log('Service-staff assignments created successfully');
+                                }
+                            }
+                        }
+                    } catch (staffErr) {
+                        console.error('Error creating owner staff member:', staffErr);
+                        // Don't fail registration
                     }
                 }
 
@@ -733,6 +829,7 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                     address: fullAddress,
                     phone: regPhone,
                     ownerName: regName,
+                    email: regEmail,
                     description: salonDescription,
                     categories: salonCategories,
                     imageUrl: salonImageUrl,

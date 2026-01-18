@@ -119,3 +119,30 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Update grant to include new parameter signature
 GRANT EXECUTE ON FUNCTION public.claim_and_create_appointment(uuid, uuid, uuid, uuid, text, date, text, numeric, text, uuid, integer) TO authenticated;
+
+-- Migration: Add staff_id to deals table
+-- Allows deals to be assigned to specific staff members
+
+ALTER TABLE public.deals
+ADD COLUMN IF NOT EXISTS staff_id uuid REFERENCES public.staff(id);
+
+-- Add index for performance
+CREATE INDEX IF NOT EXISTS idx_deals_staff_id ON deals(staff_id);
+
+-- Update RLS policies for deals to include staff access
+DROP POLICY IF EXISTS "deals salon access" ON public.deals;
+CREATE POLICY "deals salon access"
+  ON public.deals FOR ALL
+  TO authenticated
+  USING (salon_id IN (
+    SELECT id FROM public.salons WHERE owner_id = auth.uid()
+  ));
+
+-- Allow staff members to view deals assigned to them
+DROP POLICY IF EXISTS "deals staff access" ON public.deals;
+CREATE POLICY "deals staff access"
+  ON public.deals FOR SELECT
+  TO authenticated
+  USING (staff_id IN (
+    SELECT id FROM public.staff WHERE user_id = auth.uid()
+  ));

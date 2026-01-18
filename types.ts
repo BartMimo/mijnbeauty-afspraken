@@ -116,6 +116,7 @@ export interface Deal {
   durationMinutes: number; // Duration of the service in minutes
   description: string;
   status?: string; // e.g., 'active', 'claimed', 'expired'
+  staffId?: string | null; // Optional staff member assigned to this deal
 }
 
 export interface DashboardStats {

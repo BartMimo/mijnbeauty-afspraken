@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Clock, Tag } from 'lucide-react';
-import { Button, Card, Badge, Modal, Input } from '../../components/UIComponents';
+import { Button, Card, Badge, Modal, Input, Select } from '../../components/UIComponents';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -10,6 +10,7 @@ export const SalonDeals: React.FC = () => {
     const [deals, setDeals] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'claimed' | 'expired'>('active');
+    const [staff, setStaff] = useState<any[]>([]);
 
     // Fetch salon and deals on mount
     useEffect(() => {
@@ -35,7 +36,10 @@ export const SalonDeals: React.FC = () => {
                 setSalonId(salon.id);
 
                 // Fetch deals for this salon (supports optional status filter)
-                let q = supabase.from('deals').select('*').eq('salon_id', salon.id).order('date', { ascending: true });
+                let q = supabase.from('deals').select(`
+                    *,
+                    staff:staff_id (id, name)
+                `).eq('salon_id', salon.id).order('date', { ascending: true });
                 if (filterStatus && filterStatus !== 'all') {
                     q = q.eq('status', filterStatus);
                 }
@@ -52,8 +56,22 @@ export const SalonDeals: React.FC = () => {
                     rawTime: d.time || '',
                     date: d.date,
                     durationMinutes: d.duration_minutes || 60,
-                    status: d.status || 'active'
+                    status: d.status || 'active',
+                    staffId: d.staff_id || '',
+                    staff: d.staff
                 })) || []);
+
+                // Fetch staff for this salon
+                const { data: staffData } = await supabase
+                    .from('staff')
+                    .select('id, name')
+                    .eq('salon_id', salon.id)
+                    .eq('is_active', true)
+                    .order('name');
+
+                if (staffData) {
+                    setStaff(staffData);
+                }
 
             } catch (err) {
                 console.error('Error fetching deals:', err);
@@ -68,7 +86,7 @@ export const SalonDeals: React.FC = () => {
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDeal, setEditingDeal] = useState<any>(null);
-    const [form, setForm] = useState({ service: '', price: '', original: '', time: '', date: '', status: 'active', durationMinutes: 60 });
+    const [form, setForm] = useState({ service: '', price: '', original: '', time: '', date: '', status: 'active', durationMinutes: 60, staffId: '' });
 
     // Actions
     const handleEdit = (deal: any) => {
@@ -80,14 +98,15 @@ export const SalonDeals: React.FC = () => {
             ...deal, 
             time: extractedTime,
             date: deal.date || new Date().toISOString().split('T')[0],
-            durationMinutes: deal.durationMinutes || 60
+            durationMinutes: deal.durationMinutes || 60,
+            staffId: deal.staffId || ''
         });
         setIsModalOpen(true);
     };
 
     const handleCreate = () => {
         setEditingDeal(null);
-        setForm({ service: '', price: '', original: '', time: '', date: new Date().toISOString().split('T')[0], status: 'active', durationMinutes: 60 });
+        setForm({ service: '', price: '', original: '', time: '', date: new Date().toISOString().split('T')[0], status: 'active', durationMinutes: 60, staffId: '' });
         setIsModalOpen(true);
     };
 
@@ -121,7 +140,8 @@ export const SalonDeals: React.FC = () => {
                         date: dealDate,
                         time: form.time,
                         duration_minutes: form.durationMinutes,
-                        status: form.status
+                        status: form.status,
+                        staff_id: form.staffId || null
                     })
                     .eq('id', editingDeal.id);
 
@@ -144,7 +164,8 @@ export const SalonDeals: React.FC = () => {
                         date: dealDate,
                         time: form.time,
                         duration_minutes: form.durationMinutes,
-                        status: form.status
+                        status: form.status,
+                        staff_id: form.staffId || null
                     })
                     .select()
                     .single();
@@ -247,6 +268,7 @@ export const SalonDeals: React.FC = () => {
                                 <th className="px-6 py-4 font-medium text-stone-600">Dienst / Titel</th>
                                 <th className="px-6 py-4 font-medium text-stone-600">Prijs</th>
                                 <th className="px-6 py-4 font-medium text-stone-600">Wanneer</th>
+                                <th className="px-6 py-4 font-medium text-stone-600">Medewerker</th>
                                 <th className="px-6 py-4 font-medium text-stone-600">Korting</th>
                                 <th className="px-6 py-4 font-medium text-stone-600">Status</th>
                                 <th className="px-6 py-4 font-medium text-stone-600 text-right">Acties</th>
@@ -266,6 +288,9 @@ export const SalonDeals: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4 text-stone-600">
                                             <span className="flex items-center"><Clock size={14} className="mr-1 text-stone-400" /> {deal.time}</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-stone-600">
+                                            {deal.staff?.name || 'Alle medewerkers'}
                                         </td>
                                         <td className="px-6 py-4">
                                             {discount > 0 && <Badge variant="warning">-{discount}%</Badge>}
@@ -302,7 +327,7 @@ export const SalonDeals: React.FC = () => {
                             })}
                             {deals.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="text-center py-12 text-stone-500">
+                                    <td colSpan={7} className="text-center py-12 text-stone-500">
                                         <div className="flex flex-col items-center">
                                             <Tag size={32} className="mb-2 text-stone-300" />
                                             <p>Nog geen deals toegevoegd.</p>
@@ -380,6 +405,18 @@ export const SalonDeals: React.FC = () => {
                         min="15"
                         max="480"
                     />
+
+                    {/* Staff selection */}
+                    <Select
+                        label="Medewerker (optioneel)"
+                        value={form.staffId}
+                        onChange={e => setForm({...form, staffId: e.target.value})}
+                    >
+                        <option value="">Alle medewerkers (standaard)</option>
+                        {staff.map(member => (
+                            <option key={member.id} value={member.id}>{member.name}</option>
+                        ))}
+                    </Select>
 
                      <p className="text-sm text-stone-600 pt-2">
                         Deals zijn standaard actief en zichtbaar voor klanten. Gebruik de "Deactiveren" knop om een deal te verwijderen.
