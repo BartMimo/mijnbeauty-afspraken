@@ -268,7 +268,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         description: s.description || '',
                         price: s.price,
                         durationMinutes: s.duration_minutes,
-                        category: 'Nails'
+                        category: s.category || 'Overig'
                     })),
                     image: data.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800',
                     openingHours: data.opening_hours
@@ -341,8 +341,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     .eq('salon_id', data.id)
                     .eq('is_active', true);
 
+                let processedStaff = [];
                 if (staffData) {
-                    setStaff(staffData.map((s: any) => ({
+                    processedStaff = staffData.map((s: any) => ({
                         id: s.id,
                         salonId: s.salon_id,
                         userId: s.user_id,
@@ -352,8 +353,59 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         role: s.role,
                         isActive: s.is_active,
                         serviceIds: s.service_staff?.map((ss: any) => ss.service_id) || []
-                    })));
+                    }));
                 }
+
+                // If no staff found, try to add the salon owner as a staff member
+                if (processedStaff.length === 0 && data.owner_id) {
+                    try {
+                        // If current user is the owner, use their name
+                        let ownerName = 'Eigenaar';
+                        if (user && user.id === data.owner_id) {
+                            ownerName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Eigenaar';
+                        } else {
+                            // Try to get owner info from users table if it exists
+                            const { data: ownerData } = await supabase
+                                .from('users')
+                                .select('name, email')
+                                .eq('id', data.owner_id)
+                                .maybeSingle();
+                            
+                            if (ownerData) {
+                                ownerName = ownerData.name || ownerData.email?.split('@')[0] || 'Eigenaar';
+                            }
+                        }
+                        
+                        // Create a temporary staff entry for the owner
+                        processedStaff = [{
+                            id: `owner-${data.owner_id}`,
+                            salonId: data.id,
+                            userId: data.owner_id,
+                            name: ownerName,
+                            email: data.email || '',
+                            phone: data.phone || '',
+                            role: 'owner',
+                            isActive: true,
+                            serviceIds: data.services?.map((s: any) => s.id) || [] // Owner can do all services
+                        }];
+                    } catch (err) {
+                        console.warn('Could not fetch owner info:', err);
+                        // Fallback: create basic owner entry
+                        processedStaff = [{
+                            id: `owner-${data.owner_id}`,
+                            salonId: data.id,
+                            userId: data.owner_id,
+                            name: 'Eigenaar',
+                            email: data.email || '',
+                            phone: data.phone || '',
+                            role: 'owner',
+                            isActive: true,
+                            serviceIds: data.services?.map((s: any) => s.id) || []
+                        }];
+                    }
+                }
+
+                setStaff(processedStaff);
             } catch (err) {
                 console.error('Error in fetchSalon:', err);
             } finally {

@@ -143,7 +143,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         description: s.description || '',
                         price: s.price,
                         duration: s.duration_minutes,
-                        category: 'Nails'
+                        category: s.category || 'Overig'
                     })),
                     image: data.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800',
                     openingHours: data.opening_hours
