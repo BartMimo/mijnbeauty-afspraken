@@ -12,6 +12,10 @@ interface AdminSalon {
     status: 'active' | 'pending' | 'suspended';
     rating: number;
     kvk?: string;
+    paymentMethods?: {
+        cash: boolean;
+        online: boolean;
+    };
     subscription: {
         plan: 'Pro' | 'Starter' | 'Gratis';
         status: 'active' | 'trialing' | 'past_due' | 'canceled' | 'none';
@@ -28,7 +32,13 @@ export const AdminSalons: React.FC = () => {
     // Modal State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingSalon, setEditingSalon] = useState<AdminSalon | null>(null);
-    const [editForm, setEditForm] = useState({ name: '', city: '', address: '', kvk: '' });
+    const [editForm, setEditForm] = useState({ 
+        name: '', 
+        city: '', 
+        address: '', 
+        kvk: '',
+        paymentMethods: { cash: true, online: false }
+    });
 
     useEffect(() => {
         const fetchSalons = async () => {
@@ -57,6 +67,8 @@ export const AdminSalons: React.FC = () => {
                     address: s.address || '',
                     status: (s.status || 'active') as AdminSalon['status'],
                     rating: s.rating || 0,
+                    kvk: s.kvk,
+                    paymentMethods: s.payment_methods || { cash: true, online: false },
                     subscription: { plan: 'Gratis', status: 'none' }
                 }));
 
@@ -156,7 +168,8 @@ export const AdminSalons: React.FC = () => {
             name: salon.name, 
             city: salon.city, 
             address: salon.address,
-            kvk: salon.kvk || '' 
+            kvk: salon.kvk || '',
+            paymentMethods: salon.paymentMethods || { cash: true, online: false }
         });
         setIsEditModalOpen(true);
     };
@@ -168,7 +181,8 @@ export const AdminSalons: React.FC = () => {
                 .update({
                     name: editForm.name,
                     city: editForm.city,
-                    address: editForm.address
+                    address: editForm.address,
+                    payment_methods: editForm.paymentMethods
                 })
                 .eq('id', editingSalon.id);
 
@@ -181,7 +195,8 @@ export const AdminSalons: React.FC = () => {
                 ...s,
                 name: editForm.name,
                 city: editForm.city,
-                address: editForm.address
+                address: editForm.address,
+                paymentMethods: editForm.paymentMethods
             } : s));
             setIsEditModalOpen(false);
             setEditingSalon(null);
@@ -390,6 +405,41 @@ export const AdminSalons: React.FC = () => {
                         value={editForm.address}
                         onChange={(e) => setEditForm({...editForm, address: e.target.value})}
                     />
+                    
+                    {/* Payment Methods Section */}
+                    <div className="border-t pt-4">
+                        <label className="block text-sm font-medium text-stone-700 mb-3">Betaalmethoden</label>
+                        <div className="space-y-2">
+                            <label className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={editForm.paymentMethods.cash}
+                                    onChange={(e) => setEditForm({
+                                        ...editForm, 
+                                        paymentMethods: {...editForm.paymentMethods, cash: e.target.checked}
+                                    })}
+                                    className="mr-2"
+                                />
+                                Contant betalen
+                            </label>
+                            <label className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={editForm.paymentMethods.online}
+                                    onChange={(e) => setEditForm({
+                                        ...editForm, 
+                                        paymentMethods: {...editForm.paymentMethods, online: e.target.checked}
+                                    })}
+                                    className="mr-2"
+                                />
+                                Online betalen
+                            </label>
+                        </div>
+                        <p className="text-xs text-stone-500 mt-2">
+                            Selecteer welke betaalmethoden deze salon accepteert. Dit is zichtbaar voor klanten tijdens het boeken.
+                        </p>
+                    </div>
+                    
                     <div className="flex justify-end gap-2 pt-4">
                         <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Annuleren</Button>
                         <Button onClick={saveEdit}>Opslaan</Button>
