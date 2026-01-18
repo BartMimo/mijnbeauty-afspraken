@@ -27,6 +27,7 @@ const SALON_CATEGORIES = [
 
 type SalonVM = {
   id: string;
+  salonId: string; // Real UUID for database operations
   slug?: string;
   name: string;
   city: string;
@@ -210,6 +211,7 @@ export const SearchPage: React.FC = () => {
       setSalons(
         (data ?? []).map((s: any): SalonVM => ({
           id: s.slug ?? s.id,
+          salonId: s.id, // Real UUID for database operations
           slug: s.slug,
           name: s.name,
           city: s.city ?? '',
@@ -275,7 +277,7 @@ export const SearchPage: React.FC = () => {
         calculateDistance(userLocation.lat, userLocation.lng, s.latitude, s.longitude) <= searchRadius;
 
       // Deals filtering
-      const matchDeals = !showDealsOnly || salonsWithDeals.has(s.id);
+      const matchDeals = !showDealsOnly || salonsWithDeals.has(s.salonId);
 
       return matchQuery && matchCategory && matchLocation && matchDeals;
     });
@@ -549,15 +551,15 @@ export const SearchPage: React.FC = () => {
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleFavorite(s.id);
+                            toggleFavorite(s.salonId);
                           }}
                           className={`p-2 rounded-full transition-colors ${
-                            favorites.has(s.id) 
+                            favorites.has(s.salonId) 
                               ? 'bg-red-100 text-red-600 hover:bg-red-200' 
                               : 'bg-stone-100 text-stone-400 hover:bg-stone-200 hover:text-stone-600'
                           }`}
                         >
-                          <Heart className={favorites.has(s.id) ? 'fill-current' : ''} size={16} />
+                          <Heart className={favorites.has(s.salonId) ? 'fill-current' : ''} size={16} />
                         </button>
                       </div>
                     </div>
