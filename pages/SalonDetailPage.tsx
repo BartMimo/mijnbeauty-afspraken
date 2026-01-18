@@ -4,7 +4,7 @@ import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar a
 import { Button, Card, Badge } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Service, Deal } from '../types';
+import { Service, Deal, Staff } from '../types';
 import { insertAppointmentSafe } from '../lib/appointments';
 
 // Salon categories - matches the categories used in registration
@@ -65,9 +65,11 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const [loading, setLoading] = useState(true);
     const [bookingLoading, setBookingLoading] = useState(false);
     const [activeDeals, setActiveDeals] = useState<Deal[]>([]);
+    const [staff, setStaff] = useState<Staff[]>([]);
+    const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
     const [selectedService, setSelectedService] = useState<string | null>(null);
     const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
-    const [bookingStep, setBookingStep] = useState<'service' | 'time' | 'confirm'>('service');
+    const [bookingStep, setBookingStep] = useState<'staff' | 'service' | 'time' | 'confirm'>('staff');
     const [existingAppointments, setExistingAppointments] = useState<Appointment[]>([]);
     
     // Favorite State
@@ -321,6 +323,37 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         duration_minutes: a.duration_minutes || 30
                     })));
                 }
+
+                // Fetch staff for this salon
+                const { data: staffData } = await supabase
+                    .from('staff')
+                    .select(`
+                        id,
+                        salon_id,
+                        user_id,
+                        name,
+                        email,
+                        phone,
+                        role,
+                        is_active,
+                        service_staff(service_id)
+                    `)
+                    .eq('salon_id', data.id)
+                    .eq('is_active', true);
+
+                if (staffData) {
+                    setStaff(staffData.map((s: any) => ({
+                        id: s.id,
+                        salonId: s.salon_id,
+                        userId: s.user_id,
+                        name: s.name,
+                        email: s.email,
+                        phone: s.phone,
+                        role: s.role,
+                        isActive: s.is_active,
+                        serviceIds: s.service_staff?.map((ss: any) => ss.service_id) || []
+                    })));
+                }
             } catch (err) {
                 console.error('Error in fetchSalon:', err);
             } finally {
@@ -363,17 +396,14 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const handleBookService = (serviceId: string) => {
         setSelectedService(serviceId);
         setSelectedDeal(null); // Clear deal selection
-        setBookingStep('time');
+        setBookingStep('staff');
         scrollToWidget();
     };
 
     const handleBookDeal = (deal: Deal) => {
         setSelectedDeal(deal);
         setSelectedService(null); // Clear service selection
-        
-        // For deals, we often skip date selection if it's fixed, 
-        // but for this demo we'll jump straight to confirm to show the deal price logic
-        setBookingStep('confirm'); 
+        setBookingStep('staff'); // Start with staff selection for deals too
         scrollToWidget();
     };
 
@@ -612,27 +642,43 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     )}
 
                     <div id="services-list">
-                        <h2 className="text-xl font-bold mb-4 px-2">Diensten</h2>
-                        <div className="space-y-4">
-                            {salon.services.map(service => (
-                                <Card key={service.id} className="p-4 md:p-6 flex justify-between items-center hover:border-brand-200 transition-colors">
-                                    <div>
-                                        <h3 className="font-semibold text-stone-900 text-lg">{service.name}</h3>
-                                        <p className="text-sm text-stone-500 mb-2">{service.description}</p>
-                                        <div className="flex items-center gap-3 text-sm text-stone-500">
-                                            <span className="flex items-center"><Clock size={14} className="mr-1" /> {service.durationMinutes} min</span>
-                                            <span className="flex items-center font-medium text-stone-900"><Euro size={14} className="mr-1" /> {service.price}</span>
-                                        </div>
+                        {/* Group services by category */}
+                        {(() => {
+                            const servicesByCategory = salon.services.reduce((acc, service) => {
+                                const category = service.category;
+                                if (!acc[category]) {
+                                    acc[category] = [];
+                                }
+                                acc[category].push(service);
+                                return acc;
+                            }, {} as Record<string, typeof salon.services>);
+
+                            return Object.entries(servicesByCategory).map(([category, services]) => (
+                                <div key={category} className="mb-8">
+                                    <h2 className="text-xl font-bold mb-4 px-2">{category}</h2>
+                                    <div className="space-y-4">
+                                        {services.map(service => (
+                                            <Card key={service.id} className="p-4 md:p-6 flex justify-between items-center hover:border-brand-200 transition-colors">
+                                                <div>
+                                                    <h3 className="font-semibold text-stone-900 text-lg">{service.name}</h3>
+                                                    <p className="text-sm text-stone-500 mb-2">{service.description}</p>
+                                                    <div className="flex items-center gap-3 text-sm text-stone-500">
+                                                        <span className="flex items-center"><Clock size={14} className="mr-1" /> {service.durationMinutes} min</span>
+                                                        <span className="flex items-center font-medium text-stone-900"><Euro size={14} className="mr-1" /> {service.price}</span>
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    onClick={() => handleBookService(service.id)}
+                                                    variant={selectedService === service.id ? 'primary' : 'outline'}
+                                                >
+                                                    Boeken
+                                                </Button>
+                                            </Card>
+                                        ))}
                                     </div>
-                                    <Button 
-                                        onClick={() => handleBookService(service.id)}
-                                        variant={selectedService === service.id ? 'primary' : 'outline'}
-                                    >
-                                        Boeken
-                                    </Button>
-                                </Card>
-                            ))}
-                        </div>
+                                </div>
+                            ));
+                        })()}
                     </div>
 
                     {/* Reviews */}
@@ -662,12 +708,116 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         <Card className="p-6 border-brand-100 shadow-lg transition-all duration-300">
                             <h3 className="text-lg font-bold mb-4 border-b border-stone-100 pb-2">Je afspraak</h3>
                             
-                            {!selectedService && !selectedDeal ? (
-                                <div className="text-center py-8 text-stone-500">
-                                    <p>Selecteer een dienst of deal om te boeken.</p>
+                            {/* STAFF SELECTION STEP */}
+                            {bookingStep === 'staff' && (
+                                <div className="space-y-4 animate-fadeIn">
+                                    <div className="text-center mb-4">
+                                        <h4 className="font-semibold text-stone-900 mb-2">Kies een medewerker</h4>
+                                        <p className="text-sm text-stone-500">Selecteer bij welke medewerker je graag een afspraak wilt maken</p>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {/* All staff option */}
+                                        <button
+                                            onClick={() => {
+                                                setSelectedStaff(null);
+                                                setBookingStep(selectedDeal ? 'confirm' : 'service');
+                                                scrollToWidget();
+                                            }}
+                                            className="w-full p-4 border-2 border-stone-200 rounded-xl hover:border-brand-300 hover:bg-brand-50 transition-colors text-left"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-stone-100 rounded-full flex items-center justify-center">
+                                                    <span className="text-stone-600 font-medium">AL</span>
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-stone-900">Alle medewerkers</div>
+                                                    <div className="text-sm text-stone-500">Toon alle beschikbare diensten</div>
+                                                </div>
+                                            </div>
+                                        </button>
+
+                                        {/* Individual staff members */}
+                                        {staff.map((member) => (
+                                            <button
+                                                key={member.id}
+                                                onClick={() => {
+                                                    setSelectedStaff(member);
+                                                    setBookingStep(selectedDeal ? 'confirm' : 'service');
+                                                    scrollToWidget();
+                                                }}
+                                                className="w-full p-4 border-2 border-stone-200 rounded-xl hover:border-brand-300 hover:bg-brand-50 transition-colors text-left"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center">
+                                                        <span className="text-brand-600 font-medium">
+                                                            {member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-medium text-stone-900">{member.name}</div>
+                                                        <div className="text-sm text-stone-500">
+                                                            {member.role === 'owner' ? 'Eigenaar' : 'Medewerker'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="space-y-6">
+                            )}
+
+                            {/* SERVICE SELECTION STEP */}
+                            {bookingStep === 'service' && selectedStaff !== undefined && (
+                                <div className="space-y-4 animate-fadeIn">
+                                    <div className="text-center mb-4">
+                                        <h4 className="font-semibold text-stone-900 mb-2">Kies een dienst</h4>
+                                        <p className="text-sm text-stone-500">
+                                            {selectedStaff ? `Diensten van ${selectedStaff.name}` : 'Alle beschikbare diensten'}
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                                        {/* Filter services based on selected staff */}
+                                        {salon?.services?.filter((service: any) => {
+                                            if (!selectedStaff) return true; // Show all if no staff selected
+                                            return selectedStaff.serviceIds?.includes(service.id);
+                                        }).map((service: any) => (
+                                            <button
+                                                key={service.id}
+                                                onClick={() => {
+                                                    setSelectedService(service.id);
+                                                    setSelectedDeal(null);
+                                                    setBookingStep('time');
+                                                    scrollToWidget();
+                                                }}
+                                                className="w-full p-4 border-2 border-stone-200 rounded-xl hover:border-brand-300 hover:bg-brand-50 transition-colors text-left"
+                                            >
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h4 className="font-medium text-stone-900">{service.name}</h4>
+                                                        <p className="text-sm text-stone-500 mt-1 flex items-center">
+                                                            <Clock size={12} className="mr-1"/> {service.durationMinutes} min
+                                                        </p>
+                                                    </div>
+                                                    <span className="font-bold text-stone-700">€{service.price}</span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <button
+                                        onClick={() => setBookingStep('staff')}
+                                        className="w-full mt-4 text-sm text-stone-500 hover:text-stone-700 transition-colors"
+                                    >
+                                        ← Andere medewerker kiezen
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* TIME SELECTION STEP */}
+                            {bookingStep === 'time' && selectedService && (
+                                <div className="space-y-6 animate-fadeIn">
                                     
                                     {/* SELECTION DISPLAY */}
                                     {selectedDeal ? (
@@ -760,138 +910,151 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                             </Button>
                                         </div>
                                     )}
-
-                                    {/* CONFIRMATION SCREEN */}
-                                    {bookingStep === 'confirm' && (
-                                        <div className="space-y-4 animate-fadeIn">
-                                            <div className="p-4 bg-stone-50 rounded-xl space-y-2 text-sm">
-                                                <div className="flex justify-between">
-                                                    <span className="text-stone-500">Behandeling</span>
-                                                    <span className="font-medium text-stone-900">{selectedDeal ? selectedDeal.serviceName : currentService?.name}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-stone-500">Datum</span>
-                                                    <span className="font-medium text-stone-900">
-                                                        {selectedDeal ? 'Volgens afspraak (Deal)' : (selectedDate && formatDateDutch(selectedDate))}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-stone-500">Tijd</span>
-                                                    <span className="font-medium text-stone-900">
-                                                        {selectedDeal ? selectedDeal.time : selectedTime}
-                                                    </span>
-                                                </div>
-                                                <div className="border-t border-stone-200 pt-2 flex justify-between font-bold text-base">
-                                                    <span>Totaal</span>
-                                                    <span className={selectedDeal ? 'text-brand-600' : ''}>
-                                                        €{selectedDeal ? selectedDeal.discountPrice : currentService?.price}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            
-                                            <Button 
-                                                className="w-full" 
-                                                onClick={async () => {
-                                                    if (!user) {
-                                                        alert('Log eerst in om te boeken');
-                                                        navigate('/login');
-                                                        return;
-                                                    }
-                                                    
-                                                    setBookingLoading(true);
-                                                    try {
-                                                        const serviceDuration = (currentService?.durationMinutes ?? 30);
-                                                        // Use a resilient insert helper that can retry without missing columns (eg. service_name)
-                                                        const insertData: any = {
-                                                            user_id: user?.id || null,  // Set to user.id if logged in
-                                                            salon_id: salon.supabaseId,
-                                                            service_id: selectedService,
-                                                            service_name: currentService?.name,
-                                                            date: selectedDate ? toLocalDateString(selectedDate) : null,
-                                                            time: selectedDeal ? selectedDeal.rawTime : selectedTime,
-                                                            duration_minutes: serviceDuration,
-                                                            price: selectedDeal ? selectedDeal.discountPrice : currentService?.price,
-                                                            status: 'confirmed'
-                                                        };
-
-                                                        // lazy import to avoid circular deps during module init
-                                                        const { insertAppointmentSafe } = await import('../lib/appointments');
-                                                        // If this is a deal booking, use the DB RPC so claim+insert happen atomically server-side
-                                                        if (selectedDeal) {
-                                                            const { data, error: rpcErr } = await supabase.rpc('claim_and_create_appointment', {
-                                                                p_deal_id: selectedDeal.id,
-                                                                p_user_id: user?.id || null,  // Set to user.id if logged in
-                                                                p_salon_id: salon.supabaseId,
-                                                                p_service_id: null,
-                                                                p_service_name: selectedDeal.serviceName,
-                                                                p_date: selectedDeal.date,
-                                                                p_time: selectedDeal.rawTime,
-                                                                p_duration_minutes: null,
-                                                                p_price: selectedDeal.discountPrice,
-                                                                p_customer_name: user?.user_metadata?.full_name || user?.email || 'Gast'
-                                                            });
-                                                            if (rpcErr) throw rpcErr;
-
-                                                            // Supabase returns the function value inside `data` (null when unclaimed)
-                                                            const returnedId = Array.isArray(data) ? data[0] : data;
-                                                            if (!returnedId) {
-                                                                alert('Deze deal is helaas net geclaimd door iemand anders. Probeer een andere deal of ververs de pagina.');
-                                                                setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
-                                                                setSelectedDeal(null);
-                                                                setBookingLoading(false);
-                                                                return;
-                                                            }
-
-                                                            // Success—returnedId is appointment id
-                                                            setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
-                                                            setSelectedDeal(null);
-                                                            alert('Boeking succesvol! (Deal)');
-                                                            navigate('/dashboard/user');
-                                                            setBookingLoading(false);
-                                                            return;
-                                                        }
-
-                                                        // Non-deal booking: use the resilient insert helper
-                                                        const { error } = await insertAppointmentSafe(insertData);
-                                                        if (error) throw error;
-
-                                                        // Remove from local state if deal was claimed
-                                                        if (selectedDeal) {
-                                                            setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
-                                                            setSelectedDeal(null);
-                                                        }
-
-                                                        alert('Boeking succesvol!');
-                                                        navigate('/dashboard/user');
-                                                    } catch (err: any) {
-                                                        console.error('Booking error:', err);
-                                                        alert('Boeking mislukt: ' + (err.message || 'Onbekende fout'));
-                                                    } finally {
-                                                        setBookingLoading(false);
-                                                    }
-                                                }}
-                                                isLoading={bookingLoading}
-                                            >
-                                                {selectedDeal ? 'Deal Claimen & Boeken' : 'Bevestig Boeking'}
-                                            </Button>
-                                            
-                                            <button 
-                                                className="w-full text-center text-xs text-stone-400 hover:text-stone-600 underline"
-                                                onClick={() => {
-                                                    if(selectedDeal) {
-                                                        setSelectedDeal(null);
-                                                    } else {
-                                                        setBookingStep('time');
-                                                    }
-                                                }}
-                                            >
-                                                {selectedDeal ? 'Annuleren' : 'Wijzig datum of tijd'}
-                                            </button>
-                                        </div>
-                                    )}
                                 </div>
                             )}
+
                         </Card>
+
+                        {/* CONFIRMATION SCREEN - Outside booking widget card */}
+                        {bookingStep === 'confirm' && ((selectedService && selectedStaff !== undefined) || selectedDeal) && (
+                            <Card className="p-6 border-brand-100 shadow-lg transition-all duration-300 mt-4">
+                                <h3 className="text-lg font-bold mb-4 border-b border-stone-100 pb-2">Bevestig je afspraak</h3>
+                                <div className="space-y-4 animate-fadeIn">
+                                    <div className="p-4 bg-stone-50 rounded-xl space-y-2 text-sm">
+                                        {selectedStaff && (
+                                            <div className="flex justify-between">
+                                                <span className="text-stone-500">Medewerker</span>
+                                                <span className="font-medium text-stone-900">{selectedStaff.name}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between">
+                                            <span className="text-stone-500">Behandeling</span>
+                                            <span className="font-medium text-stone-900">{selectedDeal ? selectedDeal.serviceName : currentService?.name}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-stone-500">Datum</span>
+                                            <span className="font-medium text-stone-900">
+                                                {selectedDeal ? 'Volgens afspraak (Deal)' : (selectedDate && formatDateDutch(selectedDate))}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-stone-500">Tijd</span>
+                                            <span className="font-medium text-stone-900">
+                                                {selectedDeal ? selectedDeal.time : selectedTime}
+                                            </span>
+                                        </div>
+                                        <div className="border-t border-stone-200 pt-2 flex justify-between font-bold text-base">
+                                            <span>Totaal</span>
+                                            <span className={selectedDeal ? 'text-brand-600' : ''}>
+                                                €{selectedDeal ? selectedDeal.discountPrice : currentService?.price}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <Button 
+                                        className="w-full" 
+                                        onClick={async () => {
+                                            if (!user) {
+                                                alert('Log eerst in om te boeken');
+                                                navigate('/login');
+                                                return;
+                                            }
+                                            
+                                            setBookingLoading(true);
+                                            try {
+                                                const serviceDuration = (currentService?.durationMinutes ?? 30);
+                                                // Use a resilient insert helper that can retry without missing columns (eg. service_name)
+                                                const insertData: any = {
+                                                    user_id: user?.id || null,  // Set to user.id if logged in
+                                                    salon_id: salon.supabaseId,
+                                                    service_id: selectedService,
+                                                    service_name: currentService?.name,
+                                                    date: selectedDate ? toLocalDateString(selectedDate) : null,
+                                                    time: selectedDeal ? selectedDeal.rawTime : selectedTime,
+                                                    duration_minutes: serviceDuration,
+                                                    price: selectedDeal ? selectedDeal.discountPrice : currentService?.price,
+                                                    status: 'confirmed',
+                                                    staff_id: selectedStaff?.id || null
+                                                };
+
+                                                // lazy import to avoid circular deps during module init
+                                                const { insertAppointmentSafe } = await import('../lib/appointments');
+                                                // If this is a deal booking, use the DB RPC so claim+insert happen atomically server-side
+                                                if (selectedDeal) {
+                                                    const { data, error: rpcErr } = await supabase.rpc('claim_and_create_appointment', {
+                                                        p_deal_id: selectedDeal.id,
+                                                        p_user_id: user?.id || null,  // Set to user.id if logged in
+                                                        p_salon_id: salon.supabaseId,
+                                                        p_service_id: null,
+                                                        p_service_name: selectedDeal.serviceName,
+                                                        p_date: selectedDeal.date,
+                                                        p_time: selectedDeal.rawTime,
+                                                        p_duration_minutes: null,
+                                                        p_price: selectedDeal.discountPrice,
+                                                        p_customer_name: user?.user_metadata?.full_name || user?.email || 'Gast',
+                                                        p_staff_id: selectedStaff?.id || null
+                                                    });
+                                                    if (rpcErr) throw rpcErr;
+
+                                                    // Supabase returns the function value inside `data` (null when unclaimed)
+                                                    const returnedId = Array.isArray(data) ? data[0] : data;
+                                                    if (!returnedId) {
+                                                        alert('Deze deal is helaas net geclaimd door iemand anders. Probeer een andere deal of ververs de pagina.');
+                                                        setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
+                                                        setSelectedDeal(null);
+                                                        setBookingLoading(false);
+                                                        return;
+                                                    }
+
+                                                    // Success—returnedId is appointment id
+                                                    setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
+                                                    setSelectedDeal(null);
+                                                    alert('Boeking succesvol! (Deal)');
+                                                    navigate('/dashboard/user');
+                                                    setBookingLoading(false);
+                                                    return;
+                                                }
+
+                                                // Non-deal booking: use the resilient insert helper
+                                                const { error } = await insertAppointmentSafe(insertData);
+                                                if (error) throw error;
+
+                                                // Remove from local state if deal was claimed
+                                                if (selectedDeal) {
+                                                    setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
+                                                    setSelectedDeal(null);
+                                                }
+
+                                                alert('Boeking succesvol!');
+                                                navigate('/dashboard/user');
+                                            } catch (err: any) {
+                                                console.error('Booking error:', err);
+                                                alert('Boeking mislukt: ' + (err.message || 'Onbekende fout'));
+                                            } finally {
+                                                setBookingLoading(false);
+                                            }
+                                        }}
+                                        isLoading={bookingLoading}
+                                    >
+                                        {selectedDeal ? 'Deal Claimen & Boeken' : 'Bevestig Boeking'}
+                                    </Button>
+                                    
+                                    <button 
+                                        className="w-full text-center text-xs text-stone-400 hover:text-stone-600 underline"
+                                        onClick={() => {
+                                            if(selectedDeal) {
+                                                setSelectedDeal(null);
+                                                setBookingStep('staff');
+                                            } else {
+                                                setBookingStep('time');
+                                            }
+                                        }}
+                                    >
+                                        {selectedDeal ? 'Annuleren' : 'Wijzig datum of tijd'}
+                                    </button>
+                                </div>
+                            </Card>
+                        )}
                         
                         {/* Trust Badges */}
                         <div className="mt-4 flex justify-center gap-4 text-xs text-stone-400">

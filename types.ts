@@ -38,6 +38,19 @@ export interface Service {
   price: number;
   durationMinutes: number;
   category: ServiceCategory;
+  staffIds?: string[]; // Associated staff members
+}
+
+export interface Staff {
+  id: string;
+  salonId: string;
+  userId?: string; // Optional - some staff might not have user accounts
+  name: string;
+  email?: string;
+  phone?: string;
+  role: 'owner' | 'staff';
+  isActive: boolean;
+  serviceIds?: string[]; // Services this staff member provides
 }
 
 export interface Location {

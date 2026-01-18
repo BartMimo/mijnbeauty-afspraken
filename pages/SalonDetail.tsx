@@ -599,28 +599,44 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     )}
 
                     <div id="services-list">
-                        <h2 className="text-xl font-bold mb-4 px-2">Diensten</h2>
-                        <div className="space-y-4">
-                            {salon.services.map(service => (
-                                <Card key={service.id} className="p-4 md:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-brand-200 transition-colors">
-                                    <div>
-                                        <h3 className="font-semibold text-stone-900 text-lg">{service.name}</h3>
-                                        <p className="text-sm text-stone-500 mb-2">{service.description}</p>
-                                        <div className="flex items-center gap-3 text-sm text-stone-500">
-                                            <span className="flex items-center"><Clock size={14} className="mr-1" /> {service.durationMinutes} min</span>
-                                            <span className="flex items-center font-medium text-stone-900"><Euro size={14} className="mr-1" /> {service.price}</span>
-                                        </div>
+                        {/* Group services by category */}
+                        {(() => {
+                            const servicesByCategory = salon.services.reduce((acc, service) => {
+                                const category = service.category;
+                                if (!acc[category]) {
+                                    acc[category] = [];
+                                }
+                                acc[category].push(service);
+                                return acc;
+                            }, {} as Record<string, typeof salon.services>);
+
+                            return Object.entries(servicesByCategory).map(([category, services]) => (
+                                <div key={category} className="mb-8">
+                                    <h2 className="text-xl font-bold mb-4 px-2">{category}</h2>
+                                    <div className="space-y-4">
+                                        {services.map(service => (
+                                            <Card key={service.id} className="p-4 md:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-brand-200 transition-colors">
+                                                <div>
+                                                    <h3 className="font-semibold text-stone-900 text-lg">{service.name}</h3>
+                                                    <p className="text-sm text-stone-500 mb-2">{service.description}</p>
+                                                    <div className="flex items-center gap-3 text-sm text-stone-500">
+                                                        <span className="flex items-center"><Clock size={14} className="mr-1" /> {service.durationMinutes} min</span>
+                                                        <span className="flex items-center font-medium text-stone-900"><Euro size={14} className="mr-1" /> {service.price}</span>
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    onClick={() => handleBookService(service.id)}
+                                                    variant={selectedService === service.id ? 'primary' : 'outline'}
+                                                    className="w-full sm:w-auto"
+                                                >
+                                                    Boeken
+                                                </Button>
+                                            </Card>
+                                        ))}
                                     </div>
-                                    <Button 
-                                        onClick={() => handleBookService(service.id)}
-                                        variant={selectedService === service.id ? 'primary' : 'outline'}
-                                        className="w-full sm:w-auto"
-                                    >
-                                        Boeken
-                                    </Button>
-                                </Card>
-                            ))}
-                        </div>
+                                </div>
+                            ));
+                        })()}
                     </div>
 
                     {/* Reviews */}
