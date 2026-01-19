@@ -276,8 +276,6 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     openingHours: data.opening_hours
                 });
 
-                console.log('Salon loaded with payment methods:', data.payment_methods);
-
                 // Check if user has this salon as favorite
                 if (user) {
                     const { data: favoriteData } = await supabase
@@ -953,7 +951,6 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                 <h3 className="text-lg font-bold mb-4 border-b border-stone-100 pb-2">Betaalmethode kiezen</h3>
                                 <div className="space-y-4 animate-fadeIn">
                                     <p className="text-stone-600 text-sm">Kies hoe je wilt betalen voor je afspraak.</p>
-                                    {(() => { console.log('Payment methods debug:', { salonPaymentMethods: salon?.paymentMethods, bookingStep, selectedService, selectedStaff, selectedDeal }); return null; })()}
                                     
                                     <div className="grid grid-cols-1 gap-3">
                                         {salon?.paymentMethods?.cash && (
