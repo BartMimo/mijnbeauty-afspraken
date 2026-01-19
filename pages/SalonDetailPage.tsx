@@ -263,6 +263,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     reviewCount: 0,
                     email: data.email,
                     phone: data.phone,
+                    paymentMethods: data.payment_methods || { cash: true, online: false },
                     services: (data.services || []).map((s: any) => ({
                         id: s.id,
                         name: s.name,
@@ -274,6 +275,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     image: data.image_url || 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800',
                     openingHours: data.opening_hours
                 });
+
+                console.log('Salon loaded with payment methods:', data.payment_methods);
 
                 // Check if user has this salon as favorite
                 if (user) {
@@ -950,6 +953,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                 <h3 className="text-lg font-bold mb-4 border-b border-stone-100 pb-2">Betaalmethode kiezen</h3>
                                 <div className="space-y-4 animate-fadeIn">
                                     <p className="text-stone-600 text-sm">Kies hoe je wilt betalen voor je afspraak.</p>
+                                    {(() => { console.log('Payment methods debug:', { salonPaymentMethods: salon?.paymentMethods, bookingStep, selectedService, selectedStaff, selectedDeal }); return null; })()}
                                     
                                     <div className="grid grid-cols-1 gap-3">
                                         {salon?.paymentMethods?.cash && (
