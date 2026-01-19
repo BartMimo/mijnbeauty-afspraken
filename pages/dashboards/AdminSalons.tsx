@@ -277,6 +277,11 @@ export const AdminSalons: React.FC = () => {
                                 <th className="px-6 py-4 font-medium text-stone-600">Locatie</th>
                                 <th className="px-6 py-4 font-medium text-stone-600">
                                     <div className="flex items-center gap-1">
+                                        <CreditCard size={14} /> Betalingen
+                                    </div>
+                                </th>
+                                <th className="px-6 py-4 font-medium text-stone-600">
+                                    <div className="flex items-center gap-1">
                                         <ShieldAlert size={14} /> Account
                                     </div>
                                 </th>
@@ -286,9 +291,9 @@ export const AdminSalons: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-stone-100">
                             {loading ? (
-                                <tr><td colSpan={5} className="px-6 py-8 text-center text-stone-500">Laden...</td></tr>
+                                <tr><td colSpan={6} className="px-6 py-8 text-center text-stone-500">Laden...</td></tr>
                             ) : filteredSalons.length === 0 ? (
-                                <tr><td colSpan={5} className="px-6 py-8 text-center text-stone-500">Geen salons gevonden.</td></tr>
+                                <tr><td colSpan={6} className="px-6 py-8 text-center text-stone-500">Geen salons gevonden.</td></tr>
                             ) : filteredSalons.map(salon => (
                                 <tr key={salon.id} className={`hover:bg-stone-50/50 ${salon.status === 'pending' ? 'bg-amber-50/30' : ''}`}>
                                     <td className="px-6 py-4">
@@ -304,6 +309,25 @@ export const AdminSalons: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 text-stone-600">
                                         {salon.address}, {salon.city}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-wrap gap-1">
+                                            {salon.paymentMethods?.cash && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                                    💵 Contant
+                                                </span>
+                                            )}
+                                            {salon.paymentMethods?.online && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                                    💳 Online
+                                                </span>
+                                            )}
+                                            {!salon.paymentMethods?.cash && !salon.paymentMethods?.online && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-stone-100 text-stone-600">
+                                                    Geen
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         {renderSubBadge(salon.subscription)}
@@ -430,13 +454,15 @@ export const AdminSalons: React.FC = () => {
                                         ...editForm, 
                                         paymentMethods: {...editForm.paymentMethods, online: e.target.checked}
                                     })}
+                                    disabled={true}
                                     className="mr-2"
                                 />
-                                Online betalen
+                                <span className="text-stone-400">Online betalen (binnenkort beschikbaar)</span>
+                                <span className="ml-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">Demo</span>
                             </label>
                         </div>
                         <p className="text-xs text-stone-500 mt-2">
-                            Selecteer welke betaalmethoden deze salon accepteert. Dit is zichtbaar voor klanten tijdens het boeken.
+                            Selecteer welke betaalmethoden deze salon accepteert. Contant betalen is direct beschikbaar. Online betalen met Stripe komt binnenkort.
                         </p>
                     </div>
                     
