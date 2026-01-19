@@ -28,12 +28,37 @@
   }
 }
 </script>
-  <script type="module" crossorigin src="/mijnbeauty-afspraken/assets/index-ZyaoUx06.js"></script>
-  <link rel="modulepreload" crossorigin href="/mijnbeauty-afspraken/assets/vendor-BLPh2XG4.js">
-  <link rel="modulepreload" crossorigin href="/mijnbeauty-afspraken/assets/ui-Cc21CRjn.js">
-  <link rel="modulepreload" crossorigin href="/mijnbeauty-afspraken/assets/supabase-wzm6nDUs.js">
-  <link rel="modulepreload" crossorigin href="/mijnbeauty-afspraken/assets/dashboards-DU353vVh.js">
-  <link rel="stylesheet" crossorigin href="/mijnbeauty-afspraken/assets/index-CraHmUjl.css">
+  <script>
+    // Dynamically determine base path so this single 404.html works for both:
+    // - GitHub Pages (repo served under /mijnbeauty-afspraken/)
+    // - Custom domains (served at root '/')
+    (function(){
+      var host = location.hostname || '';
+      var base = '/';
+      if (host.indexOf('github.io') !== -1 || location.pathname.indexOf('/mijnbeauty-afspraken/') === 0) {
+        base = '/mijnbeauty-afspraken/';
+      }
+
+      // Helper to inject tags
+      function inject(tag, attrs) {
+        var el = document.createElement(tag);
+        Object.keys(attrs).forEach(function(k){ el.setAttribute(k, attrs[k]); });
+        document.head.appendChild(el);
+      }
+
+      // Module script (main)
+      inject('script', { type: 'module', crossorigin: '', src: base + 'assets/index-ZyaoUx06.js' });
+
+      // Preloads
+      inject('link', { rel: 'modulepreload', crossorigin: '', href: base + 'assets/vendor-BLPh2XG4.js' });
+      inject('link', { rel: 'modulepreload', crossorigin: '', href: base + 'assets/ui-Cc21CRjn.js' });
+      inject('link', { rel: 'modulepreload', crossorigin: '', href: base + 'assets/supabase-wzm6nDUs.js' });
+      inject('link', { rel: 'modulepreload', crossorigin: '', href: base + 'assets/dashboards-DU353vVh.js' });
+
+      // CSS
+      inject('link', { rel: 'stylesheet', crossorigin: '', href: base + 'assets/index-CraHmUjl.css' });
+    })();
+  </script>
 </head>
   <body>
     <div id="root"></div>
