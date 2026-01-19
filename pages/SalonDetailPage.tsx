@@ -775,7 +775,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                 key={member.id}
                                                 onClick={() => {
                                                     setSelectedStaff(member);
-                                                    setBookingStep(selectedDeal ? 'confirm' : 'service');
+                                                    setBookingStep(selectedDeal ? 'payment' : 'service');
                                                     scrollToWidget();
                                                 }}
                                                 className="w-full p-4 border-2 border-stone-200 rounded-xl hover:border-brand-300 hover:bg-brand-50 transition-colors text-left"
@@ -948,7 +948,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         </Card>
 
                         {/* PAYMENT METHOD SELECTION */}
-                        {bookingStep === 'payment' && ((selectedService && selectedStaff !== undefined) || selectedDeal) && (
+                        {bookingStep === 'payment' && ((selectedService && selectedStaff !== undefined) || (selectedDeal && selectedStaff !== undefined)) && (
                             <Card className="p-6 border-brand-100 shadow-lg transition-all duration-300 mt-4">
                                 <h3 className="text-lg font-bold mb-4 border-b border-stone-100 pb-2">Betaalmethode kiezen</h3>
                                 <div className="space-y-4 animate-fadeIn">
