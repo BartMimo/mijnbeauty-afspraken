@@ -288,14 +288,21 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 }
 
                 // Fetch deals separately
-                const { data: dealsData } = await supabase
+                // Request only staff id (older DBs may not have staff.name).
+                // We'll enrich names from the separate staff query below when available.
+                const { data: dealsData, error: dealsError } = await supabase
                     .from('deals')
                     .select(`
                         *,
-                        staff:staff_id (id, name)
+                        staff:staff_id (id)
                     `)
                     .eq('salon_id', data.id)
                     .eq('status', 'active');
+
+                if (dealsError) {
+                    // Don't abort the whole page if nested columns are missing on older DBs
+                    console.warn('Could not fetch nested staff for deals (fallback):', dealsError.message || dealsError);
+                }
 
                 if (dealsData) {
                     setActiveDeals(dealsData.map((d: any) => ({
@@ -312,7 +319,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         description: d.description || '',
                         status: d.status,
                         staffId: d.staff_id,
-                        staff: d.staff
+                        staff: d.staff || null,
+                        staffName: null // will be filled after staff fetch if possible
                     })));
                 }
 
@@ -385,6 +393,15 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 }
 
                 setStaff(processedStaff);
+
+                // Enrich any previously-loaded deals with staff names (if available)
+                if (processedStaff.length > 0) {
+                    setActiveDeals(prev => prev.map(d => {
+                        if (!d.staffId) return d;
+                        const match = processedStaff.find((s: any) => s.id === d.staffId);
+                        return { ...d, staffName: match?.name || null };
+                    }));
+                }
             } catch (err) {
                 console.error('Error in fetchSalon:', err);
             } finally {

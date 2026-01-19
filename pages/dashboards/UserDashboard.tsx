@@ -109,19 +109,46 @@ export const UserDashboard: React.FC = () => {
         
         try {
             // Fetch detailed appointment info including staff and salon details
+            // First fetch appointment and only request staff id to avoid 400s on older DBs
             const { data, error } = await supabase
                 .from('appointments')
                 .select(`
                     *,
                     service:services(name, category),
                     salon:salons(name, address, city, phone, email),
-                    staff:staff(name, email, phone)
+                    staff:staff_id(id, user_id)
                 `)
                 .eq('id', appointment.id)
                 .single();
 
             if (error) throw error;
-            setAppointmentDetails(data);
+
+            // Try to enrich staff details (name/email/phone) from public.staff if available,
+            // otherwise fall back to profiles (auth.profiles)
+            let enrichedStaff = null;
+            try {
+                if (data?.staff?.id) {
+                    const { data: s, error: sErr } = await supabase
+                        .from('staff')
+                        .select('id, name, email, phone, role, user_id')
+                        .eq('id', data.staff.id)
+                        .maybeSingle();
+
+                    if (!sErr && s) enrichedStaff = s;
+                    else if (data.staff.user_id) {
+                        const { data: p, error: pErr } = await supabase
+                            .from('profiles')
+                            .select('id, full_name as name, email')
+                            .eq('id', data.staff.user_id)
+                            .maybeSingle();
+                        if (!pErr && p) enrichedStaff = p;
+                    }
+                }
+            } catch (err) {
+                console.warn('Could not enrich staff details (older DB):', err);
+            }
+
+            setAppointmentDetails({ ...data, staff: enrichedStaff || data.staff });
         } catch (err) {
             console.error('Error fetching appointment details:', err);
         }
