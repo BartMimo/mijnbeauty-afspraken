@@ -28,11 +28,11 @@ async function createOwnerStaffMembers() {
       if (staff.length === 0) {
         console.log('Creating staff member for salon:', salon.name);
 
-        // Create staff member with salon name + owner as default
-        let ownerName = `${salon.name} Eigenaar`;
-        let ownerEmail = salon.email || '';
+        // Create staff member using owner's profile or salon name (no "Eigenaar" suffix)
+        const ownerName = salon.name || '';
+        const ownerEmail = salon.email || '';
 
-        // Create staff member
+        // Create staff member with an allowed role ('admin') to satisfy DB constraints
         const { data: newStaff, error: insertError } = await supabase
           .from('staff')
           .insert({
@@ -41,7 +41,7 @@ async function createOwnerStaffMembers() {
             name: ownerName,
             email: ownerEmail,
             phone: salon.phone || '',
-            role: 'owner'
+            role: 'admin'
           })
           .select()
           .single();

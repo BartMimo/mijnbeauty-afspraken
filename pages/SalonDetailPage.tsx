@@ -364,10 +364,12 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         id: `owner-${data.owner_id}`,
                         salonId: data.id,
                         userId: data.owner_id,
-                        name: `${data.name} Eigenaar`,
+                        // Only show the name (no "Eigenaar" suffix)
+                        name: data.name || '',
                         email: data.email || '',
                         phone: data.phone || '',
-                        role: 'owner',
+                        // Use an allowed role value that represents the owner/admin
+                        role: 'admin',
                         isActive: true,
                         serviceIds: data.services?.map((s: any) => s.id) || []
                     }];
@@ -785,7 +787,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                     <div>
                                                         <div className="font-medium text-stone-900">{member.name}</div>
                                                         <div className="text-sm text-stone-500">
-                                                            {member.role === 'owner' ? 'Eigenaar' : 'Medewerker'}
+                                                            {(['owner','admin'] as string[]).includes(member.role as string) ? 'Eigenaar' : 'Medewerker'}
                                                         </div>
                                                     </div>
                                                 </div>

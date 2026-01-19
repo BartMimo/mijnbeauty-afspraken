@@ -98,7 +98,7 @@ export const SalonStaff: React.FC = () => {
                     const mappedStaff = staffData?.map(s => ({
                         id: s.id,
                         name: s.name,
-                        role: s.role === 'owner' ? 'Eigenaar' : 'Medewerker',
+                        role: (['owner','admin'] as string[]).includes(s.role as string) ? 'Eigenaar' : 'Medewerker',
                         email: s.email || '',
                         phone: s.phone || '',
                         isActive: s.is_active,
