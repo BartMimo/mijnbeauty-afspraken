@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Tag, Zap, Phone, Mail, MessageCircle, Loader2, Heart } from 'lucide-react';
 import { Button, Card, Badge } from '../components/UIComponents';
-import { supabase } from '../lib/supabase';
+import { supabase, fetchStaffForSalon } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Service, Deal, Staff } from '../types';
 import { insertAppointmentSafe } from '../lib/appointments';
@@ -339,34 +339,20 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     })));
                 }
 
-                // Fetch staff for this salon
-                const { data: staffData } = await supabase
-                    .from('staff')
-                    .select(`
-                        id,
-                        salon_id,
-                        user_id,
-                        name,
-                        email,
-                        phone,
-                        role,
-                        is_active,
-                        service_staff(service_id)
-                    `)
-                    .eq('salon_id', data.id)
-                    .eq('is_active', true);
+                // Fetch staff for this salon (use safe helper — some DBs miss `is_active`)
+                const staffRows = await fetchStaffForSalon(data.id);
 
                 let processedStaff = [];
-                if (staffData) {
-                    processedStaff = staffData.map((s: any) => ({
+                if (staffRows && staffRows.length > 0) {
+                    processedStaff = staffRows.map((s: any) => ({
                         id: s.id,
                         salonId: s.salon_id,
                         userId: s.user_id,
-                        name: s.name,
-                        email: s.email,
-                        phone: s.phone,
-                        role: s.role,
-                        isActive: s.is_active,
+                        name: s.name || '',
+                        email: s.email || '',
+                        phone: s.phone || '',
+                        role: s.role || 'staff',
+                        isActive: typeof s.is_active === 'boolean' ? s.is_active : true,
                         serviceIds: s.service_staff?.map((ss: any) => ss.service_id) || []
                     }));
                 }
@@ -374,22 +360,17 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 // If no staff found, try to add the salon owner as a staff member (fallback for old salons)
                 if (processedStaff.length === 0 && data.owner_id) {
                     console.warn('No staff members found for salon, creating fallback owner entry');
-                    try {
-                        // Create a fallback owner entry for salons without staff members
-                        processedStaff = [{
-                            id: `owner-${data.owner_id}`,
-                            salonId: data.id,
-                            userId: data.owner_id,
-                            name: `${data.name} Eigenaar`,
-                            email: data.email || '',
-                            phone: data.phone || '',
-                            role: 'owner',
-                            isActive: true,
-                            serviceIds: data.services?.map((s: any) => s.id) || []
-                        }];
-                    } catch (err) {
-                        console.warn('Could not create fallback owner entry:', err);
-                    }
+                    processedStaff = [{
+                        id: `owner-${data.owner_id}`,
+                        salonId: data.id,
+                        userId: data.owner_id,
+                        name: `${data.name} Eigenaar`,
+                        email: data.email || '',
+                        phone: data.phone || '',
+                        role: 'owner',
+                        isActive: true,
+                        serviceIds: data.services?.map((s: any) => s.id) || []
+                    }];
                 }
 
                 setStaff(processedStaff);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Clock, Euro } from 'lucide-react';
 import { Button, Card, Badge, Modal, Input, Select } from '../../components/UIComponents';
-import { supabase } from '../../lib/supabase';
+import { supabase, fetchStaffForSalon } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
 export const SalonServices: React.FC = () => {
@@ -68,17 +68,10 @@ export const SalonServices: React.FC = () => {
 
                 setCategories(categoriesData || []);
 
-                // Fetch staff for this salon
-                const { data: staffData, error: staffError } = await supabase
-                    .from('staff')
-                    .select('id, name')
-                    .eq('salon_id', salon.id)
-                    .eq('is_active', true)
-                    .order('name');
-
-                if (staffError) throw staffError;
-
-                setStaff(staffData || []);
+                // Fetch staff for this salon (safe for older DBs)
+                const staffRows = await fetchStaffForSalon(salon.id);
+                const simplified = (staffRows || []).map((s: any) => ({ id: s.id, name: s.name || '' })).sort((a: any,b: any)=> (a.name||'').localeCompare(b.name||''));
+                setStaff(simplified);
 
             } catch (err) {
                 console.error('Error fetching services:', err);
