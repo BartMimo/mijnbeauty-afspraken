@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Users, CreditCard, Calendar, ArrowUpRight, Tag, Plus, Clock, Trash2, Edit2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, CreditCard, Calendar, ArrowUpRight, Plus, Clock, Trash2, Edit2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, Badge, Button, Modal, Input, Select } from '../../components/UIComponents';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -14,7 +14,6 @@ export const SalonDashboard: React.FC = () => {
     // --- STATE MANAGEMENT ---
     const [salonId, setSalonId] = useState<string | null>(null);
     const [salonName, setSalonName] = useState<string>('Mijn Salon');
-    const [deals, setDeals] = useState<any[]>([]);
     const [appointments, setAppointments] = useState<any[]>([]);
     const [stats, setStats] = useState({
         totalBookings: 0,
@@ -56,25 +55,6 @@ export const SalonDashboard: React.FC = () => {
 
                 setSalonId(salon.id);
                 setSalonName(salon.name);
-
-                // Fetch deals for this salon
-                const { data: dealsData } = await supabase
-                    .from('deals')
-                    .select('*')
-                    .eq('salon_id', salon.id)
-                    .eq('status', 'active')
-                    .order('date', { ascending: true });
-
-                if (dealsData) {
-                    setDeals(dealsData.map(d => ({
-                        id: d.id,
-                        service: d.service_name,
-                        price: d.discount_price,
-                        original: d.original_price,
-                        time: `${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${d.time || ''}`,
-                        status: d.status
-                    })));
-                }
 
                 // Fetch appointments based on view mode
                 let appointmentsQuery = supabase
@@ -255,13 +235,6 @@ export const SalonDashboard: React.FC = () => {
                     <p className="text-stone-500">Welkom terug, {salonName}</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button 
-                        variant="secondary" 
-                        className="hidden md:inline-flex"
-                        onClick={() => navigate(`${basePath}/deals`)}
-                    >
-                        <Tag className="mr-2 h-4 w-4" /> Promotie maken
-                    </Button>
                     <Button onClick={() => setIsAptModalOpen(true)}>
                         <Plus className="mr-2 h-4 w-4" /> Nieuwe afspraak
                     </Button>
@@ -286,9 +259,9 @@ export const SalonDashboard: React.FC = () => {
                 ))}
             </div>
 
-            <div className="grid gap-8 lg:grid-cols-3">
+            <div className="space-y-8">
                 {/* Schedule */}
-                <div className="lg:col-span-2 space-y-8">
+                <div className="space-y-8">
                     <Card className="h-auto">
                         {/* Header with controls */}
                         <div className="p-6 border-b border-stone-100">
@@ -386,69 +359,6 @@ export const SalonDashboard: React.FC = () => {
                             >
                                 Bekijk volledige agenda
                             </Button>
-                        </div>
-                    </Card>
-                </div>
-
-                {/* Right Column: Quick Actions & Deals */}
-                <div className="space-y-8">
-                     {/* Deals Widget */}
-                     <Card className="p-6 border-brand-100 bg-gradient-to-br from-white to-brand-50/50">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-stone-900 flex items-center">
-                                <Tag size={18} className="mr-2 text-brand-500" /> Mijn Deals
-                            </h3>
-                            <button 
-                                onClick={() => navigate('/dashboard/salon/deals')}
-                                className="text-xs font-bold text-brand-600 bg-white px-2 py-1 rounded shadow-sm hover:bg-brand-50 transition-colors"
-                            >
-                                + Nieuw
-                            </button>
-                        </div>
-                        <p className="text-xs text-stone-500 mb-4">
-                            Vul lege gaten in je agenda op door last-minute kortingen aan te bieden.
-                        </p>
-                        
-                        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-                            {deals.filter(d => d.status === 'active').length > 0 ? deals.filter(d => d.status === 'active').map(deal => (
-                                <div key={deal.id} className="bg-white p-3 rounded-xl border border-stone-100 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-brand-200 group relative">
-                                    <div className="flex justify-between items-start" onClick={() => navigate(`${basePath}/deals`)}>
-                                        <span className="font-semibold text-stone-800 text-sm truncate pr-6">{deal.service}</span>
-                                        <Badge variant="success">Actief</Badge>
-                                    </div>
-                                    <div className="flex justify-between items-center text-xs" onClick={() => navigate(`${basePath}/deals`)}>
-                                        <span className="text-stone-500 flex items-center"><Clock size={12} className="mr-1" /> {deal.time}</span>
-                                        <div>
-                                            {deal.original && <span className="line-through text-stone-400 mr-2">€{deal.original}</span>}
-                                            <span className="font-bold text-brand-600">€{deal.price}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )) : (
-                                <p className="text-xs text-stone-400 text-center py-4">Nog geen actieve deals.</p>
-                            )}
-                        </div>
-                        <Button 
-                            className="w-full mt-4" 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => navigate(`${basePath}/deals`)}
-                        >
-                            Beheer alle deals
-                        </Button>
-                    </Card>
-
-                    <Card className="p-6 bg-stone-900 text-white border-none shadow-xl">
-                        <h3 className="font-bold text-lg mb-4">Salon Tips</h3>
-                        <p className="text-stone-300 text-sm mb-6">Voeg foto's van je werk toe om meer klanten aan te trekken.</p>
-                        
-                        <div className="space-y-3">
-                            <button 
-                                onClick={() => alert("Foto upload dialoog...")}
-                                className="w-full bg-white/10 hover:bg-white/20 text-white py-3 px-4 rounded-xl text-sm font-medium text-left flex justify-between items-center transition-colors"
-                            >
-                                Foto's uploaden <span>→</span>
-                            </button>
                         </div>
                     </Card>
                 </div>

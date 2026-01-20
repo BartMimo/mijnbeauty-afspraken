@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, TrendingUp, Calendar, Shield, Zap, Users, Check, Globe } from 'lucide-react';
+import { CheckCircle, TrendingUp, Calendar, Shield, Users, Check, Globe } from 'lucide-react';
 import { Button, Card } from '../components/UIComponents';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay } from 'swiper/modules';
@@ -152,7 +152,6 @@ export const ForPartners: React.FC = () => {
                     { title: "Meer Zichtbaarheid", desc: "Word gevonden door duizenden klanten in jouw regio die op zoek zijn naar jouw diensten.", icon: Users },
                     { title: "Slimme Agenda", desc: "Een overzichtelijk planningssysteem dat 24/7 werkt, ook als jij gesloten bent.", icon: Calendar },
                     { title: "Jouw Eigen Website", desc: "Krijg direct een unieke link (jouwnaam.mijnbeautyafspraken.nl) om te delen op Instagram.", icon: Globe },
-                    { title: "Deals Functie", desc: "Vul lege gaten in je agenda direct op door last-minute deals aan te bieden.", icon: Zap },
                     { title: "Statistieken", desc: "Krijg inzicht in jouw populairste behandelingen en klanttevredenheid.", icon: TrendingUp },
                     { title: "Veilige Betalingen", desc: "Laat klanten gewoon in de salon betalen.", icon: Shield },
                 ].map((feature, idx) => (

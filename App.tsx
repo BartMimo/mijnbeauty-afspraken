@@ -23,15 +23,11 @@ const UserFavorites = lazy(() => import('./pages/dashboards/UserFavorites').then
 const SalonDashboard = lazy(() => import('./pages/dashboards/SalonDashboard').then(module => ({ default: module.SalonDashboard })));
 const SalonSchedule = lazy(() => import('./pages/dashboards/SalonSchedule').then(module => ({ default: module.SalonSchedule })));
 const SalonServices = lazy(() => import('./pages/dashboards/SalonServices').then(module => ({ default: module.SalonServices })));
-const SalonStaff = lazy(() => import('./pages/dashboards/SalonStaff').then(module => ({ default: module.SalonStaff })));
-const SalonSettings = lazy(() => import('./pages/dashboards/SalonSettings').then(module => ({ default: module.SalonSettings })));
-const SalonDeals = lazy(() => import('./pages/dashboards/SalonDeals').then(module => ({ default: module.SalonDeals })));
 const SalonClients = lazy(() => import('./pages/dashboards/SalonClients').then(module => ({ default: module.SalonClients })));
+const SalonSettings = lazy(() => import('./pages/dashboards/SalonSettings').then(module => ({ default: module.SalonSettings })));
 const AdminDashboard = lazy(() => import('./pages/dashboards/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
 const AdminSalons = lazy(() => import('./pages/dashboards/AdminSalons').then(module => ({ default: module.AdminSalons })));
 const AdminUsers = lazy(() => import('./pages/dashboards/AdminUsers').then(module => ({ default: module.AdminUsers })));
-const StaffDashboard = lazy(() => import('./pages/dashboards/StaffDashboard').then(module => ({ default: module.StaffDashboard })));
-const StaffProfile = lazy(() => import('./pages/dashboards/StaffProfile').then(module => ({ default: module.StaffProfile })));
 
 const AboutPage = lazy(() => import('./pages/StaticPages').then(module => ({ default: module.AboutPage })));
 const HelpPage = lazy(() => import('./pages/StaticPages').then(module => ({ default: module.HelpPage })));
@@ -70,7 +66,6 @@ const normalizeRole = (rawRole: unknown) => {
     const role = (rawRole ?? 'user').toString().trim().toLowerCase();
     if (role.includes('admin')) return 'admin';
     if (role.includes('salon') || role.includes('owner')) return 'salon';
-    if (role.includes('staff')) return 'staff';
     return 'user';
 };
 
@@ -90,11 +85,10 @@ const DashboardRedirect: React.FC = () => {
     const role = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
     if (role === 'admin') return <Navigate to="/dashboard/admin" replace />;
     if (role === 'salon') return <Navigate to="/dashboard/salon" replace />;
-    if (role === 'staff') return <Navigate to="/dashboard/staff" replace />;
     return <Navigate to="/dashboard/user" replace />;
 };
 
-const RequireRole: React.FC<{ role: 'user' | 'salon' | 'admin' | 'staff'; children: React.ReactNode }> = ({ role, children }) => {
+const RequireRole: React.FC<{ role: 'user' | 'salon' | 'admin'; children: React.ReactNode }> = ({ role, children }) => {
     const { user, profile, isLoading } = useAuth();
 
     if (isLoading) return null;
@@ -203,24 +197,8 @@ const App: React.FC = () => {
                                 <Route path="/" element={<SalonDashboard />} />
                                 <Route path="/schedule" element={<SalonSchedule />} />
                                 <Route path="/services" element={<SalonServices />} />
-                                <Route path="/staff" element={<SalonStaff />} />
                                 <Route path="/settings" element={<SalonSettings />} />
-                                <Route path="/deals" element={<SalonDeals />} /> 
                                 <Route path="/clients" element={<SalonClients />} />
-                            </Routes>
-                        </DashboardLayout>
-                    </RequireRole>
-                } 
-            />
-            
-            <Route 
-                path="/dashboard/staff/*" 
-                element={
-                    <RequireRole role="staff">
-                        <DashboardLayout role="staff">
-                            <Routes>
-                                <Route path="/" element={<StaffDashboard />} />
-                                <Route path="/profile" element={<StaffProfile />} />
                             </Routes>
                         </DashboardLayout>
                     </RequireRole>

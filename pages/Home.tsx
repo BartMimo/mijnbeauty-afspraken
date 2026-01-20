@@ -8,44 +8,6 @@ export const Home: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [location, setLocation] = useState('');
-  const [deals, setDeals] = useState<any[]>([]);
-  const [loadingDeals, setLoadingDeals] = useState(true);
-
-  // Fetch deals from Supabase
-  useEffect(() => {
-    const fetchDeals = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('deals')
-          .select(`
-            *,
-            salon:salons(id, name, slug)
-          `)
-          .limit(4);
-
-        if (error) throw error;
-
-        const transformed = (data || []).map((deal: any) => ({
-          id: deal.id,
-          serviceName: deal.service_name,
-          originalPrice: deal.original_price,
-          discountPrice: deal.discount_price,
-          date: deal.date,
-          time: deal.time,
-          salonName: deal.salon?.name || 'Salon',
-          salonId: deal.salon?.slug || deal.salon?.id
-        }));
-
-        setDeals(transformed);
-      } catch (err) {
-        console.error('Error fetching deals:', err);
-      } finally {
-        setLoadingDeals(false);
-      }
-    };
-
-    fetchDeals();
-  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,69 +62,6 @@ export const Home: React.FC = () => {
                 </Card>
             </div>
         </div>
-      </section>
-
-      {/* Deals Section (Replaces Categories) */}
-      <section className="container mx-auto px-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 sm:mb-8 gap-2">
-            <div>
-                <h2 className="text-2xl font-bold text-stone-900 flex items-center">
-                    <Tag className="mr-2 text-brand-500" size={24} /> Huidige Deals
-                </h2>
-                <p className="text-stone-500 mt-1 text-sm md:text-base">Last-minute plekken met hoge kortingen!</p>
-            </div>
-            <a href="/search?filter=deals" className="text-brand-400 font-medium hover:underline text-sm flex items-center">
-                Bekijk alle deals <ArrowRight size={16} className="ml-1" />
-            </a>
-        </div>
-        {loadingDeals ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="animate-spin text-brand-500" size={32} />
-          </div>
-        ) : deals.length === 0 ? (
-          <Card className="p-8 text-center bg-stone-50">
-            <p className="text-stone-500">Momenteel zijn er geen actieve deals beschikbaar.</p>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {deals.map((deal) => {
-                const discount = Math.round(((deal.originalPrice - deal.discountPrice) / deal.originalPrice) * 100);
-                return (
-                    <Card key={deal.id} className="overflow-hidden group hover:shadow-lg transition-all border-brand-100 flex flex-col h-full">
-                         <div className="bg-brand-400 text-white px-3 py-1 text-xs font-bold absolute top-3 right-3 rounded-lg shadow-sm z-10">
-                            -{discount}%
-                        </div>
-                        <div className="p-5 flex flex-col h-full justify-between">
-                            <div className="mb-3">
-                                <h3 className="font-bold text-stone-900 text-lg truncate">{deal.serviceName}</h3>
-                                <p className="text-stone-500 text-sm flex items-center mt-1 truncate">
-                                    <MapPin size={14} className="mr-1 shrink-0" /> {deal.salonName}
-                                </p>
-                            </div>
-                            
-                            <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <span className="text-xs font-medium bg-stone-100 text-stone-600 px-2 py-1 rounded flex items-center">
-                                        <Clock size={12} className="mr-1" /> {deal.date}, {deal.time}
-                                    </span>
-                                </div>
-
-                                <div className="flex justify-between items-end border-t border-dashed border-stone-200 pt-4">
-                                    <div>
-                                        <span className="text-sm text-stone-400 line-through">€{deal.originalPrice}</span>
-                                        <span className="text-xl font-bold text-brand-600 block">€{deal.discountPrice}</span>
-                                    </div>
-                                    <Button size="sm" onClick={() => navigate(`/salon/${deal.salonId}`)}>
-                                        Boek Nu
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
-                );
-            })}
-          </div>
-        )}
       </section>
 
       {/* How it works */}

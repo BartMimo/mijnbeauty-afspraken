@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Tag, Zap, Phone, Mail, MessageCircle, Loader2, Heart } from 'lucide-react';
 import { Button, Card, Badge } from '../components/UIComponents';
-import { supabase, fetchStaffForSalon } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Service, Deal, Staff } from '../types';
+import { Service } from '../types';
 import { insertAppointmentSafe } from '../lib/appointments';
 
 // Salon categories - matches the categories used in registration
@@ -64,12 +64,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const [salon, setSalon] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [bookingLoading, setBookingLoading] = useState(false);
-    const [activeDeals, setActiveDeals] = useState<Deal[]>([]);
-    const [staff, setStaff] = useState<Staff[]>([]);
-    const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
     const [selectedService, setSelectedService] = useState<string | null>(null);
-    const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
-    const [bookingStep, setBookingStep] = useState<'staff' | 'service' | 'time' | 'payment' | 'confirm'>('staff');
+    const [bookingStep, setBookingStep] = useState<'service' | 'time' | 'payment' | 'confirm'>('service');
     const [existingAppointments, setExistingAppointments] = useState<Appointment[]>([]);
     
     // Favorite State
@@ -287,43 +283,6 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     setIsFavorite(!!favoriteData);
                 }
 
-                // Fetch deals separately
-                // Request only staff id (older DBs may not have staff.name).
-                // We'll enrich names from the separate staff query below when available.
-                const { data: dealsData, error: dealsError } = await supabase
-                    .from('deals')
-                    .select(`
-                        *,
-                        staff:staff_id (id)
-                    `)
-                    .eq('salon_id', data.id)
-                    .eq('status', 'active');
-
-                if (dealsError) {
-                    // Don't abort the whole page if nested columns are missing on older DBs
-                    console.warn('Could not fetch nested staff for deals (fallback):', dealsError.message || dealsError);
-                }
-
-                if (dealsData) {
-                    setActiveDeals(dealsData.map((d: any) => ({
-                        id: d.id,
-                        salonId: data.slug || data.id,
-                        salonName: data.name,
-                        salonCity: data.city,
-                        serviceName: d.service_name,
-                        originalPrice: d.original_price,
-                        discountPrice: d.discount_price,
-                        date: d.date,
-                        time: d.time && d.date ? `${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}, ${d.time}` : (d.date ? new Date(d.date).toLocaleDateString('nl-NL') : d.time || 'Geen tijd'),
-                        rawTime: d.time || '',
-                        description: d.description || '',
-                        status: d.status,
-                        staffId: d.staff_id,
-                        staff: d.staff || null,
-                        staffName: null // will be filled after staff fetch if possible
-                    })));
-                }
-
                 // Fetch existing appointments for this salon
                 const { data: appointmentsData } = await supabase
                     .from('appointments')
@@ -337,53 +296,6 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         time: a.time,
                         duration_minutes: a.duration_minutes || 30
                     })));
-                }
-
-                // Fetch staff for this salon (use safe helper — some DBs miss `is_active`)
-                const staffRows = await fetchStaffForSalon(data.id);
-
-                let processedStaff = [];
-                if (staffRows && staffRows.length > 0) {
-                    processedStaff = staffRows.map((s: any) => ({
-                        id: s.id,
-                        salonId: s.salon_id,
-                        userId: s.user_id,
-                        name: s.name || '',
-                        email: s.email || '',
-                        phone: s.phone || '',
-                        role: s.role || 'staff',
-                        isActive: typeof s.is_active === 'boolean' ? s.is_active : true,
-                        serviceIds: s.service_staff?.map((ss: any) => ss.service_id) || []
-                    }));
-                }
-
-                // If no staff found, try to add the salon owner as a staff member (fallback for old salons)
-                if (processedStaff.length === 0 && data.owner_id) {
-                    console.warn('No staff members found for salon, creating fallback owner entry');
-                    processedStaff = [{
-                        id: `owner-${data.owner_id}`,
-                        salonId: data.id,
-                        userId: data.owner_id,
-                        // Only show the name (no "Eigenaar" suffix)
-                        name: data.name || '',
-                        email: data.email || '',
-                        phone: data.phone || '',
-                        // Use an allowed role value that represents the owner/admin
-                        role: 'admin',
-                        isActive: true,
-                        serviceIds: data.services?.map((s: any) => s.id) || []
-                    }];
-                }
-
-                setStaff(processedStaff);
-
-                // Enrich any previously-loaded deals with staff names (if available)
-                if (processedStaff.length > 0) {
-                    setActiveDeals(prev => prev.map(d => {
-                        if (!d.staffId) return d;
-                        const match = processedStaff.find((s: any) => s.id === d.staffId);
-                        return { ...d, staffName: match?.name || null };
-                    }));
                 }
             } catch (err) {
                 console.error('Error in fetchSalon:', err);
@@ -402,14 +314,6 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             setSelectedTime(null);
         }
     }, [salon?.openingHours, selectedDate]);
-
-    // Auto-select staff member when entering staff step
-    useEffect(() => {
-        if (bookingStep === 'staff' && staff.length > 0 && !selectedStaff) {
-            // Always let user choose staff member, even if there's only one
-            // No auto-selection to ensure proper flow
-        }
-    }, [bookingStep, staff, selectedStaff, selectedDeal]);
 
     if (loading) {
         return (
@@ -434,15 +338,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
 
     const handleBookService = (serviceId: string) => {
         setSelectedService(serviceId);
-        setSelectedDeal(null); // Clear deal selection
-        setBookingStep('staff');
-        scrollToWidget();
-    };
-
-    const handleBookDeal = (deal: Deal) => {
-        setSelectedDeal(deal);
-        setSelectedService(null); // Clear service selection
-        setBookingStep('staff'); // Start with staff selection for deals too
+        setBookingStep('time');
         scrollToWidget();
     };
 
@@ -644,53 +540,6 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         </div>
                     </Card>
 
-                    {/* DEALS SECTION */}
-                    {activeDeals.length > 0 && (
-                        <div id="deals-list">
-                            <h2 className="text-xl font-bold mb-4 px-2 flex items-center">
-                                <Zap className="text-brand-500 mr-2 fill-brand-500" size={20}/> Actieve Deals
-                            </h2>
-                            <div className="grid sm:grid-cols-2 gap-4">
-                                {activeDeals
-                                    .filter(deal => {
-                                        // If no staff selected, show all deals
-                                        if (!selectedStaff) return true;
-                                        // If staff selected, show deals for that staff or deals for all staff (staffId is null)
-                                        // For owner entries (temporary), show deals with no specific staff assignment
-                                        if (selectedStaff.id?.startsWith('owner-')) {
-                                            return !deal.staffId;
-                                        }
-                                        return !deal.staffId || deal.staffId === selectedStaff.id;
-                                    })
-                                    .map(deal => {
-                                    const discount = Math.round(((deal.originalPrice - deal.discountPrice) / deal.originalPrice) * 100);
-                                    return (
-                                        <div key={deal.id} className="bg-white rounded-2xl p-4 border border-brand-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                                            <div className="absolute top-0 right-0 bg-brand-400 text-white text-xs font-bold px-3 py-1 rounded-bl-xl z-10">
-                                                -{discount}%
-                                            </div>
-                                            <div className="mb-3">
-                                                <h3 className="font-bold text-stone-900 truncate pr-8">{deal.serviceName}</h3>
-                                                <div className="flex items-center text-xs text-stone-500 mt-1">
-                                                    <Clock size={12} className="mr-1" /> {deal.time}
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-between items-end mt-4">
-                                                <div>
-                                                    <span className="text-xs text-stone-400 line-through block">€{deal.originalPrice}</span>
-                                                    <span className="text-lg font-bold text-brand-600">€{deal.discountPrice}</span>
-                                                </div>
-                                                <Button size="sm" onClick={() => handleBookDeal(deal)}>
-                                                    Boek Deal
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
                     <div id="services-list">
                         {/* Group services by category */}
                         {(() => {
@@ -758,66 +607,20 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         <Card className="p-6 border-brand-100 shadow-lg transition-all duration-300">
                             <h3 className="text-lg font-bold mb-4 border-b border-stone-100 pb-2">Je afspraak</h3>
                             
-                            {/* STAFF SELECTION STEP - always show staff selection first */}
-                            {bookingStep === 'staff' && (
-                                <div className="space-y-4 animate-fadeIn">
-                                    <div className="text-center mb-4">
-                                        <h4 className="font-semibold text-stone-900 mb-2">Kies een medewerker</h4>
-                                        <p className="text-sm text-stone-500">Selecteer bij welke medewerker je graag een afspraak wilt maken</p>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        {/* Individual staff members */}
-                                        {staff.map((member) => (
-                                            <button
-                                                key={member.id}
-                                                onClick={() => {
-                                                    setSelectedStaff(member);
-                                                    setBookingStep(selectedDeal ? 'payment' : 'service');
-                                                    scrollToWidget();
-                                                }}
-                                                className="w-full p-4 border-2 border-stone-200 rounded-xl hover:border-brand-300 hover:bg-brand-50 transition-colors text-left"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center">
-                                                        <span className="text-brand-600 font-medium">
-                                                            {member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-medium text-stone-900">{member.name}</div>
-                                                        <div className="text-sm text-stone-500">
-                                                            {(['owner','admin'] as string[]).includes(member.role as string) ? 'Eigenaar' : 'Medewerker'}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
                             {/* SERVICE SELECTION STEP */}
-                            {bookingStep === 'service' && selectedStaff !== undefined && (
+                            {bookingStep === 'service' && (
                                 <div className="space-y-4 animate-fadeIn">
                                     <div className="text-center mb-4">
                                         <h4 className="font-semibold text-stone-900 mb-2">Kies een dienst</h4>
-                                        <p className="text-sm text-stone-500">
-                                            {selectedStaff ? `Diensten van ${selectedStaff.name}` : 'Alle beschikbare diensten'}
-                                        </p>
+                                        <p className="text-sm text-stone-500">Alle beschikbare diensten</p>
                                     </div>
 
                                     <div className="space-y-3 max-h-96 overflow-y-auto">
-                                        {/* Filter services based on selected staff */}
-                                        {salon?.services?.filter((service: any) => {
-                                            if (!selectedStaff) return true; // Show all if no staff selected
-                                            return selectedStaff.serviceIds?.includes(service.id);
-                                        }).map((service: any) => (
+                                        {salon?.services?.map((service: any) => (
                                             <button
                                                 key={service.id}
                                                 onClick={() => {
                                                     setSelectedService(service.id);
-                                                    setSelectedDeal(null);
                                                     setBookingStep('time');
                                                     scrollToWidget();
                                                 }}
@@ -835,13 +638,6 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                             </button>
                                         ))}
                                     </div>
-
-                                    <button
-                                        onClick={() => setBookingStep('staff')}
-                                        className="w-full mt-4 text-sm text-stone-500 hover:text-stone-700 transition-colors"
-                                    >
-                                        ← Andere medewerker kiezen
-                                    </button>
                                 </div>
                             )}
 
@@ -850,32 +646,13 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                 <div className="space-y-6 animate-fadeIn">
                                     
                                     {/* SELECTION DISPLAY */}
-                                    {selectedDeal ? (
-                                        <div className="bg-brand-50 p-4 rounded-xl border border-brand-200 flex justify-between items-start animate-fadeIn relative overflow-hidden">
-                                            <div className="absolute -right-4 -top-4 bg-brand-200 w-12 h-12 rounded-full opacity-50"></div>
-                                            <div>
-                                                <div className="flex items-center gap-1 mb-1">
-                                                     <Badge variant="warning">DEAL</Badge>
-                                                </div>
-                                                <h4 className="font-bold text-stone-900">{selectedDeal.serviceName}</h4>
-                                                <p className="text-xs text-stone-600 mt-1 flex items-center">
-                                                    <Clock size={12} className="mr-1"/> {selectedDeal.time}
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="text-xs text-stone-400 line-through block">€{selectedDeal.originalPrice}</span>
-                                                <span className="font-bold text-lg text-brand-600">€{selectedDeal.discountPrice}</span>
-                                            </div>
+                                    <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 flex justify-between items-start animate-fadeIn">
+                                        <div>
+                                            <h4 className="font-medium text-stone-900">{currentService?.name}</h4>
+                                            <p className="text-xs text-stone-500 mt-1">{currentService?.durationMinutes} min</p>
                                         </div>
-                                    ) : (
-                                        <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 flex justify-between items-start animate-fadeIn">
-                                            <div>
-                                                <h4 className="font-medium text-stone-900">{currentService?.name}</h4>
-                                                <p className="text-xs text-stone-500 mt-1">{currentService?.durationMinutes} min</p>
-                                            </div>
-                                            <span className="font-bold text-stone-700">€{currentService?.price}</span>
-                                        </div>
-                                    )}
+                                        <span className="font-bold text-stone-700">€{currentService?.price}</span>
+                                    </div>
 
                                     {/* CALENDAR (Only if standard service is selected) */}
                                     {selectedService && bookingStep === 'time' && (
@@ -946,7 +723,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         </Card>
 
                         {/* PAYMENT METHOD SELECTION */}
-                        {bookingStep === 'payment' && ((selectedService && selectedStaff !== undefined) || (selectedDeal && selectedStaff !== undefined)) && (
+                        {bookingStep === 'payment' && selectedService && (
                             <Card className="p-6 border-brand-100 shadow-lg transition-all duration-300 mt-4">
                                 <h3 className="text-lg font-bold mb-4 border-b border-stone-100 pb-2">Betaalmethode kiezen</h3>
                                 <div className="space-y-4 animate-fadeIn">
@@ -1026,31 +803,25 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         )}
 
                         {/* CONFIRMATION SCREEN - Outside booking widget card */}
-                        {bookingStep === 'confirm' && ((selectedService && selectedStaff !== undefined) || selectedDeal) && (
+                        {bookingStep === 'confirm' && selectedService && (
                             <Card className="p-6 border-brand-100 shadow-lg transition-all duration-300 mt-4">
                                 <h3 className="text-lg font-bold mb-4 border-b border-stone-100 pb-2">Bevestig je afspraak</h3>
                                 <div className="space-y-4 animate-fadeIn">
                                     <div className="p-4 bg-stone-50 rounded-xl space-y-2 text-sm">
-                                        {selectedStaff && (
-                                            <div className="flex justify-between">
-                                                <span className="text-stone-500">Medewerker</span>
-                                                <span className="font-medium text-stone-900">{selectedStaff.name}</span>
-                                            </div>
-                                        )}
                                         <div className="flex justify-between">
                                             <span className="text-stone-500">Behandeling</span>
-                                            <span className="font-medium text-stone-900">{selectedDeal ? selectedDeal.serviceName : currentService?.name}</span>
+                                            <span className="font-medium text-stone-900">{currentService?.name}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-stone-500">Datum</span>
                                             <span className="font-medium text-stone-900">
-                                                {selectedDeal ? 'Volgens afspraak (Deal)' : (selectedDate && formatDateDutch(selectedDate))}
+                                                {selectedDate && formatDateDutch(selectedDate)}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-stone-500">Tijd</span>
                                             <span className="font-medium text-stone-900">
-                                                {selectedDeal ? selectedDeal.time : selectedTime}
+                                                {selectedTime}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
@@ -1061,8 +832,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                         </div>
                                         <div className="border-t border-stone-200 pt-2 flex justify-between font-bold text-base">
                                             <span>Totaal</span>
-                                            <span className={selectedDeal ? 'text-brand-600' : ''}>
-                                                €{selectedDeal ? selectedDeal.discountPrice : currentService?.price}
+                                            <span>
+                                                €{currentService?.price}
                                             </span>
                                         </div>
                                     </div>
@@ -1086,76 +857,20 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                     service_id: selectedService,
                                                     service_name: currentService?.name,
                                                     date: selectedDate ? toLocalDateString(selectedDate) : null,
-                                                    time: selectedDeal ? selectedDeal.rawTime : selectedTime,
+                                                    time: selectedTime,
                                                     duration_minutes: serviceDuration,
-                                                    price: selectedDeal ? selectedDeal.discountPrice : currentService?.price,
+                                                    price: currentService?.price,
                                                     status: 'confirmed',
-                                                    staff_id: selectedStaff?.id?.startsWith('owner-') ? null : selectedStaff?.id || null,
                                                     payment_method: selectedPaymentMethod,
                                                     payment_status: selectedPaymentMethod === 'online' ? 'pending' : 'pending'
                                                 };
 
                                                 // lazy import to avoid circular deps during module init
                                                 const { insertAppointmentSafe } = await import('../lib/appointments');
-                                                // If this is a deal booking, use the DB RPC so claim+insert happen atomically server-side
-                                                if (selectedDeal) {
-                                                    // Find the service_id for this deal's service
-                                                    const { data: serviceData, error: serviceErr } = await supabase
-                                                        .from('services')
-                                                        .select('id')
-                                                        .eq('salon_id', salon.supabaseId)
-                                                        .eq('name', selectedDeal.serviceName)
-                                                        .single();
-
-                                                    if (serviceErr || !serviceData) {
-                                                        throw new Error(`Service "${selectedDeal.serviceName}" niet gevonden voor deze salon`);
-                                                    }
-
-                                                    const { data, error: rpcErr } = await supabase.rpc('claim_and_create_appointment', {
-                                                        p_deal_id: selectedDeal.id,
-                                                        p_user_id: user?.id || null,  // Set to user.id if logged in
-                                                        p_salon_id: salon.supabaseId,
-                                                        p_service_id: serviceData.id,
-                                                        p_service_name: selectedDeal.serviceName,
-                                                        p_date: selectedDeal.date,
-                                                        p_time: selectedDeal.rawTime,
-                                                        p_duration_minutes: selectedDeal.durationMinutes || null,
-                                                        p_price: selectedDeal.discountPrice,
-                                                        p_customer_name: user?.user_metadata?.full_name || user?.email || 'Gast',
-                                                        p_staff_id: selectedStaff?.id?.startsWith('owner-') ? null : selectedStaff?.id || null,
-                                                        p_payment_method: selectedPaymentMethod,
-                                                        p_payment_status: selectedPaymentMethod === 'online' ? 'pending' : 'pending'
-                                                    });
-                                                    if (rpcErr) throw rpcErr;
-
-                                                    // Supabase returns the function value inside `data` (null when unclaimed)
-                                                    const returnedId = Array.isArray(data) ? data[0] : data;
-                                                    if (!returnedId) {
-                                                        alert('Deze deal is helaas net geclaimd door iemand anders. Probeer een andere deal of ververs de pagina.');
-                                                        setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
-                                                        setSelectedDeal(null);
-                                                        setBookingLoading(false);
-                                                        return;
-                                                    }
-
-                                                    // Success—returnedId is appointment id
-                                                    setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
-                                                    setSelectedDeal(null);
-                                                    alert('Boeking succesvol! (Deal)');
-                                                    navigate('/dashboard/user');
-                                                    setBookingLoading(false);
-                                                    return;
-                                                }
-
-                                                // Non-deal booking: use the resilient insert helper
+                                                
+                                                // Standard booking: use the resilient insert helper
                                                 const { error } = await insertAppointmentSafe(insertData);
                                                 if (error) throw error;
-
-                                                // Remove from local state if deal was claimed
-                                                if (selectedDeal) {
-                                                    setActiveDeals(prev => prev.filter(d => d.id !== selectedDeal.id));
-                                                    setSelectedDeal(null);
-                                                }
 
                                                 alert('Boeking succesvol!');
                                                 navigate('/dashboard/user');
@@ -1168,21 +883,16 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                         }}
                                         isLoading={bookingLoading}
                                     >
-                                        {selectedDeal ? 'Deal Claimen & Boeken' : 'Bevestig Boeking'}
+                                        Bevestig Boeking
                                     </Button>
                                     
                                     <button 
                                         className="w-full text-center text-xs text-stone-400 hover:text-stone-600 underline"
                                         onClick={() => {
-                                            if(selectedDeal) {
-                                                setSelectedDeal(null);
-                                                setBookingStep('staff');
-                                            } else {
-                                                setBookingStep('time');
-                                            }
+                                            setBookingStep('time');
                                         }}
                                     >
-                                        {selectedDeal ? 'Annuleren' : 'Wijzig datum of tijd'}
+                                        Wijzig datum of tijd
                                     </button>
                                 </div>
                             </Card>

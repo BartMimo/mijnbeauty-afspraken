@@ -38,7 +38,6 @@ export interface Service {
   price: number;
   durationMinutes: number;
   category: ServiceCategory;
-  staffIds?: string[]; // Associated staff members
 }
 
 export interface Staff {
