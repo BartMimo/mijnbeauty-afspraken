@@ -250,7 +250,6 @@ export const ForPartners: React.FC = () => {
                                     "Onbeperkt aantal afspraken",
                                     "Jouw eigen website URL",
                                     "Agenda & klantenbeheer",
-                                    "Deals & promoties plaatsen",
                                     "Statistieken dashboard",
 
                                 ].map((item, i) => (
