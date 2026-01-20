@@ -37,17 +37,13 @@ export default defineConfig({
             './pages/dashboards/SalonSettings.tsx',
             './pages/dashboards/SalonSchedule.tsx',
             './pages/dashboards/SalonServices.tsx',
-            './pages/dashboards/SalonDeals.tsx',
-            './pages/dashboards/SalonStaff.tsx',
             './pages/dashboards/SalonClients.tsx',
             './pages/dashboards/UserDashboard.tsx',
             './pages/dashboards/UserFavorites.tsx',
             './pages/dashboards/UserProfile.tsx',
             './pages/dashboards/AdminDashboard.tsx',
             './pages/dashboards/AdminUsers.tsx',
-            './pages/dashboards/AdminSalons.tsx',
-            './pages/dashboards/StaffDashboard.tsx',
-            './pages/dashboards/StaffProfile.tsx'
+            './pages/dashboards/AdminSalons.tsx'
           ]
         }
       }

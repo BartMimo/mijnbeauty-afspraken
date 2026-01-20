@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Clock, Tag } from 'lucide-react';
 import { Button, Card, Badge, Modal, Input, Select } from '../../components/UIComponents';
-import { supabase, fetchStaffForSalon } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
 export const SalonDeals: React.FC = () => {
@@ -10,7 +10,6 @@ export const SalonDeals: React.FC = () => {
     const [deals, setDeals] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'claimed' | 'expired'>('active');
-    const [staff, setStaff] = useState<any[]>([]);
 
     // Fetch salon and deals on mount
     useEffect(() => {
@@ -38,7 +37,7 @@ export const SalonDeals: React.FC = () => {
                 // Fetch deals for this salon (supports optional status filter)
                 let q = supabase.from('deals').select(`
                     *,
-                    staff:staff_id (id, name)
+                    services(name, duration_minutes)
                 `).eq('salon_id', salon.id).order('date', { ascending: true });
                 if (filterStatus && filterStatus !== 'all') {
                     q = q.eq('status', filterStatus);
@@ -56,15 +55,8 @@ export const SalonDeals: React.FC = () => {
                     rawTime: d.time || '',
                     date: d.date,
                     durationMinutes: d.duration_minutes || 60,
-                    status: d.status || 'active',
-                    staffId: d.staff_id || '',
-                    staff: d.staff
+                    status: d.status || 'active'
                 })) || []);
-
-                // Fetch staff for this salon (safe for older DBs)
-                const staffRows = await fetchStaffForSalon(salon.id);
-                const simplified = (staffRows || []).map((s: any) => ({ id: s.id, name: s.name || '' })).sort((a: any,b: any)=> (a.name||'').localeCompare(b.name||''));
-                setStaff(simplified);
 
             } catch (err) {
                 console.error('Error fetching deals:', err);
@@ -79,7 +71,7 @@ export const SalonDeals: React.FC = () => {
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDeal, setEditingDeal] = useState<any>(null);
-    const [form, setForm] = useState({ service: '', price: '', original: '', time: '', date: '', status: 'active', durationMinutes: 60, staffId: '' });
+    const [form, setForm] = useState({ service: '', price: '', original: '', time: '', date: '', status: 'active', durationMinutes: 60 });
 
     // Actions
     const handleEdit = (deal: any) => {
@@ -91,15 +83,14 @@ export const SalonDeals: React.FC = () => {
             ...deal, 
             time: extractedTime,
             date: deal.date || new Date().toISOString().split('T')[0],
-            durationMinutes: deal.durationMinutes || 60,
-            staffId: deal.staffId || ''
+            durationMinutes: deal.durationMinutes || 60
         });
         setIsModalOpen(true);
     };
 
     const handleCreate = () => {
         setEditingDeal(null);
-        setForm({ service: '', price: '', original: '', time: '', date: new Date().toISOString().split('T')[0], status: 'active', durationMinutes: 60, staffId: '' });
+        setForm({ service: '', price: '', original: '', time: '', date: new Date().toISOString().split('T')[0], status: 'active', durationMinutes: 60 });
         setIsModalOpen(true);
     };
 
@@ -133,8 +124,7 @@ export const SalonDeals: React.FC = () => {
                         date: dealDate,
                         time: form.time,
                         duration_minutes: form.durationMinutes,
-                        status: form.status,
-                        staff_id: form.staffId || null
+                        status: form.status
                     })
                     .eq('id', editingDeal.id);
 
@@ -157,8 +147,7 @@ export const SalonDeals: React.FC = () => {
                         date: dealDate,
                         time: form.time,
                         duration_minutes: form.durationMinutes,
-                        status: form.status,
-                        staff_id: form.staffId || null
+                        status: form.status
                     })
                     .select()
                     .single();
@@ -398,18 +387,6 @@ export const SalonDeals: React.FC = () => {
                         min="15"
                         max="480"
                     />
-
-                    {/* Staff selection */}
-                    <Select
-                        label="Medewerker (optioneel)"
-                        value={form.staffId}
-                        onChange={e => setForm({...form, staffId: e.target.value})}
-                    >
-                        <option value="">Alle medewerkers (standaard)</option>
-                        {staff.map(member => (
-                            <option key={member.id} value={member.id}>{member.name}</option>
-                        ))}
-                    </Select>
 
                      <p className="text-sm text-stone-600 pt-2">
                         Deals zijn standaard actief en zichtbaar voor klanten. Gebruik de "Deactiveren" knop om een deal te verwijderen.

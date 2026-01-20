@@ -2,8 +2,7 @@
 export enum UserRole {
   CONSUMER = 'CONSUMER',
   SALON_OWNER = 'SALON_OWNER',
-  ADMIN = 'ADMIN',
-  STAFF = 'STAFF'
+  ADMIN = 'ADMIN'
 }
 
 export enum ServiceCategory {
@@ -38,18 +37,6 @@ export interface Service {
   price: number;
   durationMinutes: number;
   category: ServiceCategory;
-}
-
-export interface Staff {
-  id: string;
-  salonId: string;
-  userId?: string; // Optional - some staff might not have user accounts
-  name: string;
-  email?: string;
-  phone?: string;
-  role: 'owner' | 'staff';
-  isActive: boolean;
-  serviceIds?: string[]; // Services this staff member provides
 }
 
 export interface Location {
@@ -107,7 +94,6 @@ export interface Appointment {
   customerName: string;
   paymentMethod?: 'cash' | 'online';
   paymentStatus?: 'pending' | 'paid' | 'refunded';
-  staffId?: string | null;
 }
 
 export interface Deal {
@@ -124,7 +110,6 @@ export interface Deal {
   durationMinutes: number; // Duration of the service in minutes
   description: string;
   status?: string; // e.g., 'active', 'claimed', 'expired'
-  staffId?: string | null; // Optional staff member assigned to this deal
 }
 
 export interface Payment {

@@ -80,19 +80,16 @@ const UserDropdown: React.FC = () => {
         const value = (rawRole ?? 'user').toString().trim().toLowerCase();
         if (value.includes('admin')) return 'admin';
         if (value.includes('salon') || value.includes('owner')) return 'salon';
-        if (value.includes('staff')) return 'staff';
         return 'user';
     };
 
     const role = normalizeRole(profile?.role || (user as any)?.user_metadata?.role);
-    const roleLabel = role === 'staff' ? 'Medewerker' : role === 'salon' ? 'Salon' : role;
+    const roleLabel = role === 'salon' ? 'Salon' : role;
     const profilePath = role === 'salon'
         ? '/dashboard/salon/settings'
-        : role === 'staff'
-            ? '/dashboard/staff/profile'
-            : role === 'admin'
-                ? '/dashboard/admin'
-                : '/dashboard/user/profile';
+        : role === 'admin'
+            ? '/dashboard/admin'
+            : '/dashboard/user/profile';
 
     return (
         <div className="relative" ref={dropdownRef}>
@@ -121,11 +118,6 @@ const UserDropdown: React.FC = () => {
                     {role === 'salon' && (
                         <button onClick={() => handleNavigate('/dashboard/salon')} className="w-full text-left block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50">
                             Salon Dashboard
-                        </button>
-                    )}
-                    {role === 'staff' && (
-                        <button onClick={() => handleNavigate('/dashboard/staff')} className="w-full text-left block px-4 py-2 text-sm text-stone-700 hover:bg-stone-50">
-                            Mijn Agenda
                         </button>
                     )}
                     {role === 'admin' && (
@@ -359,15 +351,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode; role: 'user'
         salon: [
             { icon: Home, label: 'Dashboard', path: '/dashboard/salon' },
             { icon: Calendar, label: 'Agenda', path: '/dashboard/salon/schedule' },
-            { icon: Tag, label: 'Mijn Deals', path: '/dashboard/salon/deals' },
             { icon: Users, label: 'Klanten', path: '/dashboard/salon/clients' },
             { icon: Scissors, label: 'Diensten', path: '/dashboard/salon/services' },
-            { icon: User, label: 'Medewerkers', path: '/dashboard/salon/staff' },
             { icon: Settings, label: 'Instellingen', path: '/dashboard/salon/settings' },
-        ],
-        staff: [
-            { icon: Calendar, label: 'Mijn Agenda', path: '/dashboard/staff' },
-            { icon: Clock, label: 'Mijn Werktijden', path: '/dashboard/staff/profile' },
         ],
         admin: [
             { icon: PieChart, label: 'Statistieken', path: '/dashboard/admin' },
