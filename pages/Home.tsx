@@ -16,7 +16,7 @@ export const Home: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-16 pb-16">
+    <div className="flex flex-col gap-12 pb-16">
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-brand-50 via-white to-sky-50 py-12 md:py-24 lg:py-32">
         <div className="container mx-auto px-4 text-center">

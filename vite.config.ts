@@ -1,25 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Detect custom domain for correct base path
-function getBase() {
-  // On GitHub Actions, process.env.GITHUB_PAGES is set
-  if (process.env.GITHUB_PAGES === 'true') return '/mijnbeauty-afspraken/';
-  // On Vercel or custom domain, use root
-  if (process.env.CUSTOM_DOMAIN === 'true') return '/';
-  // Fallback: check production env
-  if (process.env.NODE_ENV === 'production') {
-    // If running on GitHub Pages
-    if (process.env.URL && process.env.URL.includes('github.io')) return '/mijnbeauty-afspraken/';
-    // If running on custom domain
-    return '/';
-  }
-  return '/';
-}
-
 export default defineConfig({
   plugins: [react()],
-  base: getBase(),
+  base: '/',
   server: {
     port: 3000,
   },
