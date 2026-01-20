@@ -185,26 +185,45 @@ export const SearchPage: React.FC = () => {
       if (!active || error) return;
 
       setSalons(
-        (data ?? []).map((s: any): SalonVM => ({
-          id: s.slug ?? s.id,
-          salonId: s.id, // Real UUID for database operations
-          slug: s.slug,
-          name: s.name,
-          city: s.city ?? '',
-          address: s.address ?? '',
-          zipCode: s.zip_code ?? '',
-          latitude: s.latitude,
-          longitude: s.longitude,
-          description: s.description ?? '',
-          image: s.image_url ?? s.image ?? FALLBACK_IMAGE,
-          rating: s.rating ?? 4.5,
+        (data ?? []).map((s: any): SalonVM => {
+          // Try to extract city from address if city is not set
+          let city = s.city ?? '';
+          if (!city && s.address) {
+            // Parse address like "Straat 123, 1234AB Stad" -> "Stad"
+            const addressParts = s.address.split(',');
+            if (addressParts.length >= 2) {
+              const lastPart = addressParts[addressParts.length - 1].trim();
+              // Check if last part looks like a postal code + city
+              const postalCityMatch = lastPart.match(/^(\d{4}\s*\w{2})\s+(.+)$/);
+              if (postalCityMatch) {
+                city = postalCityMatch[2];
+              } else {
+                city = lastPart;
+              }
+            }
+          }
+
+          return {
+            id: s.slug ?? s.id,
+            salonId: s.id, // Real UUID for database operations
+            slug: s.slug,
+            name: s.name,
+            city: city,
+            address: s.address ?? '',
+            zipCode: s.zip_code ?? '',
+            latitude: s.latitude,
+            longitude: s.longitude,
+            description: s.description ?? '',
+            image: s.image_url ?? s.image ?? FALLBACK_IMAGE,
+            rating: s.rating ?? 4.5,
           reviewCount: s.review_count ?? 0,
           categories: s.categories ?? [],
           services: (s.services ?? []).map((sv: any) => ({
             id: sv.id,
             name: sv.name,
           })),
-        }))
+        };
+        })
       );
 
       setLoading(false);
@@ -458,7 +477,7 @@ export const SearchPage: React.FC = () => {
                       </div>
                       <p className="text-sm text-stone-500">
                         <MapPin size={14} className="inline mr-1" />
-                        {s.city}
+                        {s.city || (s.address ? s.address.split(',')[s.address.split(',').length - 1]?.trim() : 'Locatie onbekend')}
                         {userLocation && s.latitude && s.longitude && (
                           <span className="ml-2 text-blue-600">
                             • {calculateDistance(userLocation.lat, userLocation.lng, s.latitude, s.longitude).toFixed(1)} km
