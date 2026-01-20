@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Plus, User, MoreVertical, Trash2, Filter, Coffee, AlertCircle, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Plus, User, MoreVertical, Trash2, Coffee, AlertCircle, Search } from 'lucide-react';
 import { Button, Card, Modal, Input, Select } from '../../components/UIComponents';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -14,7 +14,6 @@ interface ScheduleAppointment {
     date: string; // YYYY-MM-DD
     time: string;
     duration: number;
-    staff: string;
     color: string;
 }
 
@@ -40,9 +39,6 @@ export const SalonSchedule: React.FC = () => {
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredAppointments, setFilteredAppointments] = useState<ScheduleAppointment[]>([]);
-
-    // Filter State
-    const [staffFilter, setStaffFilter] = useState<string>('all');
 
     // Helper to format date as YYYY-MM-DD
     const toDateString = (date: Date) => date.toISOString().split('T')[0];
@@ -115,7 +111,6 @@ export const SalonSchedule: React.FC = () => {
                     date: a.date,
                     time: a.time,
                     duration: a.duration_minutes || a.services?.duration_minutes || 30,
-                    staff: a.staff?.name || 'Medewerker',
                     color: 'bg-brand-50 border-brand-300 text-brand-800'
                 })) || []);
 
@@ -139,7 +134,6 @@ export const SalonSchedule: React.FC = () => {
             const filtered = appointments.filter(apt =>
                 apt.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 apt.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                apt.staff.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 apt.time.includes(searchQuery)
             );
             setFilteredAppointments(filtered);
@@ -161,9 +155,6 @@ export const SalonSchedule: React.FC = () => {
 
     const getFilteredAppointments = () => {
         let filtered = filteredAppointments.filter(a => {
-            const matchesStaff = staffFilter === 'all' || a.staff === staffFilter;
-            if (!matchesStaff) return false;
-
             const aptDate = new Date(a.date);
 
             if (viewMode === 'day') {
@@ -183,7 +174,6 @@ export const SalonSchedule: React.FC = () => {
     };
 
     const displayAppointments = getFilteredAppointments();
-    const uniqueStaff = Array.from(new Set([...displayAppointments.map(a => a.staff), 'Sarah', 'Mike']));
 
     // Render functions for different views
     const renderDayView = () => {
@@ -222,7 +212,6 @@ export const SalonSchedule: React.FC = () => {
                                                 <div>
                                                     <p className="font-medium text-stone-900">{appointment.client}</p>
                                                     <p className="text-sm text-stone-600">{appointment.service}</p>
-                                                    <p className="text-xs text-stone-500">{appointment.staff}</p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs bg-brand-100 text-brand-800 px-2 py-1 rounded">
@@ -429,21 +418,8 @@ export const SalonSchedule: React.FC = () => {
                 </div>
             </div>
 
-            {/* Date Navigation and Staff Filter */}
+            {/* Date Navigation */}
             <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3 w-full lg:w-auto mb-6">
-                <div className="relative w-full sm:w-auto">
-                    <Filter size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-stone-400" />
-                    <select
-                        className="h-10 w-full pl-9 pr-4 rounded-xl border border-stone-200 bg-white text-sm font-medium text-stone-700 outline-none focus:ring-2 focus:ring-brand-400 cursor-pointer hover:bg-stone-50"
-                        value={staffFilter}
-                        onChange={(e) => setStaffFilter(e.target.value)}
-                    >
-                        <option value="all">Alle medewerkers</option>
-                        {uniqueStaff.map(s => (
-                            <option key={s} value={s}>{s}</option>
-                        ))}
-                    </select>
-                </div>
 
                 <div className="flex gap-2 w-full sm:w-auto justify-between">
                     <div className="flex items-center bg-white rounded-xl shadow-sm border border-stone-200 p-1 flex-1 sm:flex-none justify-between">
@@ -481,14 +457,10 @@ export const SalonSchedule: React.FC = () => {
             <Modal isOpen={isDetailsModalOpen} onClose={() => setIsDetailsModalOpen(false)} title="Afspraak Details">
                 {selectedAppointment && (
                     <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                             <div>
                                 <label className="text-sm font-medium text-stone-700">Klant</label>
                                 <p className="text-stone-900">{selectedAppointment.client}</p>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-stone-700">Medewerker</label>
-                                <p className="text-stone-900">{selectedAppointment.staff}</p>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
