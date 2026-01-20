@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Store, MapPin, Clock, Image as ImageIcon, Upload, Trash2, Check, X, CreditCard } from 'lucide-react';
+import { Save, Store, MapPin, Clock, Image as ImageIcon, Upload, Trash2, Check, X } from 'lucide-react';
 import { Button, Input, Card, Badge } from '../../components/UIComponents';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -10,7 +10,7 @@ export const SalonSettings: React.FC = () => {
     const [loading, setLoading] = useState(true);
     
     // Tab State
-    const [activeTab, setActiveTab] = useState<'general' | 'portfolio' | 'payments'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'portfolio'>('general');
 
     // State initialization
     const [settings, setSettings] = useState({
@@ -30,13 +30,7 @@ export const SalonSettings: React.FC = () => {
             za: { start: '10:00', end: '17:00', closed: false },
             zo: { start: '00:00', end: '00:00', closed: true }
         },
-        portfolio: [] as string[],
-        paymentMethods: {
-            cash: true,
-            online: false
-        },
-        stripeAccountId: '',
-        stripePublishableKey: ''
+        portfolio: [] as string[]
     });
 
     // Fetch salon data
@@ -72,10 +66,7 @@ export const SalonSettings: React.FC = () => {
                         phone: salon.phone || '',
                         email: salon.email || '',
                         portfolio: salon.image_url ? [salon.image_url] : [],
-                        openings: salon.opening_hours || prev.openings,
-                        paymentMethods: salon.payment_methods || { cash: true, online: false },
-                        stripeAccountId: salon.stripe_account_id || '',
-                        stripePublishableKey: salon.stripe_publishable_key || ''
+                        openings: salon.opening_hours || prev.openings
                     }));
                 }
             } catch (err) {
@@ -108,9 +99,7 @@ export const SalonSettings: React.FC = () => {
                     email: settings.email,
                     image_url: settings.portfolio[0] || null,
                     opening_hours: settings.openings,
-                    payment_methods: settings.paymentMethods,
-                    stripe_account_id: settings.stripeAccountId,
-                    stripe_publishable_key: settings.stripePublishableKey
+                    payment_methods: { cash: true, online: false }
                 })
                 .eq('id', salonId);
 
@@ -199,12 +188,6 @@ export const SalonSettings: React.FC = () => {
                     className={`pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'portfolio' ? 'border-brand-500 text-brand-600' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
                 >
                     Portfolio & Foto's
-                </button>
-                <button 
-                    onClick={() => setActiveTab('payments')}
-                    className={`pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'payments' ? 'border-brand-500 text-brand-600' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
-                >
-                    Betalingen
                 </button>
             </div>
 
@@ -355,89 +338,6 @@ export const SalonSettings: React.FC = () => {
                                  <ImageIcon size={32} className="mb-2" />
                                  <p className="text-xs text-center">Geen foto's toegevoegd</p>
                              </div>
-                        </div>
-                    </Card>
-                </div>
-            )}
-
-            {/* TAB: PAYMENTS */}
-            {activeTab === 'payments' && (
-                <div className="space-y-6 animate-fadeIn">
-                    <Card className="p-6">
-                        <h2 className="text-lg font-bold mb-6 flex items-center text-stone-800">
-                            <CreditCard size={20} className="mr-2 text-brand-500"/> Betalingsmethoden
-                        </h2>
-                        <div className="space-y-6">
-                            <div>
-                                <h3 className="text-sm font-medium text-stone-700 mb-3">Beschikbare betalingsmethoden</h3>
-                                <p className="text-sm text-stone-500 mb-4">Kies welke betalingsmethoden je wilt aanbieden aan je klanten.</p>
-                                
-                                <div className="space-y-3">
-                                    <label className="flex items-center space-x-3 p-3 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors">
-                                        <input
-                                            type="checkbox"
-                                            checked={settings.paymentMethods.cash}
-                                            onChange={(e) => setSettings({
-                                                ...settings,
-                                                paymentMethods: {
-                                                    ...settings.paymentMethods,
-                                                    cash: e.target.checked
-                                                }
-                                            })}
-                                            className="w-4 h-4 text-brand-600 bg-stone-100 border-stone-300 rounded focus:ring-brand-500"
-                                        />
-                                        <div>
-                                            <div className="font-medium text-stone-900">Contant betalen</div>
-                                            <div className="text-sm text-stone-500">Klanten betalen ter plekke bij aankomst</div>
-                                        </div>
-                                    </label>
-                                    
-                                    <label className="flex items-center space-x-3 p-3 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors">
-                                        <input
-                                            type="checkbox"
-                                            checked={settings.paymentMethods.online}
-                                            onChange={(e) => setSettings({
-                                                ...settings,
-                                                paymentMethods: {
-                                                    ...settings.paymentMethods,
-                                                    online: e.target.checked
-                                                }
-                                            })}
-                                            className="w-4 h-4 text-brand-600 bg-stone-100 border-stone-300 rounded focus:ring-brand-500"
-                                        />
-                                        <div>
-                                            <div className="font-medium text-stone-900">Online betalen</div>
-                                            <div className="text-sm text-stone-500">Klanten betalen direct tijdens het boeken met creditcard</div>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {settings.paymentMethods.online && (
-                                <div className="border-t border-stone-200 pt-6">
-                                    <h3 className="text-sm font-medium text-stone-700 mb-3">Stripe Instellingen</h3>
-                                    <p className="text-sm text-stone-500 mb-4">Configureer je Stripe account voor online betalingen.</p>
-                                    
-                                    <div className="space-y-4">
-                                        <Input 
-                                            label="Stripe Account ID" 
-                                            value={settings.stripeAccountId} 
-                                            onChange={(e) => handleChange('stripeAccountId', e.target.value)}
-                                            placeholder="acct_..."
-                                        />
-                                        <Input 
-                                            label="Stripe Publishable Key" 
-                                            value={settings.stripePublishableKey} 
-                                            onChange={(e) => handleChange('stripePublishableKey', e.target.value)}
-                                            placeholder="pk_..."
-                                        />
-                                        <p className="text-xs text-stone-400">
-                                            Je Stripe keys vind je in je Stripe Dashboard onder Developers &gt; API keys.
-                                            Gebruik de test keys tijdens ontwikkeling.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </Card>
                 </div>
