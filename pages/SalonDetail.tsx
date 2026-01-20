@@ -155,6 +155,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         profiles:user_id (full_name)
                     `)
                     .eq('salon_id', data.id)
+                    .eq('is_approved', true)
                     .order('created_at', { ascending: false });
 
                 if (reviewsData) {
@@ -294,7 +295,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     salon_id: salon.supabaseId,
                     user_id: user.id,
                     rating: reviewForm.rating,
-                    comment: reviewForm.text
+                    comment: reviewForm.text,
+                    is_approved: true // Auto-approve reviews for now, admin can moderate later
                 })
                 .select()
                 .single();
@@ -322,6 +324,30 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         } catch (err) {
             console.error('Error submitting review:', err);
             alert('Er ging iets mis. Probeer het opnieuw.');
+        }
+    };
+
+    const flagReview = async (reviewId: string) => {
+        if (!user) {
+            alert('Log in om een review te rapporteren.');
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('reviews')
+                .update({
+                    is_flagged: true,
+                    flagged_reason: 'Gerapporteerd door gebruiker'
+                })
+                .eq('id', reviewId);
+
+            if (error) throw error;
+
+            alert('Review gerapporteerd. Een moderator zal deze beoordelen.');
+        } catch (err) {
+            console.error('Error flagging review:', err);
+            alert('Er ging iets mis bij het rapporteren.');
         }
     };
 
@@ -581,10 +607,19 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                 <div key={review.id} className="border-b border-stone-100 last:border-0 pb-6 last:pb-0 animate-fadeIn">
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="font-semibold text-stone-900">{review.user}</span>
-                                        <div className="flex text-yellow-400">
-                                            {[...Array(5)].map((_, i) => (
-                                                <Star key={i} size={14} className={i < review.rating ? "fill-current" : "text-stone-200"} />
-                                            ))}
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex text-yellow-400">
+                                                {[...Array(5)].map((_, i) => (
+                                                    <Star key={i} size={14} className={i < review.rating ? "fill-current" : "text-stone-200"} />
+                                                ))}
+                                            </div>
+                                            <button
+                                                onClick={() => flagReview(review.id)}
+                                                className="text-xs text-stone-400 hover:text-red-500 transition-colors"
+                                                title="Review rapporteren"
+                                            >
+                                                🚩
+                                            </button>
                                         </div>
                                     </div>
                                     <p className="text-stone-600 text-sm">"{review.text}"</p>

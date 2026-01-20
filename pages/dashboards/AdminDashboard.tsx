@@ -164,8 +164,27 @@ export const AdminDashboard: React.FC = () => {
                 });
                 setSalonGrowth(growthMonths.map(m => ({ m: m.label, s: growthMonthCounts.get(m.key) || 0 })));
 
-                // Placeholder for moderation queue (no reviews moderation table yet)
-                setFlaggedReviews([]);
+                // Fetch flagged reviews for moderation
+                const { data: reviewsData } = await supabase
+                    .from('reviews')
+                    .select(`
+                        *,
+                        profiles:user_id (full_name),
+                        salons:salon_id (name)
+                    `)
+                    .eq('is_flagged', true)
+                    .order('created_at', { ascending: false });
+
+                if (reviewsData) {
+                    setFlaggedReviews(reviewsData.map((r: any) => ({
+                        id: r.id,
+                        text: r.comment || '',
+                        reason: r.flagged_reason || 'Gemeld',
+                        date: new Date(r.created_at).toLocaleDateString('nl-NL'),
+                        user: r.profiles?.full_name || 'Anoniem',
+                        salon: r.salons?.name || 'Onbekende Salon'
+                    })));
+                }
             } catch (err) {
                 console.error('Admin dashboard load failed:', err);
             } finally {
@@ -175,6 +194,69 @@ export const AdminDashboard: React.FC = () => {
 
         fetchAdminData();
     }, []);
+
+    // Review moderation functions
+    const approveReview = async (reviewId: string) => {
+        try {
+            const { error } = await supabase
+                .from('reviews')
+                .update({
+                    is_flagged: false,
+                    is_approved: true,
+                    moderated_at: new Date().toISOString()
+                })
+                .eq('id', reviewId);
+
+            if (error) throw error;
+
+            // Remove from flagged reviews list
+            setFlaggedReviews(prev => prev.filter(r => r.id !== reviewId));
+        } catch (err) {
+            console.error('Error approving review:', err);
+            alert('Fout bij het goedkeuren van de review');
+        }
+    };
+
+    const rejectReview = async (reviewId: string) => {
+        try {
+            const { error } = await supabase
+                .from('reviews')
+                .update({
+                    is_approved: false,
+                    moderated_at: new Date().toISOString()
+                })
+                .eq('id', reviewId);
+
+            if (error) throw error;
+
+            // Remove from flagged reviews list
+            setFlaggedReviews(prev => prev.filter(r => r.id !== reviewId));
+        } catch (err) {
+            console.error('Error rejecting review:', err);
+            alert('Fout bij het afkeuren van de review');
+        }
+    };
+
+    const deleteReview = async (reviewId: string) => {
+        if (!confirm('Weet je zeker dat je deze review wilt verwijderen? Dit kan niet ongedaan worden gemaakt.')) {
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('reviews')
+                .delete()
+                .eq('id', reviewId);
+
+            if (error) throw error;
+
+            // Remove from flagged reviews list
+            setFlaggedReviews(prev => prev.filter(r => r.id !== reviewId));
+        } catch (err) {
+            console.error('Error deleting review:', err);
+            alert('Fout bij het verwijderen van de review');
+        }
+    };
 
     const data = useMemo(() => bookingsByDay, [bookingsByDay]);
     const monthlyData = useMemo(() => bookingsByMonth, [bookingsByMonth]);
@@ -387,8 +469,8 @@ export const AdminDashboard: React.FC = () => {
                                  <p className="text-xs text-stone-500">Door {item.user} bij <span className="font-semibold">{item.salon}</span></p>
                                  
                                  <div className="flex gap-2 mt-3">
-                                     <Button size="sm" variant="outline" className="text-xs h-7">Negeren</Button>
-                                     <Button size="sm" variant="danger" className="text-xs h-7">Verwijderen</Button>
+                                     <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => approveReview(item.id)}>Goedkeuren</Button>
+                                     <Button size="sm" variant="danger" className="text-xs h-7" onClick={() => deleteReview(item.id)}>Verwijderen</Button>
                                  </div>
                              </div>
                         ))}

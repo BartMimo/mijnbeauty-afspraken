@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logo Preview</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: white;
+            font-family: Arial, sans-serif;
+        }
+        .logo-container {
+            text-align: center;
+            padding: 40px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            background: white;
+        }
+        .logo {
+            width: 128px;
+            height: 128px;
+            margin: 0 auto 20px;
+            display: block;
+        }
+        .instructions {
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo-container">
+        <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="6" cy="6" r="3"/>
+            <path d="m8.12 8.12 6 6"/>
+            <path d="M20.88 9.88a3 3 0 0 0-4.24-4.24l-6 6a3 3 0 1 0 4.24 4.24"/>
+            <path d="m14.12 14.12 6 6"/>
+            <circle cx="18" cy="18" r="3"/>
+        </svg>
+        <h2>Schaar Logo</h2>
+        <p>128x128 pixels - Zwart op wit</p>
+        <div class="instructions">
+            Gebruik Cmd+Shift+4 op Mac of Print Screen op Windows om een screenshot te maken van dit logo.
+        </div>
+    </div>
+</body>
+</html>
