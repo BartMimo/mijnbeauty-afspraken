@@ -53,16 +53,13 @@ export const SalonSettings: React.FC = () => {
                 if (salon) {
                     setSalonId(salon.id);
                     
-                    // Parse address into parts if possible
-                    const addressParts = salon.address?.match(/^(.+?),\s*(\d{4}\s*\w{2})\s+(.+)$/);
-                    
                     setSettings(prev => ({
                         ...prev,
                         name: salon.name || '',
                         description: salon.description || '',
-                        address: addressParts ? addressParts[1] : salon.address || '',
-                        zipCode: addressParts ? addressParts[2] : salon.zip_code || '',
-                        city: addressParts ? addressParts[3] : salon.city || '',
+                        address: salon.address || '',
+                        zipCode: salon.zipCode || '',
+                        city: salon.city || '',
                         phone: salon.phone || '',
                         email: salon.email || '',
                         portfolio: salon.image_url ? [salon.image_url] : [],

@@ -711,6 +711,12 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 // Wait a bit more to ensure profile is committed
                 await new Promise(resolve => setTimeout(resolve, 500));
 
+                // Parse address into components
+                const addressParts = fullAddress.match(/^(.+?),\s*(\d{4}\s*\w{2})\s+(.+)$/);
+                const streetAddress = addressParts ? addressParts[1] : fullAddress;
+                const zipCode = addressParts ? addressParts[2] : '';
+                const city = addressParts ? addressParts[3] : '';
+
                 // Create salon entry with pending status (needs admin approval)
                 const { data: salonData, error: salonError } = await supabase
                     .from('salons')
@@ -720,7 +726,9 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                         slug: regSubdomain,
                         subdomain: regSubdomain,
                         status: 'pending',
-                        address: fullAddress,
+                        address: streetAddress,
+                        city: city,
+                        zipCode: zipCode,
                         phone: regPhone,
                         description: salonDescription,
                         categories: salonCategories,
@@ -847,12 +855,20 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                 navigate('/dashboard');
             } else {
                 // No session - email confirmation required
+                // Parse address into components
+                const addressParts = fullAddress.match(/^(.+?),\s*(\d{4}\s*\w{2})\s+(.+)$/);
+                const streetAddress = addressParts ? addressParts[1] : fullAddress;
+                const zipCode = addressParts ? addressParts[2] : '';
+                const city = addressParts ? addressParts[3] : '';
+
                 // Store salon data in localStorage for later creation after email confirmation
                 localStorage.setItem('pendingSalon', JSON.stringify({
                     userId: data.user.id,
                     salonName: regSalonName,
                     subdomain: regSubdomain,
-                    address: fullAddress,
+                    address: streetAddress,
+                    city: city,
+                    zipCode: zipCode,
                     phone: regPhone,
                     ownerName: regName,
                     email: regEmail,
