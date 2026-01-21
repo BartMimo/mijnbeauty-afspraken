@@ -31,6 +31,8 @@ export const SalonSettings: React.FC = () => {
             zo: { start: '00:00', end: '00:00', closed: true }
         },
         portfolio: [] as string[]
+        ,
+        leadTimeHours: '0'
     });
 
     // Fetch salon data
@@ -63,7 +65,8 @@ export const SalonSettings: React.FC = () => {
                         phone: salon.phone || '',
                         email: salon.email || '',
                         portfolio: salon.image_url ? [salon.image_url] : [],
-                        openings: salon.opening_hours || prev.openings
+                        openings: salon.opening_hours || prev.openings,
+                        leadTimeHours: salon.lead_time_hours != null ? String(salon.lead_time_hours) : (prev.leadTimeHours || '0')
                     }));
                 }
             } catch (err) {
@@ -96,7 +99,8 @@ export const SalonSettings: React.FC = () => {
                     email: settings.email,
                     image_url: settings.portfolio[0] || null,
                     opening_hours: settings.openings,
-                    payment_methods: { cash: true, online: false }
+                    payment_methods: { cash: true, online: false },
+                    lead_time_hours: Number(settings.leadTimeHours || 0)
                 })
                 .eq('id', salonId);
 
@@ -244,6 +248,18 @@ export const SalonSettings: React.FC = () => {
                                 value={settings.email}
                                 onChange={(e) => handleChange('email', e.target.value)}
                             />
+                            <div>
+                                <label className="block text-sm font-medium text-stone-700 mb-1.5">Reserveer tijd (uur)</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    className="w-full h-11 px-4 rounded-xl border border-stone-200"
+                                    value={settings.leadTimeHours}
+                                    onChange={(e) => handleChange('leadTimeHours', e.target.value)}
+                                    placeholder="Aantal uur van tevoren blokkeren (bijv. 2)"
+                                />
+                                <p className="text-xs text-stone-400 mt-1">Aantal uur dat klanten minimaal van tevoren moeten boeken.</p>
+                            </div>
                         </div>
                     </Card>
 

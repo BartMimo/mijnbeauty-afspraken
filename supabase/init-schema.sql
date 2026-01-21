@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS public.salons (
   created_at timestamptz DEFAULT now()
 );
 
+-- Lead time: minimum hours before a booking is allowed
+ALTER TABLE IF EXISTS public.salons
+  ADD COLUMN IF NOT EXISTS lead_time_hours integer DEFAULT 0;
+
 -- Services offered by salons
 CREATE TABLE IF NOT EXISTS public.services (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

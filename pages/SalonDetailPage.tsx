@@ -196,6 +196,18 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
 
             if (startMinutes + serviceDuration > maxEndTime) return false;
 
+            // Enforce salon-configured lead time (hours)
+            const leadHours = Number(salon?.leadTimeHours || 0);
+            if (leadHours > 0) {
+                const now = new Date();
+                const cutoff = new Date(now.getTime() + leadHours * 60 * 60 * 1000);
+                const sameDay = selectedDate.getFullYear() === cutoff.getFullYear() && selectedDate.getMonth() === cutoff.getMonth() && selectedDate.getDate() === cutoff.getDate();
+                if (sameDay) {
+                    const cutoffMinutes = cutoff.getHours() * 60 + cutoff.getMinutes();
+                    if (startMinutes < cutoffMinutes) return false;
+                }
+            }
+
             // Check if any needed slot is blocked
             return !isSlotBlocked(time, serviceDuration);
         });
@@ -270,6 +282,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     email: data.email,
                     phone: data.phone,
                     paymentMethods: data.payment_methods || { cash: true, online: false },
+                    leadTimeHours: data.lead_time_hours || 0,
                     services: (data.services || []).map((s: any) => ({
                         id: s.id,
                         name: s.name,

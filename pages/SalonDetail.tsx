@@ -136,6 +136,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     reviewCount: 0,
                     email: data.email,
                     phone: data.phone,
+                    leadTimeHours: data.lead_time_hours || 0,
                     services: (data.services || []).map((s: any) => ({
                         id: s.id,
                         name: s.name,
@@ -453,6 +454,21 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         return times;
     };
 
+    // Enforce salon-configured lead time by filtering out slots earlier than now + lead_time_hours when booking same-day
+    const filterByLeadTime = (date: Date, times: string[]) => {
+        const leadHours = Number(salon?.leadTimeHours || 0);
+        if (!leadHours) return times;
+        const now = new Date();
+        const cutoff = new Date(now.getTime() + leadHours * 60 * 60 * 1000);
+        const sameDay = date.getFullYear() === cutoff.getFullYear() && date.getMonth() === cutoff.getMonth() && date.getDate() === cutoff.getDate();
+        if (!sameDay) return times;
+        const cutoffMinutes = cutoff.getHours() * 60 + cutoff.getMinutes();
+        return times.filter(t => {
+            const [h, m] = t.split(':').map(Number);
+            return (h * 60 + m) >= cutoffMinutes;
+        });
+    };
+
     const formatDateDutch = (date: Date) => {
         return new Intl.DateTimeFormat('nl-NL', { weekday: 'short', day: 'numeric', month: 'long' }).format(date);
     };
@@ -702,7 +718,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                 <div className="border-t border-stone-100 pt-4 animate-fadeIn">
                                                     <p className="text-sm font-medium text-stone-700 mb-3">Tijdstip:</p>
                                                     <div className="grid grid-cols-3 gap-2">
-                                                        {(selectedDate ? getAvailableTimes(selectedDate) : []).filter(time => !bookedTimes.includes(time)).map(time => (
+                                                        {(selectedDate ? filterByLeadTime(selectedDate, getAvailableTimes(selectedDate)) : []).filter(time => !bookedTimes.includes(time)).map(time => (
                                                             <button 
                                                                 key={time} 
                                                                 onClick={() => setSelectedTime(time)}
