@@ -149,6 +149,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     openingHours: data.opening_hours
                 });
 
+                // Debug: log lead time value
+                console.debug('Salon lead_time_hours:', data.lead_time_hours);
+
                 // Fetch reviews from Supabase
                 const { data: reviewsData } = await supabase
                     .from('reviews')
@@ -200,6 +203,35 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             setBookedTimes([]);
         }
     }, [salon?.openingHours, selectedDate]);
+
+    // Reset selected date/time if salon lead-time makes the selected date/time invalid
+    useEffect(() => {
+        if (!selectedDate || !salon) return;
+        const leadHours = Number(salon?.leadTimeHours || 0);
+        if (!leadHours) return;
+        const now = new Date();
+        const cutoff = new Date(now.getTime() + leadHours * 60 * 60 * 1000);
+        const selectedDateOnly = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+        const cutoffDateOnly = new Date(cutoff.getFullYear(), cutoff.getMonth(), cutoff.getDate());
+
+        // If selected date is before cutoff date, clear it
+        if (selectedDateOnly < cutoffDateOnly) {
+            setSelectedDate(null);
+            setSelectedTime(null);
+            setBookedTimes([]);
+            return;
+        }
+
+        // If selected date is the same day, ensure selected time is after cutoff minutes
+        if (selectedDateOnly.getTime() === cutoffDateOnly.getTime() && selectedTime) {
+            const [sh, sm] = selectedTime.split(':').map(Number);
+            const selectedMinutes = sh * 60 + (sm || 0);
+            const cutoffMinutes = cutoff.getHours() * 60 + cutoff.getMinutes();
+            if (selectedMinutes < cutoffMinutes) {
+                setSelectedTime(null);
+            }
+        }
+    }, [salon?.leadTimeHours, selectedDate, selectedTime]);
 
     const toggleFavorite = async () => {
         if (!salon || !user) {

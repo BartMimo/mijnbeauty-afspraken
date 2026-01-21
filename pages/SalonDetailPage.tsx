@@ -295,6 +295,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     openingHours: data.opening_hours
                 });
 
+                // Debug: log lead time value
+                console.debug('Salon lead_time_hours (page):', data.lead_time_hours);
+
                 // Check if user has this salon as favorite
                 if (user) {
                     const { data: favoriteData } = await supabase
