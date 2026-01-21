@@ -91,7 +91,7 @@ export interface Appointment {
   time: string;
   status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
   // duration in minutes as stored/returned by the database (snake_case used by Postgres)
-  duration_minutes?: number;
+  duration_minutes?: number | null;
   price: number;
   customerName: string;
   paymentMethod?: 'cash' | 'online';
