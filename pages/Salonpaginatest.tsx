@@ -18,7 +18,7 @@ const SALON_CATEGORIES = [
 interface Appointment {
     date: string;
     time: string;
-    duration_minutes: number;
+    duration_minutes?: number | null;
 }
 
 // Mock salon data for testing
