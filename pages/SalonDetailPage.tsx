@@ -444,7 +444,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 is_approved: true
             };
 
-            const { insertReviewSafe } = await import('../../lib/reviews');
+            const { insertReviewSafe } = await import('../lib/reviews');
             const { error, data: newReviewData } = await insertReviewSafe(payload) as any;
 
             if (error) {
