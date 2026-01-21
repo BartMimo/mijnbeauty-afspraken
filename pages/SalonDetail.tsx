@@ -300,14 +300,11 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 is_approved: true // Auto-approve reviews for now, admin can moderate later
             };
 
-            const { data: newReviewData, error } = await supabase
-                .from('reviews')
-                .insert(payload)
-                .select()
-                .single();
+            const { insertReviewSafe } = await import('../../lib/reviews');
+            const { error, data: newReviewData } = await insertReviewSafe(payload) as any;
 
             if (error) {
-                console.error('Error saving review:', error, 'payload:', payload);
+                console.error('Error saving review (safe insert):', error, 'payload:', payload);
                 alert('Er ging iets mis bij het opslaan van je review. Probeer het opnieuw.');
                 return;
             }
