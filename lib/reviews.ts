@@ -1,134 +1,161 @@
-import { supabase } from './supabase';
+import { supabase } from "./supabase";
 
-// Robust insert for `reviews` table. Some deployments may have different
-// columns (older/newer schemas). Try a full insert first, then retry
-// omitting columns mentioned in DB errors.
-export async function insertReviewSafe(review: Record<string, any>) {
-  const attemptInsert = async (payload: Record<string, any>) => {
-    return await supabase.from('reviews').insert([payload]).select().single();
+/**
+ * reviews.ts
+ * Centrale laag voor Reviews (Supabase + RLS)
+ *
+ * Verwachte RLS policies:
+ * - INSERT / UPDATE / DELETE:
+ *     auth.uid() = user_id
+ *
+ * Minimale kolommen in `reviews`:
+ * - id (uuid)
+ * - salon_id (uuid)
+ * - user_id (uuid)
+ * - rating (number)
+ * - comment (text)
+ * - created_at (timestamp)
+ */
+
+export type ReviewRow = Record<string, any>;
+
+export type CreateReviewInput = {
+  salon_id: string;
+  rating: number;
+  comment?: string | null;
+};
+
+/* ================================
+   Auth errors
+================================ */
+
+export class NotAuthenticatedError extends Error {
+  constructor() {
+    super("NOT_AUTHENTICATED");
+    this.name = "NotAuthenticatedError";
+  }
+}
+
+export function isNotAuthenticatedError(err: unknown): boolean {
+  if (!err) return false;
+
+  if (err instanceof NotAuthenticatedError) return true;
+
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    return (
+      msg === "not_authenticated" ||
+      msg.includes("permission") ||
+      msg.includes("not authorized") ||
+      msg.includes("jwt")
+    );
+  }
+
+  return false;
+}
+
+/* ================================
+   Create
+================================ */
+
+export async function insertReviewSafe(input: CreateReviewInput) {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) {
+    return { data: null as ReviewRow | null, error: authError };
+  }
+
+  if (!user) {
+    return { data: null as ReviewRow | null, error: new NotAuthenticatedError() };
+  }
+
+  const payload = {
+    salon_id: input.salon_id,
+    rating: input.rating,
+    comment: input.comment ?? null,
+    user_id: user.id,
   };
 
-  // Force anonymous reviews by clearing `user_id` so FK errors don't block inserts
-  const basePayload = { ...review, user_id: null };
-  try {
-    const { error, data } = await attemptInsert(basePayload);
-    if (error) {
-      const message = (error.message || error.msg || JSON.stringify(error)) as string;
+  const { data, error } = await supabase
+    .from("reviews")
+    .insert(payload)
+    .select()
+    .single();
 
-      // If DB complains about a missing column, drop it and retry
-      // Try to detect any quoted column names mentioned in the error (covers variants like
-      // "Could not find the 'is_approved' column of 'reviews' in the schema cache")
-      const quotedMatches = Array.from(message.matchAll(/'([a-zA-Z0-9_]+)'/g)).map(m => m[1]);
-      for (const maybeCol of quotedMatches) {
-        if (maybeCol in basePayload) {
-          const { [maybeCol]: _omitted, ...rest } = basePayload as any;
-          return await attemptInsert(rest);
-        }
-      }
+  return { data: data as ReviewRow | null, error };
+}
 
-      // Fallback: try removing `user_id` or `salon_id` if present (common RLS issues)
-      if (message.toLowerCase().includes('permission') || message.toLowerCase().includes('policy')) {
-        const { user_id, salon_id, ...rest } = basePayload as any;
-        return await attemptInsert(rest);
-      }
+/* ================================
+   Read
+================================ */
 
-      // Handle foreign key constraint violations (e.g. reviews_user_id_fkey)
-      if (message.toLowerCase().includes('violates foreign key constraint') || /_fkey\b/.test(message)) {
-        // If the constraint name mentions user_id or salon_id, drop that field and retry
-        const lower = message.toLowerCase();
-        if (lower.includes('user_id') || lower.includes('reviews_user_id_fkey')) {
-          const { user_id, ...rest } = basePayload as any;
-          return await attemptInsert(rest);
-        }
-        if (lower.includes('salon_id') || lower.includes('reviews_salon_id_fkey')) {
-          const { salon_id, ...rest } = basePayload as any;
-          return await attemptInsert(rest);
-        }
+export async function fetchSalonReviews(params: {
+  salonId: string;
+  limit?: number;
+}) {
+  const { salonId, limit = 50 } = params;
 
-        // Generic: try omitting user_id first, then salon_id
-        if ('user_id' in basePayload) {
-          const { user_id, ...rest } = basePayload as any;
-          const r = await attemptInsert(rest);
-          if (!r.error) return r;
-        }
-        if ('salon_id' in basePayload) {
-          const { salon_id, ...rest } = basePayload as any;
-          return await attemptInsert(rest);
-        }
-      }
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("*, profiles!reviews_user_id_fkey(full_name)")
+    .eq("salon_id", salonId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
-      return { error };
-    }
+  return { data, error };
+}
 
-    return { error: null, data };
-  } catch (err: any) {
-    const message = (err && (err.message || err.msg || JSON.stringify(err))) || '';
-    const quotedMatches = Array.from(message.matchAll(/'([a-zA-Z0-9_]+)'/g)).map(m => m[1]);
-    for (const maybeCol of quotedMatches) {
-      if (maybeCol in basePayload) {
-        const { [maybeCol]: _omitted, ...rest } = basePayload as any;
-        try {
-          const { error, data } = await supabase.from('reviews').insert([rest]).select().single();
-          return { error, data };
-        } catch (err2: any) {
-          return { error: err2 };
-        }
-      }
-    }
+/* ================================
+   Update (eigen review)
+================================ */
 
-    // Catch foreign key constraint violations and retry without the offending FK
-    if (message.toLowerCase().includes('violates foreign key constraint') || /_fkey\b/.test(message)) {
-      const lower = message.toLowerCase();
-      if (lower.includes('user_id') || lower.includes('reviews_user_id_fkey')) {
-        const { user_id, ...rest } = basePayload as any;
-        try {
-          const { error, data } = await supabase.from('reviews').insert([rest]).select().single();
-          return { error, data };
-        } catch (err4: any) {
-          return { error: err4 };
-        }
-      }
-      if (lower.includes('salon_id') || lower.includes('reviews_salon_id_fkey')) {
-        const { salon_id, ...rest } = basePayload as any;
-        try {
-          const { error, data } = await supabase.from('reviews').insert([rest]).select().single();
-          return { error, data };
-        } catch (err5: any) {
-          return { error: err5 };
-        }
-      }
+export async function updateReviewSafe(
+  reviewId: string,
+  patch: Partial<CreateReviewInput>
+) {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-      // Generic retry: try without user_id then without salon_id
-      if ('user_id' in basePayload) {
-        const { user_id, ...rest } = basePayload as any;
-        try {
-          const { error, data } = await supabase.from('reviews').insert([rest]).select().single();
-          if (!error) return { error: null, data };
-        } catch (err6: any) {
-          // continue
-        }
-      }
-      if ('salon_id' in basePayload) {
-        const { salon_id, ...rest } = basePayload as any;
-        try {
-          const { error, data } = await supabase.from('reviews').insert([rest]).select().single();
-          return { error, data };
-        } catch (err7: any) {
-          return { error: err7 };
-        }
-      }
-    }
-
-    if (message.toLowerCase().includes('permission') || message.toLowerCase().includes('policy')) {
-      const { user_id, salon_id, ...rest } = basePayload as any;
-      try {
-        const { error, data } = await supabase.from('reviews').insert([rest]).select().single();
-        return { error, data };
-      } catch (err3: any) {
-        return { error: err3 };
-      }
-    }
-
-    return { error: err };
+  if (authError) {
+    return { data: null as ReviewRow | null, error: authError };
   }
+
+  if (!user) {
+    return { data: null as ReviewRow | null, error: new NotAuthenticatedError() };
+  }
+
+  const { data, error } = await supabase
+    .from("reviews")
+    .update(patch)
+    .eq("id", reviewId)
+    .select()
+    .single();
+
+  return { data: data as ReviewRow | null, error };
+}
+
+/* ================================
+   Delete (eigen review)
+================================ */
+
+export async function deleteReviewSafe(reviewId: string) {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) return { error: authError };
+  if (!user) return { error: new NotAuthenticatedError() };
+
+  const { error } = await supabase
+    .from("reviews")
+    .delete()
+    .eq("id", reviewId);
+
+  return { error };
 }
