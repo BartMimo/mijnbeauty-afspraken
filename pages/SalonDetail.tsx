@@ -290,20 +290,24 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
 
         try {
             // Save review to database
+            // Send both `comment` and legacy `text` to maximize compatibility across DB schemas
+            const payload: any = {
+                salon_id: salon.supabaseId,
+                user_id: user.id,
+                rating: reviewForm.rating,
+                comment: reviewForm.text,
+                text: reviewForm.text,
+                is_approved: true // Auto-approve reviews for now, admin can moderate later
+            };
+
             const { data: newReviewData, error } = await supabase
                 .from('reviews')
-                .insert({
-                    salon_id: salon.supabaseId,
-                    user_id: user.id,
-                    rating: reviewForm.rating,
-                    comment: reviewForm.text,
-                    is_approved: true // Auto-approve reviews for now, admin can moderate later
-                })
+                .insert(payload)
                 .select()
                 .single();
 
             if (error) {
-                console.error('Error saving review:', error);
+                console.error('Error saving review:', error, 'payload:', payload);
                 alert('Er ging iets mis bij het opslaan van je review. Probeer het opnieuw.');
                 return;
             }
