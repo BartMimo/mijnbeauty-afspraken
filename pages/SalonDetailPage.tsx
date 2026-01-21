@@ -37,38 +37,18 @@ class ErrorBoundary extends React.Component<{children?: React.ReactNode}, {error
                     <div>
                         <h2 className="font-bold mb-2">Er is iets misgegaan</h2>
                         <pre className="text-xs whitespace-pre-wrap">{this.state.error?.message || String(this.state.error)}</pre>
-                    try {
-                        let reviewsData = null;
-                        try {
-                            const res = await supabase
-                                .from('reviews')
-                                .select(`*, profiles:user_id (full_name)`)
-                                .eq('salon_id', data.id)
-                                .eq('is_approved', true)
-                                .order('created_at', { ascending: false });
-                            reviewsData = res.data;
-                        } catch (e) {
-                            const res = await supabase
-                                .from('reviews')
-                                .select(`*, profiles:user_id (full_name)`)
-                                .eq('salon_id', data.id)
-                                .order('created_at', { ascending: false });
-                            reviewsData = res.data;
-                        }
+                    </div>
+                </div>
+            );
+        }
 
-                        if (reviewsData) {
-                            setReviews(reviewsData.map((r: any) => ({
-                                id: r.id,
-                                user: r.profiles?.full_name || 'Anoniem',
-                                rating: r.rating,
-                                text: r.comment || r.text || '',
-                                date: new Date(r.created_at).toLocaleDateString('nl-NL')
-                            })));
-                        }
-                    } catch (err) {
-                        // ignore review loading errors
-                    }
+        return this.props.children as any;
+    }
+}
+
+export const SalonDetailPage: React.FC = () => {
     const navigate = useNavigate();
+    const { id, subdomain } = useParams();
     const { user } = useAuth();
     const salonId = subdomain || id;
 
