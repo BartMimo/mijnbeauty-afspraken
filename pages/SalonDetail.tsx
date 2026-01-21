@@ -305,7 +305,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
 
             if (error) {
                 console.error('Error saving review (safe insert):', error, 'payload:', payload);
-                alert('Er ging iets mis bij het opslaan van je review. Probeer het opnieuw.');
+                const msg = error?.message || error?.msg || JSON.stringify(error) || 'Onbekende fout';
+                alert(`Er ging iets mis bij het opslaan van je review: ${msg}`);
                 return;
             }
 
