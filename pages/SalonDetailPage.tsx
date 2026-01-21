@@ -201,7 +201,11 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             if (leadHours > 0) {
                 const now = new Date();
                 const cutoff = new Date(now.getTime() + leadHours * 60 * 60 * 1000);
-                const sameDay = selectedDate.getFullYear() === cutoff.getFullYear() && selectedDate.getMonth() === cutoff.getMonth() && selectedDate.getDate() === cutoff.getDate();
+                const selectedDateOnly = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+                const cutoffDateOnly = new Date(cutoff.getFullYear(), cutoff.getMonth(), cutoff.getDate());
+                // If the selected date is before the cutoff date, no slots should be allowed
+                if (selectedDateOnly < cutoffDateOnly) return false;
+                const sameDay = selectedDateOnly.getTime() === cutoffDateOnly.getTime();
                 if (sameDay) {
                     const cutoffMinutes = cutoff.getHours() * 60 + cutoff.getMinutes();
                     if (startMinutes < cutoffMinutes) return false;
@@ -212,6 +216,82 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             return !isSlotBlocked(time, serviceDuration);
         });
     }, [selectedDate, currentService, existingAppointments, salon?.openingHours]);
+
+    // Helper to determine if a given date has any selectable times after applying lead-time and existing appointments
+    const hasSelectableTimes = (date: Date) => {
+        if (!salon) return false;
+        // generate times for the date similar to availableTimes
+        let timeSlotsForDate: string[] = [];
+        if (salon?.openingHours) {
+            const days = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
+            const dayOfWeek = days[date.getDay()];
+            const dayHours = salon.openingHours[dayOfWeek];
+            if (dayHours && !dayHours.closed) {
+                const times: string[] = [];
+                const [startHour, startMinute] = dayHours.start.split(':').map(Number);
+                const [endHour, endMinute] = dayHours.end.split(':').map(Number);
+                let currentHour = startHour;
+                let currentMinute = startMinute;
+                while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
+                    const timeString = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+                    times.push(timeString);
+                    currentMinute += SLOT_STEP;
+                    if (currentMinute >= 60) {
+                        currentMinute = currentMinute % 60;
+                        currentHour += 1;
+                    }
+                }
+                timeSlotsForDate = times;
+            }
+        } else {
+            timeSlotsForDate = allTimeSlots;
+        }
+
+        // apply lead-time filtering (reuse logic from availableTimes)
+        const leadHours = Number(salon?.leadTimeHours || 0);
+        const now = new Date();
+        const cutoff = new Date(now.getTime() + leadHours * 60 * 60 * 1000);
+        const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const cutoffDateOnly = new Date(cutoff.getFullYear(), cutoff.getMonth(), cutoff.getDate());
+        if (leadHours > 0 && dateOnly < cutoffDateOnly) return false;
+        let filteredTimes = timeSlotsForDate;
+        if (leadHours > 0 && dateOnly.getTime() === cutoffDateOnly.getTime()) {
+            const cutoffMinutes = cutoff.getHours() * 60 + cutoff.getMinutes();
+            filteredTimes = filteredTimes.filter(t => {
+                const [h, m] = t.split(':').map(Number);
+                return (h * 60 + m) >= cutoffMinutes;
+            });
+        }
+
+        // check against existing appointments for that date
+        const dateStr = toLocalDateString(date);
+        const dayAppointments = existingAppointments.filter(apt => apt.date === dateStr);
+        const timeToMinutes = (time?: string) => {
+            if (!time || typeof time !== 'string') return -1;
+            const parts = time.split(':').map(Number);
+            if (parts.length < 2 || parts.some(isNaN)) return -1;
+            const [hours, mins] = parts;
+            return hours * 60 + mins;
+        };
+        const serviceDuration = (currentService?.durationMinutes ?? 30);
+        const isSlotBlocked = (slotTime: string, duration: number) => {
+            const slotStart = timeToMinutes(slotTime);
+            if (slotStart < 0) return true;
+            const slotEnd = slotStart + duration;
+            return dayAppointments.some(apt => {
+                const aptStart = timeToMinutes(apt.time);
+                if (aptStart < 0) return false;
+                const aptEnd = aptStart + (apt.duration_minutes || 30);
+                return (slotStart < aptEnd && slotEnd > aptStart);
+            });
+        };
+
+        // if any filtered time is not blocked, the day has selectable times
+        for (const t of filteredTimes) {
+            if (!isSlotBlocked(t, serviceDuration)) return true;
+        }
+        return false;
+    };
 
     // Fetch salon data from Supabase
     useEffect(() => {
@@ -821,7 +901,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                     const isSelected = selectedDate && isSameDay(selectedDate, dateObj);
                                                     const isPastDate = isPast(dateObj);
                                                     const isClosed = !isSalonOpen(dateObj);
-                                                    const isDisabled = isPastDate || isClosed;
+                                                    const hasTimes = hasSelectableTimes(dateObj);
+                                                    const isDisabled = isPastDate || isClosed || !hasTimes;
                                                     return (
                                                         <button 
                                                             key={d}

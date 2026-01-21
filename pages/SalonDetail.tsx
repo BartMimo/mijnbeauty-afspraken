@@ -492,7 +492,14 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         if (!leadHours) return times;
         const now = new Date();
         const cutoff = new Date(now.getTime() + leadHours * 60 * 60 * 1000);
-        const sameDay = date.getFullYear() === cutoff.getFullYear() && date.getMonth() === cutoff.getMonth() && date.getDate() === cutoff.getDate();
+        const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const cutoffDateOnly = new Date(cutoff.getFullYear(), cutoff.getMonth(), cutoff.getDate());
+
+        // If the requested date is strictly before the cutoff date, no times are selectable
+        if (dateOnly < cutoffDateOnly) return [];
+
+        // If it's the same day as the cutoff, filter times before cutoff minutes
+        const sameDay = dateOnly.getTime() === cutoffDateOnly.getTime();
         if (!sameDay) return times;
         const cutoffMinutes = cutoff.getHours() * 60 + cutoff.getMinutes();
         return times.filter(t => {
