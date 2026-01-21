@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Tag, Zap, Phone, Mail, MessageCircle, Loader2, Heart } from 'lucide-react';
-import { Button, Card, Badge } from '../components/UIComponents';
+import { Button, Card, Badge, Modal, Input } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Service } from '../types';
@@ -67,6 +67,11 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
     const [selectedService, setSelectedService] = useState<string | null>(null);
     const [bookingStep, setBookingStep] = useState<'service' | 'time' | 'payment' | 'confirm'>('service');
     const [existingAppointments, setExistingAppointments] = useState<Appointment[]>([]);
+    // Reviews
+    const [reviews, setReviews] = useState<any[]>([]);
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    const [reviewForm, setReviewForm] = useState({ name: '', rating: 0, text: '' });
+    const [hoverRating, setHoverRating] = useState(0);
     
     // Favorite State
     const [isFavorite, setIsFavorite] = useState(false);
@@ -302,6 +307,28 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                         duration_minutes: a.duration_minutes || 30
                     })));
                 }
+
+                // Fetch approved reviews
+                try {
+                    const { data: reviewsData } = await supabase
+                        .from('reviews')
+                        .select(`*, profiles:user_id (full_name)`)
+                        .eq('salon_id', data.id)
+                        .eq('is_approved', true)
+                        .order('created_at', { ascending: false });
+
+                    if (reviewsData) {
+                        setReviews(reviewsData.map((r: any) => ({
+                            id: r.id,
+                            user: r.profiles?.full_name || 'Anoniem',
+                            rating: r.rating,
+                            text: r.comment || r.text || '',
+                            date: new Date(r.created_at).toLocaleDateString('nl-NL')
+                        })));
+                    }
+                } catch (e) {
+                    console.error('Error fetching reviews:', e);
+                }
             } catch (err) {
                 console.error('Error in fetchSalon:', err);
             } finally {
@@ -382,6 +409,82 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             if (process.env.NODE_ENV === 'development') {
                 console.error('Error toggling favorite:', err);
             }
+        }
+    };
+
+    // --- Review Actions ---
+    const handleOpenReviewModal = () => {
+        const userStr = localStorage.getItem('currentUser');
+        const localUser = userStr ? JSON.parse(userStr) : null;
+        setReviewForm({ name: localUser?.name || '', rating: 0, text: '' });
+        setIsReviewModalOpen(true);
+    };
+
+    const handleSubmitReview = async () => {
+        if (reviewForm.rating === 0) {
+            alert('Selecteer alstublieft een aantal sterren.');
+            return;
+        }
+        if (!reviewForm.name || !reviewForm.text) {
+            alert('Vul alstublieft alle velden in.');
+            return;
+        }
+        if (!user) {
+            alert('Log in om een review te plaatsen.');
+            return;
+        }
+
+        try {
+            const { data: newReviewData, error } = await supabase
+                .from('reviews')
+                .insert({
+                    salon_id: salon.supabaseId || salon.id,
+                    user_id: user.id,
+                    rating: reviewForm.rating,
+                    comment: reviewForm.text,
+                    is_approved: true
+                })
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Error saving review:', error);
+                alert('Er ging iets mis bij het opslaan van je review. Probeer het opnieuw.');
+                return;
+            }
+
+            const newReview = {
+                id: newReviewData.id,
+                user: reviewForm.name,
+                text: reviewForm.text,
+                rating: reviewForm.rating,
+                created_at: newReviewData.created_at
+            };
+            setReviews(prev => [newReview, ...prev]);
+            setIsReviewModalOpen(false);
+            setReviewForm({ name: '', rating: 0, text: '' });
+            alert('Bedankt voor je review!');
+        } catch (err) {
+            console.error('Error submitting review:', err);
+            alert('Er ging iets mis. Probeer het opnieuw.');
+        }
+    };
+
+    const flagReview = async (reviewId: string) => {
+        if (!user) {
+            alert('Log in om een review te rapporteren.');
+            return;
+        }
+        try {
+            const { error } = await supabase
+                .from('reviews')
+                .update({ is_flagged: true, flagged_reason: 'Gerapporteerd door gebruiker' })
+                .eq('id', reviewId);
+            if (error) throw error;
+            alert('Review gerapporteerd. Een moderator zal deze beoordelen.');
+        } catch (err) {
+            console.error('Error flagging review:', err);
+            alert('Er ging iets mis bij het rapporteren.');
         }
     };
 
@@ -587,16 +690,32 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
 
                     {/* Reviews */}
                      <Card className="p-8">
-                        <h2 className="text-xl font-bold mb-6">Reviews</h2>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold">Reviews ({reviews.length})</h2>
+                            <Button variant="secondary" size="sm" onClick={handleOpenReviewModal}>
+                                Schrijf een review
+                            </Button>
+                        </div>
                         <div className="space-y-6">
-                            {[].map((review: any) => (
+                            {reviews.length === 0 ? (
+                                <div className="text-stone-500 text-sm">Nog geen reviews. Wees de eerste!</div>
+                            ) : reviews.map((review: any) => (
                                 <div key={review.id} className="border-b border-stone-100 last:border-0 pb-6 last:pb-0">
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="font-semibold">{review.user}</span>
-                                        <div className="flex text-yellow-400">
-                                            {[...Array(5)].map((_, i) => (
-                                                <Star key={i} size={14} className={i < review.rating ? "fill-current" : "text-stone-200"} />
-                                            ))}
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex text-yellow-400">
+                                                {[...Array(5)].map((_, i) => (
+                                                    <Star key={i} size={14} className={i < review.rating ? "fill-current" : "text-stone-200"} />
+                                                ))}
+                                            </div>
+                                            <button
+                                                onClick={() => flagReview(review.id)}
+                                                className="text-xs text-stone-400 hover:text-red-500 transition-colors"
+                                                title="Review rapporteren"
+                                            >
+                                                🚩
+                                            </button>
                                         </div>
                                     </div>
                                     <p className="text-stone-600 text-sm">"{review.text}"</p>
@@ -912,6 +1031,49 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 </div>
             </div>
         </div>
+            {/* Review Modal */}
+            <Modal
+                isOpen={isReviewModalOpen}
+                onClose={() => setIsReviewModalOpen(false)}
+                title="Schrijf een review"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-stone-500 mb-4">
+                        Wat vond je van je ervaring bij <span className="font-semibold text-stone-900">{salon?.name}</span>?
+                    </p>
+
+                    <div className="flex justify-center gap-2 mb-4">
+                        {[1,2,3,4,5].map((star) => (
+                            <button
+                                key={star}
+                                type="button"
+                                className="focus:outline-none transition-transform hover:scale-110"
+                                onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                                onMouseEnter={() => setHoverRating(star)}
+                                onMouseLeave={() => setHoverRating(0)}
+                            >
+                                <Star size={32} className={`${star <= (hoverRating || reviewForm.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-stone-300'} transition-colors`} />
+                            </button>
+                        ))}
+                    </div>
+
+                    <Input label="Jouw naam" value={reviewForm.name} onChange={(e) => setReviewForm({ ...reviewForm, name: e.target.value })} placeholder="Naam" />
+                    <div className="w-full">
+                        <label className="mb-2 block text-sm font-medium text-stone-700">Jouw ervaring</label>
+                        <textarea
+                            className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-brand-400 focus:outline-none min-h-[100px]"
+                            value={reviewForm.text}
+                            onChange={(e) => setReviewForm({ ...reviewForm, text: e.target.value })}
+                            placeholder="Vertel ons wat je ervan vond..."
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="outline" onClick={() => setIsReviewModalOpen(false)}>Annuleren</Button>
+                        <Button onClick={handleSubmitReview}>Plaats Review</Button>
+                    </div>
+                </div>
+            </Modal>
         </ErrorBoundary>
     );
 };

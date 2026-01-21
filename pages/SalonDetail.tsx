@@ -162,9 +162,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 if (reviewsData) {
                     setReviews(reviewsData.map((r: any) => ({
                         id: r.id,
-                        name: r.profiles?.full_name || 'Anoniem',
+                        user: r.profiles?.full_name || 'Anoniem',
                         rating: r.rating,
-                        text: r.comment || '',
+                        text: r.comment || r.text || '',
                         date: new Date(r.created_at).toLocaleDateString('nl-NL')
                     })));
                 }

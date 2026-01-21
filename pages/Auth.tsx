@@ -37,7 +37,8 @@ const geocodeAddress = async (address: string) => {
     return null;
 };
 
-// Service duration options (30-min blocks)
+// DURATION_OPTIONS kept for backwards compatibility in other places but
+// registration now uses a free numeric input for duration minutes.
 const DURATION_OPTIONS = [
     { value: 30, label: '30 minuten' },
     { value: 60, label: '1 uur' },
@@ -1428,15 +1429,14 @@ export const AuthPage: React.FC<{ initialMode?: 'login' | 'register' }> = ({ ini
                                                                     </div>
                                                                     <div className="relative">
                                                                         <Clock size={14} className="absolute left-3 top-3 text-stone-400" />
-                                                                        <select
+                                                                        <input
+                                                                            type="number"
+                                                                            min={1}
+                                                                            step={1}
                                                                             value={service.duration}
                                                                             onChange={e => updateService(index, 'duration', Number(e.target.value))}
                                                                             className="w-full h-10 pl-8 pr-3 rounded-lg border border-stone-200 text-sm outline-none focus:ring-2 focus:ring-brand-400 bg-white"
-                                                                        >
-                                                                            {DURATION_OPTIONS.map(opt => (
-                                                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                                            ))}
-                                                                        </select>
+                                                                        />
                                                                     </div>
                                                                 </div>
 

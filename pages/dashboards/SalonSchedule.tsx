@@ -34,6 +34,13 @@ export const SalonSchedule: React.FC = () => {
     const [selectedAppointment, setSelectedAppointment] = useState<ScheduleAppointment | null>(null);
     const [loading, setLoading] = useState(true);
     const [services, setServices] = useState<Service[]>([]);
+    // Form state for creating/editing appointments
+    const [formClient, setFormClient] = useState('');
+    const [formServiceId, setFormServiceId] = useState<string | null>(null);
+    const [formDate, setFormDate] = useState(() => toDateString(new Date()));
+    const [formTime, setFormTime] = useState('09:00');
+    const [formDuration, setFormDuration] = useState<number>(30);
+    const [formPrice, setFormPrice] = useState<number>(0);
 
     // View mode state
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
@@ -125,6 +132,26 @@ export const SalonSchedule: React.FC = () => {
 
         fetchData();
     }, [user]);
+
+    // Initialize form when modal opens or editing appointment changes
+    useEffect(() => {
+        if (!isModalOpen) return;
+        if (editingApt) {
+            setFormClient(editingApt.client);
+            setFormServiceId(editingApt.serviceId || null);
+            setFormDate(editingApt.date);
+            setFormTime(editingApt.time);
+            setFormDuration(editingApt.duration || 30);
+            setFormPrice(0);
+        } else {
+            setFormClient('');
+            setFormServiceId(services.length > 0 ? services[0].id : null);
+            setFormDate(toDateString(currentDate));
+            setFormTime('09:00');
+            setFormDuration(services.length > 0 ? services[0].duration : 30);
+            setFormPrice(services.length > 0 ? services[0].price : 0);
+        }
+    }, [isModalOpen, editingApt, services, currentDate]);
 
     // Filter appointments based on search query
     useEffect(() => {
@@ -453,6 +480,93 @@ export const SalonSchedule: React.FC = () => {
                 {viewMode === 'week' && renderWeekView()}
                 {viewMode === 'month' && renderMonthView()}
             </Card>
+
+            {/* Create / Edit Appointment Modal */}
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingApt ? 'Afspraak Bewerken' : 'Nieuwe Afspraak'}>
+                <div className="space-y-4">
+                    <Input label="Klantnaam" value={formClient} onChange={e => setFormClient(e.target.value)} placeholder="Naam klant" />
+
+                    <div>
+                        <label className="block text-sm font-medium text-stone-700 mb-1.5">Dienst</label>
+                        <select className="w-full h-11 px-4 rounded-xl border border-stone-200 bg-white text-sm outline-none focus:ring-2 focus:ring-brand-400" value={formServiceId ?? ''} onChange={e => {
+                            const id = e.target.value || null;
+                            setFormServiceId(id);
+                            const s = services.find(x => x.id === id);
+                            if (s) { setFormDuration(s.duration); setFormPrice(s.price); }
+                        }}>
+                            <option value="">Selecteer dienst...</option>
+                            {services.map(s => (
+                                <option key={s.id} value={s.id}>{s.name} — {s.duration}min</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-stone-700 mb-1.5">Datum</label>
+                            <input type="date" className="w-full h-11 px-4 rounded-xl border border-stone-200" value={formDate} onChange={e => setFormDate(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-stone-700 mb-1.5">Tijd</label>
+                            <input type="time" className="w-full h-11 px-4 rounded-xl border border-stone-200" value={formTime} onChange={e => setFormTime(e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input label="Duur (min)" type="number" value={formDuration} onChange={e => setFormDuration(Number(e.target.value))} />
+                        <Input label="Prijs (€)" type="number" value={formPrice} onChange={e => setFormPrice(Number(e.target.value))} />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="outline" onClick={() => setIsModalOpen(false)}>Annuleren</Button>
+                        <Button onClick={async () => {
+                            // Basic validation
+                            if (!formClient || !formDate || !formTime) { alert('Vul klant, datum en tijd in'); return; }
+                            if (!salonId) { alert('Geen salon gevonden'); return; }
+
+                            try {
+                                const insertData: any = {
+                                    salon_id: salonId,
+                                    service_id: formServiceId,
+                                    service_name: services.find(s => s.id === formServiceId)?.name || null,
+                                    date: formDate,
+                                    time: formTime,
+                                    duration_minutes: formDuration,
+                                    price: formPrice || 0,
+                                    customer_name: formClient,
+                                    status: 'confirmed'
+                                };
+
+                                const { insertAppointmentSafe } = await import('../../lib/appointments');
+                                const { error, data } = await insertAppointmentSafe(insertData) as any;
+                                if (error) { console.error('Insert appointment error:', error); alert('Kon afspraak niet aanmaken'); return; }
+
+                                // Update local appointments list (inserted row may be returned in data)
+                                const created = Array.isArray(data) && data[0] ? data[0] : (data || null);
+                                const newApt: ScheduleAppointment = {
+                                    id: created?.id || (Math.random() + ''),
+                                    type: 'appointment',
+                                    client: insertData.customer_name,
+                                    service: insertData.service_name || 'Dienst',
+                                    serviceId: formServiceId || undefined,
+                                    date: insertData.date,
+                                    time: insertData.time,
+                                    duration: insertData.duration_minutes || 30,
+                                    color: 'bg-brand-50 border-brand-300 text-brand-800'
+                                };
+
+                                setAppointments(prev => [newApt, ...prev]);
+                                setFilteredAppointments(prev => [newApt, ...prev]);
+                                setIsModalOpen(false);
+                                setEditingApt(null);
+                            } catch (err) {
+                                console.error('Error saving appointment:', err);
+                                alert('Er ging iets mis bij opslaan');
+                            }
+                        }}>Opslaan</Button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* Appointment Details Modal */}
             <Modal isOpen={isDetailsModalOpen} onClose={() => setIsDetailsModalOpen(false)} title="Afspraak Details">
