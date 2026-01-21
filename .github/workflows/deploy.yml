@@ -3,7 +3,7 @@ name: Build and Deploy to GitHub Pages
 # Use the official Pages deployment actions which do not require a PAT.
 # Grant minimal permissions for Pages deployment.
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - name: Use Node.js
         uses: actions/setup-node@v4
