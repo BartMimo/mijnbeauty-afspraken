@@ -4,7 +4,7 @@ import { MapPin, Star, Clock, Euro, Check, ChevronLeft, ChevronRight, Calendar a
 import { Button, Card, Badge, Modal, Input } from '../components/UIComponents';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Service } from '../types';
+import { Service, Appointment } from '../types';
 import { insertAppointmentSafe } from '../lib/appointments';
 
 // Salon categories - matches the categories used in registration
@@ -46,11 +46,11 @@ class ErrorBoundary extends React.Component<{children?: React.ReactNode}, {error
     }
 }
 
-export const SalonDetailPage: React.FC = () => {
+export const SalonDetailPage: React.FC<{ subdomain?: string }> = ({ subdomain: propSubdomain }) => {
     const navigate = useNavigate();
-    const { id, subdomain } = useParams();
+    const { id, subdomain: paramsSubdomain } = useParams();
     const { user } = useAuth();
-    const salonId = subdomain || id;
+    const salonId = propSubdomain || paramsSubdomain || id;
 
     const [salon, setSalon] = useState<any>(null);
     const [loading, setLoading] = useState(true);
