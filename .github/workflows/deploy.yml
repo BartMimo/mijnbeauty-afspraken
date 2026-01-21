@@ -1,5 +1,9 @@
 name: Build and Deploy to GitHub Pages
 
+# Request permission to write repository contents so the deploy action can push
+permissions:
+  contents: write
+
 on:
   push:
     branches: [ main, master ]
@@ -25,6 +29,8 @@ jobs:
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer a personal deploy token stored in `DEPLOY_TOKEN` (create a PAT with `repo` scope),
+          # otherwise fall back to the automatic GITHUB_TOKEN if the repo settings allow pushing.
+          personal_token: ${{ secrets.DEPLOY_TOKEN || secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           publish_branch: gh-pages

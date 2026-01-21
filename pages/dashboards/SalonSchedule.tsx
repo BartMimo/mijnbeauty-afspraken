@@ -37,6 +37,10 @@ export const SalonSchedule: React.FC = () => {
     // Form state for creating/editing appointments
     const [formClient, setFormClient] = useState('');
     const [formServiceId, setFormServiceId] = useState<string | null>(null);
+
+    // Helper to format date as YYYY-MM-DD
+    const toDateString = (date: Date) => date.toISOString().split('T')[0];
+
     const [formDate, setFormDate] = useState(() => toDateString(new Date()));
     const [formTime, setFormTime] = useState('09:00');
     const [formDuration, setFormDuration] = useState<number>(30);
@@ -46,9 +50,6 @@ export const SalonSchedule: React.FC = () => {
     const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredAppointments, setFilteredAppointments] = useState<ScheduleAppointment[]>([]);
-
-    // Helper to format date as YYYY-MM-DD
-    const toDateString = (date: Date) => date.toISOString().split('T')[0];
 
     // State for appointments
     const [appointments, setAppointments] = useState<ScheduleAppointment[]>([]);
