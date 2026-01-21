@@ -731,15 +731,11 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                                                     const isSelected = selectedDate && isSameDay(selectedDate, dateObj);
                                                     const isPastDate = isPast(dateObj);
                                                     const isClosed = !isSalonOpen(dateObj);
-                                                    const isBeforeLeadCutoff = (() => {
-                                                        const leadHours = Number(salon?.leadTimeHours || 0);
-                                                        if (!leadHours) return false;
-                                                        const now = new Date();
-                                                        const cutoff = new Date(now.getTime() + leadHours * 60 * 60 * 1000);
-                                                        const dateOnly = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
-                                                        const cutoffDateOnly = new Date(cutoff.getFullYear(), cutoff.getMonth(), cutoff.getDate());
-                                                        return dateOnly < cutoffDateOnly;
-                                                    })();
+                                                    // Determine if this date has any selectable times after applying lead-time
+                                                    const timesForDate = getAvailableTimes(dateObj);
+                                                    const timesAfterLead = filterByLeadTime(dateObj, timesForDate);
+                                                    const hasSelectableTimes = timesAfterLead.length > 0;
+                                                    const isBeforeLeadCutoff = !hasSelectableTimes;
                                                     const isDisabled = isPastDate || isClosed || isBeforeLeadCutoff;
                                                     return (
                                                         <button 
