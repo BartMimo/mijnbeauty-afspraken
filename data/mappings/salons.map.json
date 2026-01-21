@@ -1,5 +1,5 @@
 {
   "ownerId": "owner_id",
   "reviewCount": "reviewCount",
-  "zipCode": "zipCode"
+  "zipCode": "zip_code"
 }

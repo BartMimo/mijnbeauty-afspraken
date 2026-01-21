@@ -109,11 +109,13 @@ export const StaffDashboard: React.FC = () => {
         }
     };
 
-    // Time slots for grid
-    const timeSlots = [];
+    // Time slots for grid (SLOT_STEP minutes)
+    const SLOT_STEP = 5;
+    const timeSlots: string[] = [];
     for (let i = 8; i < 18; i++) {
-        timeSlots.push(`${i.toString().padStart(2, '0')}:00`);
-        timeSlots.push(`${i.toString().padStart(2, '0')}:30`);
+        for (let minute = 0; minute < 60; minute += SLOT_STEP) {
+            timeSlots.push(`${i.toString().padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+        }
     }
 
     const getPosition = (time: string, duration: number) => {
@@ -165,8 +167,8 @@ export const StaffDashboard: React.FC = () => {
                 {/* Time Axis */}
                 <div className="w-16 flex-shrink-0 border-r border-stone-100 bg-stone-50 overflow-y-hidden text-xs text-stone-400 font-medium select-none">
                     {timeSlots.map((time, i) => (
-                        <div key={i} className="h-[60px] flex items-start justify-center pt-2 relative">
-                           <span className={time.endsWith('00') ? 'font-bold text-stone-600' : ''}>{time}</span>
+                        <div key={i} className="h-[10px] flex items-start justify-center pt-2 relative">
+                           <span className={time.endsWith('00') ? 'font-bold text-stone-600' : ''}>{time.endsWith('00') ? time : ''}</span>
                         </div>
                     ))}
                 </div>
@@ -175,7 +177,7 @@ export const StaffDashboard: React.FC = () => {
                 <div className="flex-1 relative overflow-y-auto custom-scrollbar">
                      {/* Grid Lines */}
                      {timeSlots.map((time, i) => (
-                        <div key={i} className={`h-[60px] w-full border-b ${time.endsWith('30') ? 'border-stone-100 border-dashed' : 'border-stone-200'}`} />
+                        <div key={i} className={`h-[10px] w-full border-b ${time.endsWith('30') ? 'border-stone-100 border-dashed' : 'border-stone-200'}`} />
                     ))}
 
                     {/* Appointments */}

@@ -177,10 +177,11 @@ export const SalonSchedule: React.FC = () => {
 
     // Render functions for different views
     const renderDayView = () => {
+        const SLOT_STEP = 5; // minutes per grid row
         const dayAppointments = displayAppointments.filter(a => a.date === toDateString(currentDate));
-        const timeSlots = [];
+        const timeSlots: string[] = [];
         for (let hour = 9; hour <= 18; hour++) {
-            for (let minute = 0; minute < 60; minute += 30) {
+            for (let minute = 0; minute < 60; minute += SLOT_STEP) {
                 timeSlots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
             }
         }
@@ -194,12 +195,12 @@ export const SalonSchedule: React.FC = () => {
                     <p className="text-stone-500 text-sm">{dayAppointments.length} afspraak{dayAppointments.length !== 1 ? 'en' : ''}</p>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4">
-                    <div className="space-y-2">
+                    <div>
                         {timeSlots.map(timeSlot => {
                             const appointment = dayAppointments.find(a => a.time === timeSlot);
                             return (
-                                <div key={timeSlot} className="flex items-center h-12 border-l-4 border-stone-200 pl-4">
-                                    <span className="text-sm font-medium text-stone-600 w-16">{timeSlot}</span>
+                                <div key={timeSlot} className="flex items-center h-[10px] border-l-4 border-stone-200 pl-4">
+                                    <span className="text-sm font-medium text-stone-600 w-16">{timeSlot.endsWith('00') ? timeSlot : ''}</span>
                                     {appointment ? (
                                         <div 
                                             className="flex-1 ml-4 p-3 bg-brand-50 border border-brand-200 rounded-lg cursor-pointer hover:bg-brand-100 transition-colors"

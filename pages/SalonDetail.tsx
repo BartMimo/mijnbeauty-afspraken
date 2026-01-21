@@ -126,6 +126,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 setSalon({
                     id: data.slug || data.id,
                     supabaseId: data.id,
+                    zipCode: data.zip_code || data.zipCode || '',
                     name: data.name,
                     subdomain: data.subdomain,
                     city: data.city || '',
@@ -408,6 +409,9 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         return !isPast(date) && isSalonOpen(date);
     };
 
+    // Minimum slot step in minutes
+    const SLOT_STEP = 5;
+
     // Function to get available times based on opening hours
     const getAvailableTimes = (date: Date) => {
         if (!salon?.openingHours) {
@@ -424,8 +428,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             return []; // Salon is closed on this day
         }
 
-        // Generate time slots every 30 minutes between start and end time
-        const times = [];
+        // Generate time slots every SLOT_STEP minutes between start and end time
+        const times: string[] = [];
         const [startHour, startMinute] = dayHours.start.split(':').map(Number);
         const [endHour, endMinute] = dayHours.end.split(':').map(Number);
 
@@ -436,11 +440,11 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             const timeString = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
             times.push(timeString);
 
-            // Add 30 minutes
-            currentMinute += 30;
+            // Add SLOT_STEP minutes
+            currentMinute += SLOT_STEP;
             if (currentMinute >= 60) {
-                currentHour += 1;
-                currentMinute = 0;
+                currentHour += Math.floor(currentMinute / 60);
+                currentMinute = currentMinute % 60;
             }
         }
 

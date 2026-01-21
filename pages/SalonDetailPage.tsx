@@ -85,13 +85,17 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
         return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
     };
 
-    // Generate all possible time slots (30-min intervals from 09:00 to 17:30)
+    // Minimum step for time slots (minutes). Using 5 minutes allows arbitrary service durations like 5, 12, 37.
+    const SLOT_STEP = 5;
+
+    // Generate all possible time slots (SLOT_STEP intervals from 09:00 to 17:55)
     const allTimeSlots = useMemo(() => {
         const slots: string[] = [];
         for (let hour = 9; hour < 18; hour++) {
-            slots.push(`${hour.toString().padStart(2, '0')}:00`);
-            if (hour < 17 || (hour === 17 && false)) { // Don't add 17:30 if closing at 18:00
-                slots.push(`${hour.toString().padStart(2, '0')}:30`);
+            for (let minute = 0; minute < 60; minute += SLOT_STEP) {
+                // don't push times beyond 17:55 (last slot before 18:00)
+                if (hour === 17 && minute > 55) continue;
+                slots.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
             }
         }
         return slots;
@@ -108,28 +112,28 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
             const dayOfWeek = days[selectedDate.getDay()];
             const dayHours = salon.openingHours[dayOfWeek];
 
-            if (dayHours && !dayHours.closed) {
-                // Generate time slots every 30 minutes between start and end time
-                const times = [];
-                const [startHour, startMinute] = dayHours.start.split(':').map(Number);
-                const [endHour, endMinute] = dayHours.end.split(':').map(Number);
+                if (dayHours && !dayHours.closed) {
+                    // Generate time slots every SLOT_STEP minutes between start and end time
+                    const times: string[] = [];
+                    const [startHour, startMinute] = dayHours.start.split(':').map(Number);
+                    const [endHour, endMinute] = dayHours.end.split(':').map(Number);
 
-                let currentHour = startHour;
-                let currentMinute = startMinute;
+                    let currentHour = startHour;
+                    let currentMinute = startMinute;
 
-                while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
-                    const timeString = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
-                    times.push(timeString);
+                    while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
+                        const timeString = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
+                        times.push(timeString);
 
-                    // Add 30 minutes
-                    currentMinute += 30;
-                    if (currentMinute >= 60) {
-                        currentMinute = 0;
-                        currentHour += 1;
+                        // Add SLOT_STEP minutes
+                        currentMinute += SLOT_STEP;
+                        if (currentMinute >= 60) {
+                            currentMinute = currentMinute % 60;
+                            currentHour += 1;
+                        }
                     }
+                    timeSlotsForDate = times;
                 }
-                timeSlotsForDate = times;
-            }
         } else {
             // Fallback to default times if no opening hours
             timeSlotsForDate = allTimeSlots;
@@ -137,7 +141,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
 
         const dateStr = toLocalDateString(selectedDate);
         const serviceDuration = (currentService?.durationMinutes ?? 30);
-        const slotsNeeded = Math.ceil(serviceDuration / 30);
+        const slotsNeeded = Math.ceil(serviceDuration / SLOT_STEP);
 
         // Get all appointments for the selected date
         const dayAppointments = existingAppointments.filter(apt => apt.date === dateStr);
@@ -251,6 +255,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                     id: data.slug || data.id,
                     supabaseId: data.id,
                     name: data.name,
+                    zipCode: data.zip_code || data.zipCode || '',
                     city: data.city || '',
                     address: data.address || '',
                     description: data.description || 'Welkom bij onze salon!',

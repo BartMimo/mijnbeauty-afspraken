@@ -392,6 +392,7 @@ const MockSalonSchedule: React.FC = () => {
 // MOCK SALON SERVICES
 // ===========================================
 const CATEGORIES = ['Knippen', 'Styling', 'Kleuren', 'Behandelingen', 'Nagels', 'Make-up'];
+// Keep common durations available but allow free input (minutes)
 const DURATIONS = [15, 30, 45, 60, 90, 120, 150, 180];
 
 const MockSalonServices: React.FC = () => {
@@ -535,15 +536,28 @@ const MockSalonServices: React.FC = () => {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-stone-700 mb-1">Duur (minuten)</label>
-                                <select
-                                    value={formData.duration}
-                                    onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
-                                    className="w-full p-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                                >
-                                    {DURATIONS.map(dur => (
-                                        <option key={dur} value={dur}>{dur} minuten</option>
-                                    ))}
-                                </select>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="number"
+                                        value={formData.duration}
+                                        onChange={(e) => setFormData({ ...formData, duration: Math.max(1, Number(e.target.value) || 0) })}
+                                        className="w-full p-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                                        min={1}
+                                        step={1}
+                                    />
+                                    <div className="hidden sm:flex flex-wrap gap-2">
+                                        {DURATIONS.map(dur => (
+                                            <button
+                                                key={dur}
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, duration: dur })}
+                                                className="px-3 py-2 bg-stone-100 rounded-lg text-sm text-stone-700 hover:bg-stone-200"
+                                            >
+                                                {dur}m
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-stone-700 mb-1">Prijs (€)</label>

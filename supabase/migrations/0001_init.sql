@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.salons (
   description text,
   address text,
   city text,
-  "zipCode" text,
+  zip_code text,
   image text,
   rating numeric,
   "reviewCount" integer,
