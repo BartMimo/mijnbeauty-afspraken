@@ -90,6 +90,8 @@ export interface Appointment {
   date: string; // ISO string
   time: string;
   status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
+  // duration in minutes as stored/returned by the database (snake_case used by Postgres)
+  duration_minutes?: number;
   price: number;
   customerName: string;
   paymentMethod?: 'cash' | 'online';
