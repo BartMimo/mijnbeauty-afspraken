@@ -14,11 +14,14 @@ export async function insertReviewSafe(review: Record<string, any>) {
       const message = (error.message || error.msg || JSON.stringify(error)) as string;
 
       // If DB complains about a missing column, drop it and retry
-      const missingColumnMatch = message.match(/Could not find the '([a-zA-Z0-9_]+)' column/);
-      if (missingColumnMatch) {
-        const missing = missingColumnMatch[1];
-        const { [missing]: _omitted, ...rest } = review as any;
-        return await attemptInsert(rest);
+      // Try to detect any quoted column names mentioned in the error (covers variants like
+      // "Could not find the 'is_approved' column of 'reviews' in the schema cache")
+      const quotedMatches = Array.from(message.matchAll(/'([a-zA-Z0-9_]+)'/g)).map(m => m[1]);
+      for (const maybeCol of quotedMatches) {
+        if (maybeCol in review) {
+          const { [maybeCol]: _omitted, ...rest } = review as any;
+          return await attemptInsert(rest);
+        }
       }
 
       // Fallback: try removing `user_id` or `salon_id` if present (common RLS issues)
@@ -33,15 +36,16 @@ export async function insertReviewSafe(review: Record<string, any>) {
     return { error: null, data };
   } catch (err: any) {
     const message = (err && (err.message || err.msg || JSON.stringify(err))) || '';
-    const missingColumnMatch = message.match(/Could not find the '([a-zA-Z0-9_]+)' column/);
-    if (missingColumnMatch) {
-      const missing = missingColumnMatch[1];
-      const { [missing]: _omitted, ...rest } = review as any;
-      try {
-        const { error, data } = await supabase.from('reviews').insert([rest]).select().single();
-        return { error, data };
-      } catch (err2: any) {
-        return { error: err2 };
+    const quotedMatches = Array.from(message.matchAll(/'([a-zA-Z0-9_]+)'/g)).map(m => m[1]);
+    for (const maybeCol of quotedMatches) {
+      if (maybeCol in review) {
+        const { [maybeCol]: _omitted, ...rest } = review as any;
+        try {
+          const { error, data } = await supabase.from('reviews').insert([rest]).select().single();
+          return { error, data };
+        } catch (err2: any) {
+          return { error: err2 };
+        }
       }
     }
 

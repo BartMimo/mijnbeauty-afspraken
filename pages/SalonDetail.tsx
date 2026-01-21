@@ -153,15 +153,30 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 console.debug('Salon lead_time_hours:', data.lead_time_hours);
 
                 // Fetch reviews from Supabase
-                const { data: reviewsData } = await supabase
-                    .from('reviews')
-                    .select(`
-                        *,
-                        profiles:user_id (full_name)
-                    `)
-                    .eq('salon_id', data.id)
-                    .eq('is_approved', true)
-                    .order('created_at', { ascending: false });
+                let reviewsData = null;
+                try {
+                    const res = await supabase
+                        .from('reviews')
+                        .select(`
+                            *,
+                            profiles:user_id (full_name)
+                        `)
+                        .eq('salon_id', data.id)
+                        .eq('is_approved', true)
+                        .order('created_at', { ascending: false });
+                    reviewsData = res.data;
+                } catch (e) {
+                    // If the DB doesn't have `is_approved`, fall back to returning all reviews for this salon
+                    const res = await supabase
+                        .from('reviews')
+                        .select(`
+                            *,
+                            profiles:user_id (full_name)
+                        `)
+                        .eq('salon_id', data.id)
+                        .order('created_at', { ascending: false });
+                    reviewsData = res.data;
+                }
 
                 if (reviewsData) {
                     setReviews(reviewsData.map((r: any) => ({
@@ -329,8 +344,8 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 user_id: user.id,
                 rating: reviewForm.rating,
                 comment: reviewForm.text,
-                text: reviewForm.text,
-                is_approved: true // Auto-approve reviews for now, admin can moderate later
+                text: reviewForm.text
+                // Do not include `is_approved` from the client to avoid schema issues on older DBs
             };
 
             const { insertReviewSafe } = await import('../lib/reviews');

@@ -37,26 +37,37 @@ class ErrorBoundary extends React.Component<{children?: React.ReactNode}, {error
                     <div>
                         <h2 className="font-bold mb-2">Er is iets misgegaan</h2>
                         <pre className="text-xs whitespace-pre-wrap">{this.state.error?.message || String(this.state.error)}</pre>
-                    </div>
-                </div>
-            );
-        }
-        return this.props.children as React.ReactElement;
-    }
-}
+                    try {
+                        let reviewsData = null;
+                        try {
+                            const res = await supabase
+                                .from('reviews')
+                                .select(`*, profiles:user_id (full_name)`)
+                                .eq('salon_id', data.id)
+                                .eq('is_approved', true)
+                                .order('created_at', { ascending: false });
+                            reviewsData = res.data;
+                        } catch (e) {
+                            const res = await supabase
+                                .from('reviews')
+                                .select(`*, profiles:user_id (full_name)`)
+                                .eq('salon_id', data.id)
+                                .order('created_at', { ascending: false });
+                            reviewsData = res.data;
+                        }
 
-interface Appointment {
-    date: string;
-    time: string;
-    duration_minutes: number;
-}
-
-interface SalonDetailPageProps {
-    subdomain?: string;
-}
-
-export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) => {
-    const { id } = useParams<{ id: string }>();
+                        if (reviewsData) {
+                            setReviews(reviewsData.map((r: any) => ({
+                                id: r.id,
+                                user: r.profiles?.full_name || 'Anoniem',
+                                rating: r.rating,
+                                text: r.comment || r.text || '',
+                                date: new Date(r.created_at).toLocaleDateString('nl-NL')
+                            })));
+                        }
+                    } catch (err) {
+                        // ignore review loading errors
+                    }
     const navigate = useNavigate();
     const { user } = useAuth();
     const salonId = subdomain || id;
@@ -537,7 +548,7 @@ export const SalonDetailPage: React.FC<SalonDetailPageProps> = ({ subdomain }) =
                 rating: reviewForm.rating,
                 comment: reviewForm.text,
                 text: reviewForm.text,
-                is_approved: true
+                // do not send is_approved from client
             };
 
             const { insertReviewSafe } = await import('../lib/reviews');
